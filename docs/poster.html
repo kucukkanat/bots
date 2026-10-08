@@ -1,0 +1,76 @@
+<!doctype html>
+<!-- Source for docs/hero.png. Render with: node docs/screenshots.mjs (while `npm start` is running). -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>bots poster</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+  <style>
+    html, body { margin: 0; }
+    body {
+      width: 1280px; height: 640px; overflow: hidden; position: relative;
+      font-family: Inter, system-ui, sans-serif; color: #f5f3ee;
+      background:
+        radial-gradient(900px 520px at 78% 60%, rgba(84, 160, 255, .28), transparent 65%),
+        radial-gradient(600px 420px at 95% 0%, rgba(214, 92, 255, .22), transparent 70%),
+        radial-gradient(500px 400px at 0% 100%, rgba(52, 200, 140, .16), transparent 70%),
+        #11131a;
+    }
+    body::before {
+      content: ''; position: absolute; inset: 0;
+      background-image: radial-gradient(rgba(255,255,255,.07) 1px, transparent 1px);
+      background-size: 22px 22px;
+      mask-image: linear-gradient(90deg, transparent 0%, #000 55%);
+    }
+    .copy { position: absolute; left: 72px; top: 0; bottom: 0; width: 520px; display: flex; flex-direction: column; justify-content: center; }
+    .brand { display: flex; align-items: center; gap: 12px; font: 600 18px/1 'JetBrains Mono', monospace; color: #9aa3b5; letter-spacing: .02em; }
+    h1 { margin: 22px 0 18px; font-size: 112px; line-height: .92; font-weight: 800; letter-spacing: -.045em; }
+    h1 span { background: linear-gradient(90deg, #5ec8ff, #c77dff 55%, #ff7eb6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    p { margin: 0; font-size: 24px; line-height: 1.4; color: #c6cbd6; }
+    .chips { display: flex; gap: 10px; margin-top: 34px; flex-wrap: wrap; }
+    .chip { padding: 9px 14px; border-radius: 999px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); font: 500 15px/1 'JetBrains Mono', monospace; color: #e4e7ee; }
+    .crowd { position: absolute; left: 600px; right: 0; top: 0; bottom: 0; }
+    .crowd bot-avatar { position: absolute; transform: translate(-50%, -50%); }
+    .floor { position: absolute; left: 640px; right: 30px; bottom: 70px; height: 60px; background: radial-gradient(closest-side, rgba(0,0,0,.35), transparent); }
+  </style>
+</head>
+<body>
+  <div class="floor"></div>
+  <div class="copy">
+    <div class="brand"><bot-avatar type="clover" size="34" interactive="false"></bot-avatar> hackdonalds/bots</div>
+    <h1>Bot<br /><span>avatars</span></h1>
+    <p>Animated plush avatars for your AI agents. Living faces that look around, hop while they work and doze off between tasks.</p>
+    <div class="chips">
+      <span class="chip">18 shapes</span>
+      <span class="chip">3 states</span>
+      <span class="chip">0 dependencies</span>
+      <span class="chip">HTML · JS · React</span>
+    </div>
+  </div>
+  <div class="crowd" id="crowd"></div>
+  <script type="module">
+    import '../src/index.js';
+    // [left, top, size, options] — relative to the crowd box (680 × 640).
+    const bots = [
+      [340, 330, 250, { type: 'clover', face: 'mouth', state: 'working' }],
+      [140, 210, 130, { type: 'cat', face: 'mouth', hat: 'party' }],
+      [560, 190, 140, { type: 'star', hat: 'crown', face: 'mouth' }],
+      [120, 450, 150, { type: 'droid', glasses: 'round' }],
+      [570, 440, 150, { type: 'mech', headphones: true }],
+      [330, 100, 110, { type: 'ghost', blush: true }],
+      [250, 540, 110, { type: 'alien', state: 'sleeping' }],
+      [440, 545, 115, { type: 'flower', bowTie: true }],
+      [640, 320, 90,  { type: 'drop', glasses: 'shades' }],
+      [40, 330, 85,   { type: 'hexagon', hat: 'beanie' }],
+    ];
+    const crowd = document.getElementById('crowd');
+    bots.forEach(([x, y, size, o], i) => {
+      const b = document.createElement('bot-avatar');
+      for (const [k, v] of Object.entries({ ...o, size, seed: (i + 1) / 11, interactive: 'false' }))
+        b.setAttribute(k.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase()), v === true ? '' : v);
+      b.style.left = x + 'px'; b.style.top = y + 'px';
+      crowd.append(b);
+    });
+  </script>
+</body>
+</html>

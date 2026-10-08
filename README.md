@@ -1,10 +1,23 @@
+<p align="center"><img src="docs/hero.png" alt="bots — animated plush bot avatars for AI agents" width="100%" /></p>
+
 # bots
 
 Animated bot avatars for AI agents. Eighteen plush 3D shapes with living faces that look around, hop while they work and doze off between tasks — plus hats, glasses, headphones and bow ties. Drawn on a plain 2D canvas: no WebGL, no build step, no dependencies.
 
 **[Live site](https://hackdonalds.github.io/bots/) · [Playground](https://hackdonalds.github.io/bots/playground/)**
 
+<p align="center"><img src="docs/landing.png" alt="The bots landing page" width="100%" /></p>
+
 A from-scratch, framework-agnostic homage to [bot-avatars](https://libraries.dev/bots) by Jakub Antalik (MIT; the type palette follows it).
+
+## Shapes
+
+All eighteen types, idle with eyes (left) and working with a mouth (right):
+
+<p align="center">
+  <img src="docs/gallery.png" alt="All eighteen bot types, idle, dark theme" width="49%" />
+  <img src="docs/gallery-working.png" alt="All eighteen bot types, working with mouths, light theme" width="49%" />
+</p>
 
 ## Use it
 
@@ -70,6 +83,8 @@ import { BotAvatar } from '@hackdonalds/bots/react';
 
 ## Playground
 
+<p align="center"><img src="docs/playground.png" alt="The playground: a cat bot wearing a party hat, round glasses and a bow tie" width="100%" /></p>
+
 `/playground/` lets you design a bot (shape, custom outline, colour, face, material, fur, things to wear, motion), turn it round by dragging, copy the code for HTML / JS / React, share a link, download a PNG, save a crew in your browser, and **publish to GitHub Pages**: it downloads a standalone `index.html` with your bot or crew, ready to upload to any repository with Pages turned on.
 
 ## Develop
@@ -78,6 +93,8 @@ import { BotAvatar } from '@hackdonalds/bots/react';
 npm test          # unit tests (Node 18+)
 npm start         # serves the site at http://localhost:8000
 ```
+
+`node docs/screenshots.mjs` (with `npm start` running and Playwright installed) regenerates the images in `docs/`; the hero poster is `docs/poster.html`.
 
 Pushing to `main` runs the tests and deploys the site with GitHub Actions (`.github/workflows/pages.yml`). In the repository settings, set **Pages → Source** to **GitHub Actions**.
 
