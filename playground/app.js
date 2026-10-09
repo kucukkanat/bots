@@ -70,6 +70,9 @@ const STRS = {
 const KEYS = [...Object.keys(STRS), ...Object.keys(NUMERIC), ...Object.keys(BOOLS)];
 
 const defaultOf = (key, o) => {
+  // A preset's values are the starting point its controls show.
+  const fromPreset = STYLES[o.preset]?.[key];
+  if (fromPreset !== undefined) return fromPreset;
   if (key in NUMERIC) { const d = NUMERIC[key].def; return typeof d === 'function' ? d(o) : d; }
   if (key in BOOLS) return BOOLS[key];
   return STRS[key];
