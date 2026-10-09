@@ -1,4 +1,4 @@
-name: Test and deploy to GitHub Pages
+name: Test, build and deploy to GitHub Pages
 
 on:
   push:
@@ -12,29 +12,67 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: pages-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  test:
+  check:
+    name: Test, build, size
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+      - run: npm ci
       - run: npm test
+      - run: npm run build
+      - name: Size budgets
+        run: npm run size
+
+  perf:
+    name: Draw-time gate (vs v1.0.0)
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the gate compares against the v1.0.0 tag
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright and Chromium
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Perf gate
+        # CI runners are noisy: only a clear regression fails the build.
+        run: node scripts/perf.mjs
+        env:
+          MAX: 4
+          RUNS: 6
+          PORT: 8123
 
   build:
-    needs: test
+    name: Assemble site
+    needs: [check, perf]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
       - name: Assemble site
         run: |
           mkdir _site
-          cp -r index.html assets playground src LICENSE _site/
+          cp -r index.html assets playground src dist LICENSE _site/
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
         with:

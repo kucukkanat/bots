@@ -5,11 +5,15 @@
 
 import { adjust, autoInk } from './color.js';
 import { BotSim, restPose, STATES } from './engine.js';
-import { drawBot, OVERSCAN, BODY, RISE, HAT_STYLES } from './render.js';
+import { OVERSCAN, BODY, RISE, HAT_STYLES } from './constants.js';
 import { presets, getShape, shapeFromSvgPath } from './shapes.js';
-import { workerPool, mainThreadGpu, stats } from './pool.js';
+import { workerPool, mainThreadGpu, stats, loadRenderer, renderer, prefetchRenderer } from './pool.js';
 import { normalizeOptions, encodeDNA, EXPRESSIONS } from './options.js';
 import { hatDef } from './plugins.js';
+
+// The renderer loads on first need (see pool.js); this is set once it has.
+let drawBot = null;
+let warnedSnapshot = false;
 
 export const DEFAULTS = Object.freeze({
   type: 'clover',
@@ -189,15 +193,16 @@ export class BotAvatar {
     // Avatars that own their canvas are drawn on a worker thread once one has
     // started; until then (or if none can) they wait, then draw here.
     const pool = this._ownCanvas && workerPool();
-    if (pool) {
-      this._waiting = true;
-      pool.ready.then((ok) => (this._destroyed ? null : ok ? this._attachWorker(pool) : this._attachMain()));
-    } else this._attachMain();
+    this._waiting = true;
+    const attached = pool
+      ? pool.ready.then((ok) => (this._destroyed ? null : ok ? this._attachWorker(pool) : this._attachMain()))
+      : this._attachMain();
     this._layout();
     this._sync();
     this._syncFeatures();
-    /** Resolves once the avatar has a renderer (worker or main thread). */
-    this.ready = pool ? pool.ready.then(() => this) : Promise.resolve(this);
+    /** Resolves once the avatar has a renderer (worker or main thread) and has drawn. */
+    this.ready = Promise.resolve(attached).then(() => this);
+    prefetchRenderer();
   }
 
   /**
@@ -230,12 +235,18 @@ export class BotAvatar {
     }
   }
 
+  /** Draw on this thread, once the renderer has loaded. */
   _attachMain() {
-    this._waiting = false;
-    this.ctx = this.canvas.getContext('2d');
-    this.gpu = this.options.renderer === 'canvas' ? null : mainThreadGpu();
-    this._layout();
-    this.draw();
+    this._waiting = true;
+    return loadRenderer().then((r) => {
+      if (this._destroyed) return;
+      drawBot = r.drawBot;
+      this._waiting = false;
+      this.ctx = this.canvas.getContext('2d');
+      this.gpu = this.options.renderer === 'canvas' ? null : mainThreadGpu();
+      this._layout();
+      this.draw();
+    }, (e) => console.error('bots: the renderer failed to load', e));
   }
 
   _attachWorker(pool) {
@@ -502,8 +513,31 @@ export class BotAvatar {
     }
   }
 
-  /** PNG data URL of the current frame, cropped to the avatar's box unless `full`. */
+  /**
+   * PNG data URL of the current frame, cropped to the avatar's box unless `full`.
+   * Synchronous, so it needs the renderer on this thread: that loads when the
+   * page is first idle after an avatar appears. Called before then, it returns
+   * 'data:,' (an empty image, as an empty canvas gives) and starts the load.
+   * `await bot.toBlob()` always gives a picture.
+   */
   toDataURL({ full = false, scale = 2 } = {}) {
+    const r = renderer();
+    if (!r) {
+      if (!warnedSnapshot) console.warn('bots: toDataURL() before the renderer loaded; use await bot.toBlob() instead');
+      warnedSnapshot = true;
+      return 'data:,';
+    }
+    return this._snapshot(r.drawBot, full, scale).toDataURL('image/png');
+  }
+
+  /** The current frame as an image Blob (PNG unless `type`), loading the renderer if need be. */
+  async toBlob({ full = false, scale = 2, type = 'image/png', quality } = {}) {
+    const r = await loadRenderer();
+    const c = this._snapshot(r.drawBot, full, scale);
+    return new Promise((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error('bots: toBlob failed'))), type, quality));
+  }
+
+  _snapshot(draw, full, scale) {
     const size = this.options.size;
     const c = document.createElement('canvas');
     const total = size * OVERSCAN;
@@ -511,10 +545,10 @@ export class BotAvatar {
     c.width = c.height = Math.round(box * scale);
     const tmp = document.createElement('canvas');
     tmp.width = tmp.height = Math.round(total * scale);
-    drawBot(tmp.getContext('2d'), { size, dpr: scale, pose: this.pose, look: this.look, time: this.sim.time });
+    draw(tmp.getContext('2d'), { size, dpr: scale, pose: this.pose, look: this.look, time: this.sim.time });
     const off = ((total - box) / 2) * scale;
     c.getContext('2d').drawImage(tmp, -off, -off);
-    return c.toDataURL('image/png');
+    return c;
   }
 
   destroy() {

@@ -24,7 +24,7 @@ All eighteen types, idle with eyes (left) and working with a mouth (right):
 ### Custom element
 
 ```html
-<script type="module" src="https://kucukkanat.github.io/bots/src/index.js"></script>
+<script type="module" src="https://kucukkanat.github.io/bots/dist/bots.js"></script>
 
 <bot-avatar type="clover" state="working" size="96"></bot-avatar>
 <bot-avatar type="cat" face="mouth" hat="party" bow-tie></bot-avatar>
@@ -35,7 +35,7 @@ Every option is an attribute in kebab-case. Change an attribute and the avatar e
 ### JavaScript
 
 ```js
-import { createBot } from 'https://kucukkanat.github.io/bots/src/index.js';
+import { createBot } from 'https://kucukkanat.github.io/bots/dist/bots.js';
 
 const bot = createBot('#agent', { type: 'droid', size: 96, glasses: 'round' });
 bot.setState('working');   // 'default' (idle) | 'working' | 'sleeping'
