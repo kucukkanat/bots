@@ -2,12 +2,18 @@ export type BotType =
   | 'clover' | 'flower' | 'triangle' | 'square' | 'blob' | 'ghost' | 'circle' | 'drop' | 'star'
   | 'droid' | 'mech' | 'alien' | 'hexagon' | 'cat' | 'cloud' | 'pill' | 'pebble' | 'puddle';
 export type BotState = 'default' | 'working' | 'sleeping' | 'listening' | 'thinking' | 'speaking' | 'error' | 'success' | (string & {});
-export type BotShading = 'fabric' | 'plastic' | 'smooth' | 'crisp' | 'flat';
+export type BotShading = 'fabric' | 'plastic' | 'smooth' | 'crisp' | 'flat' | 'glass' | 'lantern';
+/** Imperfections: a sewn-on patch, a tuft on the crown, a worn spot, a seam. One or more, space-separated or an array. */
+export type BotQuirk = 'patch' | 'cowlick' | 'scuff' | 'stitches';
+/** How a species behaves: motion defaults, a resting-face lean and habits (aloof looks away, shy ducks when poked, dreamy floats, precise snaps). */
+export type BotTemperament = 'eager' | 'sunny' | 'sharp' | 'stoic' | 'wobbly' | 'shy' | 'calm' | 'nervous' | 'showOff' | 'precise' | 'steady' | 'curious' | 'serious' | 'aloof' | 'dreamy' | 'chipper' | 'sleepy';
+/** What the agent is doing, for observe(). */
+export type BotAgentEvent = 'typing' | 'sent' | 'prompt' | 'token' | 'tool' | 'tool-start' | 'tool-end' | 'done' | 'error' | 'idle' | 'reset';
 export type BotHat = 'none' | 'beanie' | 'party' | 'crown' | 'beret' | 'tophat' | 'cap' | 'witch' | 'halo' | 'bow' | (string & {});
 export type BotEyeStyle = 'round' | 'oval' | 'wide' | 'dot' | 'sleepy' | 'happy' | 'line' | 'star' | 'heart';
 export type BotMouthStyle = 'smile' | 'cat' | 'line' | 'o' | 'teeth' | 'tongue';
 export type BotFurPattern = 'none' | 'two-tone' | 'gradient' | 'tips' | 'spots' | 'stripes' | 'belly' | 'patches';
-export type BotStyle = 'plush' | 'teddy' | 'velvet' | 'mohair' | 'felt' | 'vinyl' | 'clay' | 'sticker' | 'paper';
+export type BotStyle = 'plush' | 'teddy' | 'velvet' | 'mohair' | 'felt' | 'vinyl' | 'clay' | 'sticker' | 'paper' | 'glass' | 'lantern' | 'ragdoll';
 export type BotExpression = 'neutral' | 'happy' | 'joy' | 'surprised' | 'worried' | 'sad' | 'angry' | 'smug' | 'sleepy' | 'confused' | 'dizzy' | 'love';
 /** Face channels for expressions and custom states. */
 export interface BotFace { brow?: number; browTilt?: number; eyeWide?: number; squint?: number; smile?: number; mouthOpen?: number; happy?: number; dizzy?: number; blushPulse?: number }
@@ -38,7 +44,7 @@ export interface BotOptions {
   // Grouped forms of the flat options below (see the README).
   fur?: { length?: number; density?: number; fuzz?: number; curl?: number; gravity?: number; clumps?: number; pattern?: BotFurPattern; color?: string; scale?: number };
   light?: number | { angle?: number; color?: string; fill?: string; fillStrength?: number; rimColor?: string; shadow?: number; highlight?: number; rim?: number; spread?: number };
-  material?: { shading?: BotShading; roundness?: number; gloss?: number; depth?: number };
+  material?: { shading?: BotShading; roundness?: number; gloss?: number; depth?: number; glow?: number; glowColor?: string; quirk?: BotQuirk | string | BotQuirk[] };
   motion?: { speed?: number; turn?: number; blinkRate?: number; glanceRate?: number; breathing?: number; jiggle?: number; whirl?: number; whirlColor?: string; jump?: { every?: number; height?: number; time?: number; spin?: number; squash?: number; stretch?: number; lean?: number } };
   /**
    * Everything worn, as a list of names: 'party-hat round-glasses bow-tie' (or an array).
@@ -146,6 +152,21 @@ export interface BotOptions {
   mood?: BotMood | 'auto' | 'none';
   /** Glance at other social bots on the page and react when they're poked (loads on first use). */
   social?: boolean;
+  /** Imperfections that make it someone: 'patch', 'cowlick', 'scuff', 'stitches' (several, space-separated). */
+  quirk?: BotQuirk | string | BotQuirk[];
+  /** The patch's cloth colour (default: a muted shift of the body colour). */
+  patchColor?: string;
+  /** 'auto' (the type's own), a named temperament, or 'none'. Your own motion options always win. */
+  temperament?: BotTemperament | 'auto' | 'none';
+  /** Lantern material: how strongly it glows (0–2, default 1) and in what colour (default: a lighter body tint). */
+  glow?: number;
+  glowColor?: string;
+  /** Glass material: how see-through, 0–1 (default 0.8). */
+  opacity?: number;
+  /** Keep the affect engine's idle timer running (it dozes off after `sleepAfter` seconds, default 120); `tone: false` stops reactions to the reply's tone. */
+  affect?: boolean | { sleepAfter?: number; tone?: boolean };
+  /** Read each state change out to screen readers from a polite live region ("Clover is thinking"). */
+  announce?: boolean;
 }
 
 export declare class BotAvatar {
@@ -183,6 +204,11 @@ export declare class BotAvatar {
    * A new call replaces the utterance; '' or null stops; `append: true` queues streamed chunks.
    */
   say(text: string | null, options?: { wpm?: number; append?: boolean }): Promise<void>;
+  /**
+   * Tell it what the agent is doing and let it work out the look: 'typing' ({ target }), 'sent', 'token' ({ text, wpm, say }),
+   * 'tool' / 'tool-end' ({ name }), 'done', 'error' ({ message }), 'idle', 'reset'. Loads the affect module on first use.
+   */
+  observe(event: BotAgentEvent, data?: { text?: string; target?: Element | { x: number; y: number } | null; name?: string; message?: string; wpm?: number; say?: boolean }): Promise<boolean | undefined>;
   /** The current mood while the `mood` option is on, else null. */
   readonly mood: { name: BotMood; energy: number } | null;
   /** Load a lazily loaded feature ('say', 'status', 'mood', 'social') and resolve to its controller. */
@@ -248,7 +274,7 @@ export declare function buildShape(points: [number, number][], meta?: Partial<Bo
 export declare function shapeToSvgPath(type: BotType): string;
 export declare function shapeFromSvgPath(d: string, base?: BotType): BotShape | null;
 export declare function defineBotAvatar(name?: string): void;
-export declare class BotAvatarElement extends HTMLElement { readonly bot: BotAvatar | null; poke(): void; say(text: string | null, options?: { wpm?: number; append?: boolean }): Promise<void>; }
+export declare class BotAvatarElement extends HTMLElement { readonly bot: BotAvatar | null; poke(): void; say(text: string | null, options?: { wpm?: number; append?: boolean }): Promise<void>; observe(event: BotAgentEvent, data?: object): Promise<boolean | undefined>; }
 export declare function autoInk(color: string): string;
 export declare function adjust(color: string, o?: { brightness?: number; saturation?: number }): string;
 export declare function shade(color: string, amount: number, hue?: number, sat?: number): string;
@@ -296,6 +322,13 @@ export declare const SPOTS: BotSpot[];
 export declare function wearables(): Wearable[];
 /** Options from a list of things to wear (the whole outfit: unmentioned spots are empty). */
 export declare function parseWear(list: string | string[]): BotOptions;
+
+/** Every temperament: motion defaults, a face lean and habits. */
+export declare const TEMPERAMENTS: Record<BotTemperament, { motion: Partial<BotOptions>; face?: BotFace; aloof?: number; shy?: number; float?: number; snap?: number; showOff?: number }>;
+export declare const TEMPERAMENT_NAMES: BotTemperament[];
+/** The temperament a set of options resolves to. */
+export declare function temperamentFor(options: BotOptions): { motion: Partial<BotOptions>; face?: BotFace };
+export declare const QUIRKS: BotQuirk[];
 /** The list of things worn, from options (the inverse of parseWear). */
 export declare function wornList(options: BotOptions): string[];
 /** Where a thing goes. */

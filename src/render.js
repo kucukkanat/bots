@@ -531,9 +531,17 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
   const la = ((look.light ?? (look.shading === 'fabric' ? 295 : 300)) * Math.PI) / 180;
   const lx = Math.sin(la), ly = -Math.cos(la);
   const fabric = look.shading === 'fabric';
-  const shadowK = look.shadow ?? (fabric ? 1.15 : 0.6);
-  const highK = look.highlight ?? (fabric ? 1.2 : 1.3);
-  const rimK = look.rim ?? (fabric ? 0.6 : 0.5);
+  const glass = look.shading === 'glass', lantern = look.shading === 'lantern';
+  // Glass is see-through: its body is painted at part alpha, which the GPU body doesn't do.
+  if (glass) gpu = null;
+  const shadowK = look.shadow ?? (fabric ? 1.15 : glass ? 0.4 : lantern ? 0.45 : 0.6);
+  const highK = look.highlight ?? (fabric ? 1.2 : glass ? 1.1 : lantern ? 0.9 : 1.3);
+  const rimK = look.rim ?? (fabric ? 0.6 : glass ? 1.2 : lantern ? 0.35 : 0.5);
+  // A lantern glows from within: steady breathing, brighter while it thinks, talks or laughs.
+  const glowC = lantern ? (look.glowColor || shade(base, 0.3, 6, 1.35)) : null;
+  const glowA = lantern ? clamp((look.glow ?? 1) * (0.32 + 0.16 * (0.5 + 0.5 * Math.sin(time * 2.2)) + 0.45 * Math.max(pose.think, pose.talk * (0.3 + 0.7 * pose.mouthOpen), pose.happy * 0.6)), 0, 1.2) : 0;
+  const quirks = look.quirk ? String(look.quirk).split(/[\s,]+/) : [];
+  const quirk = (q) => quirks.includes(q);
 
   const c0 = Math.cos(pose.yaw), s = Math.sin(pose.yaw);
   const c = Math.abs(c0) < MIN_TURN ? (c0 < 0 ? -MIN_TURN : MIN_TURN) : c0;
@@ -753,6 +761,15 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
         q: lq,
       });
     }
+    if (glass) {
+      // Fresnel: the whole edge catches light, so the rim is a thin bright band all round.
+      lq = Math.min(1, q * 1.5);
+      passes.push({ color: 'rgba(255,255,255,0.8)', blur: R * 0.045 * (0.6 + rimK), ox: 0, oy: 0, q: lq });
+      // Light passing through pools on the side away from the key.
+      highs.push({ x: -lx * R * 0.5 + R * D * s * 0.4, y: -ly * R * 0.5 + R * 0.12, r: R * 0.62, color: shade(base, 0.5, 0, 1.1), a: 0.55 * highK });
+      // A faint brightening at the heart of the body: the depth of the glass.
+      highs.push({ x: 0, y: R * 0.12, r: R * 0.9, color: shade(base, 0.3, 0, 1.05), a: 0.22 });
+    }
     // Lit side. Plush lights in its own colour (white would grey it), and pale
     // bodies, already near white, take less of it.
     const spread = look.spread ?? 1.4;
@@ -763,9 +780,10 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     // Plastic: a hot spot (and a window reflection, painted after).
     if (look.shading === 'plastic') {
       highs.push({ x: lx * R * 0.48 + R * D * s * 0.9, y: ly * R * 0.5 + R * D * sp, r: R * 0.22 * spread, color: keyC('#ffffff'), a: clamp(0.85 * highK / 1.3) });
-    } else if (look.gloss > 0) {
-      // Gloss: a tight specular spot, on any material.
-      highs.push({ x: lx * R * 0.46 + R * D * s * 0.9, y: ly * R * 0.48 + R * D * sp, r: R * 0.2 * spread, color: keyC('#ffffff'), a: clamp(0.45 * look.gloss), gloss: true });
+    } else if ((look.gloss ?? (glass ? 0.9 : 0)) > 0) {
+      // Gloss: a tight specular spot, on any material (glass has one by nature).
+      const gl = look.gloss ?? 0.9;
+      highs.push({ x: lx * R * 0.46 + R * D * s * 0.9, y: ly * R * 0.48 + R * D * sp, r: R * 0.2 * spread, color: keyC('#ffffff'), a: clamp(0.45 * gl), gloss: true });
     }
   }
 
@@ -841,7 +859,9 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     // painted with 'source-atop', which keeps it inside the silhouette
     // without a clip; what sits behind it follows with 'destination-over'.
     lc.fillStyle = base;
+    if (glass) lc.globalAlpha = look.opacity ?? 0.8;
     lc.fill(body());
+    lc.globalAlpha = 1;
   }
   lc.globalCompositeOperation = 'source-atop';
   // Gradients over the body only need to cover its box, not the overscan.
@@ -904,10 +924,55 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     lc.restore();
   }
 
+  if (glass) {
+    // Two window reflections, long and thin, on the key-light side.
+    const px = lx * R * 0.36 + R * D * s * 0.9, py = ly * R * 0.38 + R * D * sp;
+    lc.save();
+    lc.translate(px, py);
+    lc.rotate(la + Math.PI / 2);
+    lc.fillStyle = `rgba(255,255,255,${clamp(0.6 * highK)})`;
+    roundRect(lc, -R * 0.2, -R * 0.06, R * 0.4, R * 0.1, R * 0.05);
+    lc.fill();
+    lc.fillStyle = `rgba(255,255,255,${clamp(0.4 * highK)})`;
+    roundRect(lc, -R * 0.12, R * 0.09, R * 0.24, R * 0.045, R * 0.022);
+    lc.fill();
+    lc.restore();
+  }
+  if (lantern) {
+    // The core: light from inside, brightest a little below the face.
+    const g = lc.createRadialGradient(0, R * 0.15, 0, 0, R * 0.15, R * 0.92);
+    g.addColorStop(0, rgba(glowC, clamp(glowA * 0.9)));
+    g.addColorStop(0.35, rgba(glowC, clamp(glowA * 0.42)));
+    g.addColorStop(1, rgba(glowC, 0));
+    lc.fillStyle = g;
+    cover();
+  }
+  if (quirk('scuff')) {
+    // A worn spot where the pile has thinned, up on the light side.
+    const [X, Y] = proj(-0.28 * (lx < 0 ? -1 : 1), -0.12, D);
+    const g = lc.createRadialGradient(X, Y, 0, X, Y, R * 0.34);
+    g.addColorStop(0, 'rgba(255,250,240,0.34)');
+    g.addColorStop(0.55, 'rgba(255,250,240,0.14)');
+    g.addColorStop(1, 'rgba(255,250,240,0)');
+    lc.fillStyle = g;
+    cover();
+  }
+
   const whirlOn = look.whirl > 0 && pose.whirl > 0.02;
   // Face and glasses ride on the front of the body.
   const faceA = smoothstep((facing - 0.18) / 0.3);
   const fs = shape.faceScale * (look.faceScale ?? 1);
+  if (faceA > 0 && (quirk('stitches') || quirk('patch'))) {
+    // Sewn things ride on the front with the face.
+    lc.save();
+    lc.globalAlpha = faceA;
+    const [X, Y] = proj(0, 0, Math.min(1, D * 1.25));
+    lc.transform(R * c0, -R * s * sp, 0, R * cp, X, Y);
+    lc.lineCap = 'round';
+    if (quirk('stitches')) drawStitches(lc, shape, base, R);
+    if (quirk('patch')) drawPatch(lc, shape, look.patchColor || shade(base, -0.1, 150, 0.7), look.ink, R);
+    lc.restore();
+  }
   if (faceA > 0) {
     lc.save();
     lc.globalAlpha = faceA;
@@ -939,6 +1004,15 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     lc.lineWidth = Math.max(2, R * 0.05);
     lc.stroke(body());
   }
+  if (lantern && glowA > 0.05) {
+    // The halo: the glow spilling out around the body.
+    const g = lc.createRadialGradient(0, R * 0.1, R * 0.5, 0, R * 0.1, R * 1.8);
+    g.addColorStop(0, rgba(glowC, clamp(glowA * 0.42)));
+    g.addColorStop(0.45, rgba(glowC, clamp(glowA * 0.12)));
+    g.addColorStop(1, rgba(glowC, 0));
+    lc.fillStyle = g;
+    lc.fillRect(-R * 2.2, -R * 2.2, R * 4.4, R * 4.4);
+  }
   // Behind the body, nearest first.
   if (whirlOn) drawWhirl(ctx, R, pose, look, time, base, -1);
   if (look.accessories) drawAccessories(ctx, look.accessories, 'back', proj, R, c0, s, sp, cp, D, 1);
@@ -961,6 +1035,8 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
       ctx.stroke(p);
     });
   }
+
+  if (quirk('cowlick') && !(look.hat && look.hat !== 'none')) drawCowlick(ctx, shape, proj, R, base, lx, time, D);
 
   if (faceA > 0 && look.scarf) {
     const by = Math.min(shape.faceY + 0.52 * fs, shape.bounds.maxY - 0.16);
@@ -1383,6 +1459,91 @@ function earPaths(kind) {
     i.arc(0, -r * 0.7, kind === 'bear' ? 0.11 : 0.09, 0, Math.PI * 2);
   }
   return (earCache[kind] = [o, i]);
+}
+
+/** A tuft that won't lie down: a few thick strands on the crown, swept one way, swaying a little. */
+function drawCowlick(ctx, shape, proj, R, base, lx, time, D) {
+  const top = shape.topAt(0.04, 0.1);
+  const [X, Y] = proj(0.04, top + 0.03, D * 0.3);
+  const lean = lx < 0 ? 1 : -1;
+  const sway = Math.sin(time * 2.4) * 0.04;
+  ctx.save();
+  ctx.translate(X, Y);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  // Each strand: where it starts, how long, how far it sweeps sideways, how much it curls back at the tip.
+  const strands = [[-0.07, 0.27, 0.22, 0.12], [0.0, 0.33, 0.3, 0.16], [0.07, 0.24, 0.2, 0.1]];
+  for (let pass = 0; pass < 2; pass++) {
+    ctx.lineWidth = R * (pass ? 0.028 : 0.052);
+    ctx.strokeStyle = pass ? shade(base, 0.14, 0, 0.95) : shade(base, -0.16, 0, 1.05);
+    ctx.beginPath();
+    for (const [x0, len, sweep, curl] of strands) {
+      const sx = (sweep + sway) * lean;
+      const x1 = (x0 + sx * 0.3) * R, y1 = -len * R * 0.9;
+      const x2 = (x0 + sx) * R, y2 = -len * R * 1.05;
+      const x3 = (x0 + sx + curl * lean) * R, y3 = -len * R * 0.72;
+      ctx.moveTo(x0 * R, R * 0.03);
+      ctx.bezierCurveTo(x1, y1, x2, y2, x3, y3);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** A sewn seam down the body: a dashed line with ticks across it. */
+function drawStitches(ctx, shape, base, R) {
+  const col = rgba(shade(base, -0.42, 0, 0.9), 0.75);
+  const top = shape.topAt(0.1, 0.05) + 0.06, bottom = shape.bounds.maxY - 0.1;
+  const x = 0.11, bow = 0.05;
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 0.02;
+  ctx.setLineDash([0.04, 0.03]);
+  ctx.beginPath();
+  ctx.moveTo(x, top);
+  ctx.quadraticCurveTo(x + bow, (top + bottom) / 2, x, bottom);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // Cross ticks.
+  ctx.lineWidth = 0.016;
+  ctx.beginPath();
+  const n = Math.max(3, Math.round((bottom - top) / 0.11));
+  for (let i = 1; i < n; i++) {
+    const t = i / n, mt = 1 - t;
+    const px = mt * mt * x + 2 * mt * t * (x + bow) + t * t * x;
+    const py = mt * mt * top + 2 * mt * t * ((top + bottom) / 2) + t * t * bottom;
+    ctx.moveTo(px - 0.03, py - 0.012); ctx.lineTo(px + 0.03, py + 0.012);
+  }
+  ctx.stroke();
+}
+
+/** A patch of other cloth sewn on low on one side, stitched round the edge. */
+function drawPatch(ctx, shape, color, ink, R) {
+  const y = 0.3;
+  const x = Math.min(0.38, shape.halfWidthAt(y) * 0.55);
+  const w = 0.36, h = 0.3;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(-0.22);
+  const g = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+  g.addColorStop(0, shade(color, 0.08));
+  g.addColorStop(1, shade(color, -0.1));
+  ctx.fillStyle = g;
+  roundRect(ctx, -w / 2, -h / 2, w, h, 0.05);
+  ctx.fill();
+  // A touch of weave.
+  ctx.strokeStyle = rgba(shade(color, -0.2), 0.25);
+  ctx.lineWidth = 0.006;
+  ctx.beginPath();
+  for (let i = -2; i <= 2; i++) { ctx.moveTo(-w / 2 + 0.02, i * 0.045); ctx.lineTo(w / 2 - 0.02, i * 0.045); }
+  ctx.stroke();
+  // Stitches round the edge.
+  ctx.strokeStyle = rgba(ink || '#222', 0.7);
+  ctx.lineWidth = 0.016;
+  ctx.setLineDash([0.034, 0.026]);
+  roundRect(ctx, -w / 2 + 0.025, -h / 2 + 0.025, w - 0.05, h - 0.05, 0.035);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
 }
 
 function drawScarf(ctx, color) {

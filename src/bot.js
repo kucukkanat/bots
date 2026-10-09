@@ -10,6 +10,7 @@ import { presets, getShape, shapeFromSvgPath } from './shapes.js';
 import { workerPool, mainThreadGpu, stats, loadRenderer, renderer, prefetchRenderer } from './pool.js';
 import { normalizeOptions, encodeDNA, EXPRESSIONS } from './options.js';
 import { hatDef } from './plugins.js';
+import { applyTemperament } from './temperament.js';
 
 // The renderer loads on first need (see pool.js); this is set once it has.
 let drawBot = null;
@@ -37,7 +38,8 @@ export const DEFAULTS = Object.freeze({
   quality: 'auto',
 });
 
-export const SHADINGS = ['fabric', 'plastic', 'smooth', 'crisp', 'flat'];
+export const SHADINGS = ['fabric', 'plastic', 'smooth', 'crisp', 'flat', 'glass', 'lantern'];
+export const QUIRKS = ['patch', 'cowlick', 'scuff', 'stitches'];
 export const HATS = HAT_STYLES;
 export const GLASSES = ['none', 'round', 'square', 'shades'];
 
@@ -78,8 +80,9 @@ function lookMessage(look) {
 
 const STATE_WORDS = { default: 'idle', working: 'working', sleeping: 'sleeping', listening: 'listening', thinking: 'thinking', speaking: 'speaking', error: 'having trouble', success: 'done' };
 
-/** What the simulation needs on top of the options: the expression's face. */
+/** What the simulation needs on top of the options: the temperament underneath, the expression's face. */
 function simOptions(o) {
+  o = applyTemperament(o);
   const e = o.expression;
   const face = !e || e === 'neutral' ? null : typeof e === 'object' ? e : EXPRESSIONS[e] || null;
   return face ? { ...o, expressionFace: face } : o;
@@ -362,6 +365,19 @@ export class BotAvatar {
     return this.feature('say').then((f) => f?.say(text, options));
   }
 
+  /**
+   * Tell the avatar what the agent is doing and let it work out how to
+   * look: 'typing' (the user is), 'sent', 'token' ({ text }: a chunk of the
+   * reply, which it also says), 'tool' / 'tool-end' ({ name }), 'done',
+   * 'error' ({ message }), 'idle' and 'reset'. It listens, thinks, worries
+   * when the first token is slow, reacts to the tone of the reply, works
+   * through tool calls, celebrates, frets at repeated errors and dozes off
+   * when nothing happens for a while. Loads the affect module on first use.
+   */
+  observe(event, data) {
+    return this.feature('affect').then((f) => f?.observe(event, data));
+  }
+
   /** The mood ({ name, energy }) while the `mood` option is on, else null. */
   get mood() { return this._features.get('mood')?.ctl?.current ?? null; }
 
@@ -503,6 +519,8 @@ export class BotAvatar {
   _changed() {
     const p = this.sim.pose, q = this._drawn;
     if (!q || p.sleep > 0.05 || p.think > 0.05 || (p.whirl > 0.02 && this.options.whirl > 0) || p.ruffle !== q.ruffle) return true;
+    // A lantern's glow breathes on its own, about 30 times a second.
+    if (this.options.shading === 'lantern' && this.sim.time - this._drawnTime > 1 / 30) return true;
     const px = this.options.size * BODY * this.dpr;
     const geo = (Math.abs(p.yaw - q.yaw) + Math.abs(p.pitch - q.pitch)) * 1.6 + Math.abs(p.roll - q.roll) * 2
       + Math.abs(p.x - q.x) + Math.abs(p.y - q.y) + Math.abs(p.sx - q.sx) + Math.abs(p.sy - q.sy) * 2;
@@ -524,6 +542,7 @@ export class BotAvatar {
     if (this._waiting) return;
     const pose = this.pose;
     this._drawn = pose;
+    this._drawnTime = this.sim.time;
     if (this.handle) this.pool.frame(this.handle, { pose, time: this.sim.time });
     else {
       drawBot(this.ctx, { size: this.options.size, dpr: this.dpr, pose, look: this.look, time: this.sim.time }, { gpu: this.gpu, relaxed: this._economy() });
@@ -601,3 +620,5 @@ defineFeature('say', () => import('./features/say.js'));
 defineFeature('status', () => import('./features/status.js'), 'status');
 defineFeature('mood', () => import('./features/mood.js'), 'mood');
 defineFeature('social', () => import('./features/social.js'), 'social');
+defineFeature('affect', () => import('./features/affect.js'), 'affect');
+defineFeature('announce', () => import('./features/announce.js'), 'announce');
