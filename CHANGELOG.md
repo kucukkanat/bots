@@ -7,6 +7,21 @@ All notable changes to `@kucukkanat/bots` are recorded here. The format follows
 ## [Unreleased] - 1.1.0
 
 ### Added
+- **Agent features** (each a lazily loaded module): `bot.say(text, { wpm, append })`
+  lip-syncs from text with no audio, and streams LLM tokens with `append`;
+  `status` badges (`typing`, `loading`, `done`, `error`, `auto`); `mood`
+  (`auto` drifts with play and idle time); `social` bots glance at each other.
+  Bots with an eyes-only face show a mouth while talking.
+- **Play**: `toss` (drag and throw), `petting` (strokes ruffle the fur and
+  make it content), `sounds` (synthesized, opt-in); seasonal hat packs
+  `packs/halloween`, `packs/winter`, `packs/party`.
+- **Frameworks and stickers**: a Vue component (`/vue`), a Svelte action
+  (`/svelte`); `bot.export({ format: 'sticker' })` and `exportStickers()` for
+  a ZIP sticker pack with a `crew.json` of DNA codes.
+- **Website**: a new landing page with a live agent-chat demo, docs pages
+  (getting started, options, agent recipes, API, frameworks, plugins & packs,
+  export, performance), shareable crew pages (`c/#t=…`), and a rebuilt Studio
+  (three panes, settings in the URL, undo/redo, code for five frameworks).
 - `npm run build` bundles the library into `dist/` with esbuild (the only dev
   dependency; the source stays dependency-free and runs unbundled from `src/`).
   Minified ES modules with source maps and shared chunks: `bots.js` (the
@@ -22,7 +37,7 @@ All notable changes to `@kucukkanat/bots` are recorded here. The format follows
   a renderer and has drawn its first frame.
 - `npm run size` prints the gzipped size of every file in `dist/` and of each
   entry's eagerly loaded graph, and fails above the budgets in
-  `scripts/size-budget.json` (the library entry: 18 KB gzipped).
+  `scripts/size-budget.json` (the library entry: 18.5 KB gzipped).
 - `npm run perf` (scripts/perf.mjs): draw time against v1.0.0, or between two
   option sets.
 - CI runs tests, the build, the size budgets and the draw-time gate before

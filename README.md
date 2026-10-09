@@ -4,7 +4,7 @@
 
 Animated bot avatars for AI agents. Eighteen plush 3D shapes with living faces that look around, hop while they work and doze off between tasks — plus hats, glasses, headphones and bow ties. Drawn with WebGL in worker threads, with a plain 2D canvas fallback wherever either is missing: no build step, no dependencies.
 
-**[Live site](https://kucukkanat.github.io/bots/) · [Playground](https://kucukkanat.github.io/bots/playground/)**
+**[Live site](https://kucukkanat.github.io/bots/) · [Docs](https://kucukkanat.github.io/bots/docs/) · [Studio](https://kucukkanat.github.io/bots/playground/)**
 
 <p align="center"><img src="docs/landing.png" alt="The bots landing page" width="100%" /></p>
 
@@ -279,11 +279,11 @@ createBot('#x', { type: 'ghost', hat: 'pumpkin' });
 pack.hats;    // the names it added; pack.looks has a few suggested looks
 ```
 
-## Playground
+## Studio
 
-<p align="center"><img src="docs/playground.png" alt="The playground: a cat bot wearing a party hat, round glasses and a bow tie" width="100%" /></p>
+<p align="center"><img src="docs/playground.png" alt="The studio" width="100%" /></p>
 
-`/playground/` lets you design a bot (shape, custom outline, colour, face, material, fur, things to wear, motion, and with **Advanced controls** on, every option above), try the agent states and reactions, load a look from an id or Bot DNA, export a GIF / APNG / WebM / sprite sheet, turn it round by dragging, copy the code for HTML / JS / React, share a link, download a PNG, save a crew in your browser, and **publish to GitHub Pages**: it downloads a standalone `index.html` with your bot or crew, ready to upload to any repository with Pages turned on.
+[`/playground/`](https://kucukkanat.github.io/bots/playground/) is a studio for designing a bot: starters, shapes, colour, face, material, fur, things to wear (and seasonal packs), motion, and an Agent tab to try `say()`, states, status badges, moods and reactions. Every setting lives in the URL (share it), with undo and redo. The Code tab gives the snippet for HTML, JS, React, Vue or Svelte; export a PNG, GIF, APNG, WebM, sprite sheet or sticker; save a crew in your browser, share it as a crew page or **publish it to GitHub Pages**.
 
 ## How it renders
 
