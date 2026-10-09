@@ -109,15 +109,25 @@ test('APNG: signature, frame count and chunks', async () => {
 });
 
 test('wear: a list of things by name', async () => {
-  const { parseWear, normalizeOptions } = await import('../src/options.js');
-  assert.deepEqual(parseWear('party-hat round-glasses bow-tie'), { hat: 'party', glasses: 'round', bowTie: true, scarf: false });
-  assert.deepEqual(parseWear(['beanie', 'bandana', 'cat-ears', 'badge:OK']), { hat: 'beanie', scarf: true, bowTie: false, ears: 'cat', badge: 'OK' });
-  // One thing round the neck: the later one wins.
-  assert.deepEqual(parseWear('bow-tie bandana'), { bowTie: false, scarf: true });
-  assert.equal(parseWear('santa').hat, 'santa');
-  assert.deepEqual(parseWear('none'), {});
-  const o = normalizeOptions({ glasses: 'square', wear: 'top-hat shades' });
-  assert.equal(o.hat, 'tophat');
-  assert.equal(o.glasses, 'square', 'a flat option still wins');
+  const { parseWear, wornList, wearables, spotOf } = await import('../src/wear.js');
+  const { normalizeOptions } = await import('../src/options.js');
+  const p = parseWear('party-hat round-glasses bow-tie');
+  assert.equal(p.hat, 'party'); assert.equal(p.glasses, 'round'); assert.equal(p.bowTie, true);
+  assert.equal(p.scarf, false); assert.equal(p.headphones, false, 'unmentioned spots are empty');
+  // One thing per spot: the later one wins.
+  const n = parseWear('bow-tie bandana');
+  assert.equal(n.bowTie, false); assert.equal(n.scarf, true);
+  assert.equal(parseWear('beanie crown').hat, 'crown');
+  assert.equal(parseWear(['badge:OK']).badge, 'OK');
+  assert.equal(parseWear('santa').hat, 'santa', 'other names are hats');
+  assert.equal(parseWear('cat-ears').ears, 'cat', 'old body-part names still work');
+  // Round trip.
+  for (const list of [['party-hat', 'shades', 'headphones', 'bandana', 'badge:OK'], ['crown'], []]) assert.deepEqual(wornList(parseWear(list)), list);
+  assert.deepEqual(wornList({ hat: 'tophat', glasses: 'square', bowTie: true }), ['top-hat', 'square-glasses', 'bow-tie']);
+  assert.equal(spotOf('shades'), 'eyes'); assert.equal(spotOf('badge:AI'), 'chest'); assert.equal(spotOf('santa'), 'head');
+  assert.ok(wearables().every((w) => w.name && w.spot && w.label));
+  // Flat options win; wearColor is accessoryColor.
+  const o = normalizeOptions({ glasses: 'square', wear: 'top-hat shades', wearColor: '#123456' });
+  assert.equal(o.hat, 'tophat'); assert.equal(o.glasses, 'square'); assert.equal(o.accessoryColor, '#123456');
   assert.equal(normalizeOptions({ wear: { hat: 'crown' } }).hat, 'crown', 'the grouped object still works');
 });

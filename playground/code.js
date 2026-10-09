@@ -16,21 +16,18 @@ export function attrs(ch, size) {
   return parts;
 }
 
-// The things worn, as one `wear` list where they can be ('party-hat round-glasses bow-tie').
-const HAT_ITEM = { party: 'party-hat', tophat: 'top-hat', witch: 'witch-hat' };
-const GLASSES_ITEM = { round: 'round-glasses', square: 'square-glasses', shades: 'shades' };
+import { wornList } from '../src/wear.js';
+
+// What's worn, as one `wear` list ('party-hat round-glasses bow-tie'), and
+// its colour as wearColor. Body parts (ears, antennae) stay options of their own.
+const WORN = ['hat', 'glasses', 'headphones', 'bowTie', 'scarf', 'badge'];
 export function foldWear(ch) {
-  const out = { ...ch }, items = [];
-  const take = (k, item) => { if (item) { items.push(item); delete out[k]; } };
-  if (ch.hat && ch.hat !== 'none') take('hat', HAT_ITEM[ch.hat] || ch.hat);
-  if (ch.glasses && ch.glasses !== 'none') take('glasses', GLASSES_ITEM[ch.glasses]);
-  if (ch.bowTie === true) take('bowTie', 'bow-tie');
-  if (ch.scarf === true) take('scarf', 'bandana');
-  if (ch.headphones === true) take('headphones', 'headphones');
-  if (ch.ears && ch.ears !== 'none') take('ears', `${ch.ears}-ears`);
-  if (ch.antennae === 'one' || ch.antennae === 'two') take('antennae', ch.antennae === 'one' ? 'antenna' : 'antennae');
-  if (typeof ch.badge === 'string' && /^[^\s,]+$/.test(ch.badge)) take('badge', `badge:${ch.badge}`);
-  if (items.length) out.wear = items.join(' ');
+  const out = { ...ch };
+  const list = wornList(ch);
+  if (list.some((e) => /\s/.test(e))) return out; // a badge with spaces can't go in the list
+  for (const k of WORN) delete out[k];
+  if (list.length) out.wear = list.join(' ');
+  if (out.accessoryColor) { out.wearColor = out.accessoryColor; delete out.accessoryColor; }
   return out;
 }
 

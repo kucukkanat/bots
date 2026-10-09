@@ -7,7 +7,7 @@
 import {
   createBot, BotAvatar, types, presets, DEFAULTS, SHADINGS, QUIRKS, TEMPERAMENT_NAMES, HATS, GLASSES, STATES, STYLES, EXPRESSIONS,
   EYE_STYLES, MOUTH_STYLES, BROWS, EAR_STYLES, FUR_PATTERNS, lookFromId, decodeDNA, shapeToSvgPath,
-  loadRenderer, resolveLook, restPose, OVERSCAN,
+  loadRenderer, resolveLook, restPose, OVERSCAN, wearables, parseWear, wornList,
 } from '../src/index.js';
 import { FEATURE_OPTIONS } from '../src/bot.js';
 import { initTheme } from '../assets/theme.js';
@@ -453,7 +453,7 @@ const when = (ok, el) => { if (!ok) el.hidden = true; return el; };
 performance.mark('studio:controls');
 const TABS = [
   { id: 'library', label: 'Start', heading: 'Start', narrow: true },
-  { id: 'look', label: 'Look' },
+  { id: 'look', label: 'Body' },
   { id: 'face', label: 'Face' },
   { id: 'wear', label: 'Wear' },
   { id: 'light', label: 'Material', heading: 'Material & light' },
@@ -532,6 +532,7 @@ tabPanel('look', () => [
     range('saturation', 'Saturation')),
   grp('Finish',
     select('preset', 'Preset', ['', ...Object.keys(STYLES)], ['Custom', ...Object.keys(STYLES).map(title)])),
+  grp('Body parts', ...bodyParts()),
   grp('Custom outline',
     h('label', { class: 'lbl block', for: 'path' }, 'Your own SVG path, drawn in place of the shape'),
     pathArea,
@@ -564,9 +565,95 @@ tabPanel('face', () => [
     range('faceX', 'Face across'),
     range('faceY', 'Face height'))]);
 
+// --- Tiles: a picture of this bot with one thing changed -----------------------------
+
+// Every tile is drawn on the current shape and colours, in idle time, and
+// redrawn when those change. Close-ups for things on the face and chest.
+const ZOOM = { eyes: { thumbZoom: 2, thumbDy: -0.05 }, neck: { thumbZoom: 1.6, thumbDy: 0.18 }, chest: { thumbZoom: 1.6, thumbDy: 0.12 }, ears: { thumbZoom: 1.3, thumbDy: -0.05 } };
+const tiles = []; // { b, img, key, look: () => options, on: () => bool }
+function tileGrid(items) {
+  const grid = h('div', { class: 'thumbs wear-grid' });
+  for (const it of items) {
+    const [b, img] = thumbBtn(it.label, it.tap, { title: it.label });
+    grid.append(b);
+    tiles.push({ b, img, ...it });
+  }
+  refreshTiles(true);
+  return grid;
+}
+let tileBase = '', tileTimer = 0;
+function tileBaseOpts() {
+  return { type: opts.type, color: opts.color, brightness: opts.brightness, saturation: opts.saturation, path: opts.path, face: opts.face, accessoryColor: opts.accessoryColor };
+}
+function refreshTiles(force) {
+  if (!tiles.length) return;
+  const base = tileBaseOpts();
+  const key = JSON.stringify(base);
+  if (key === tileBase && !force) return;
+  tileBase = key;
+  clearTimeout(tileTimer);
+  tileTimer = setTimeout(() => {
+    for (const t of tiles) thumbInto(t.img, `tile:${t.key}:${key}`, { ...base, ...t.look() }, false);
+  }, 200);
+}
+syncs.push(() => {
+  for (const t of tiles) t.b.setAttribute('aria-pressed', String(t.on()));
+  refreshTiles();
+});
+
+// --- Body parts (on the Body tab) ------------------------------------------------------
+
+function bodyParts() {
+  const ears = [['none', 'No ears'], ...EAR_STYLES.filter((v) => v !== 'none').map((v) => [v, `${title(v)} ears`])];
+  const ants = [['auto', "Shape's own"], ['none', 'No antennae'], ['one', 'Antenna'], ['two', 'Antennae']];
+  return [
+    tileGrid(ears.map(([v, label]) => ({
+      key: `ears:${v}`, label, look: () => ({ ears: v, thumbZoom: 1.3, thumbDy: -0.08 }),
+      on: () => (opts.ears || 'none') === v, tap: () => update({ ears: v === 'none' ? undefined : v }),
+    }))),
+    tileGrid(ants.map(([v, label]) => ({
+      key: `antennae:${v}`, label, look: () => ({ antennae: v, thumbZoom: 1.3, thumbDy: -0.08 }),
+      on: () => (opts.antennae || 'auto') === v, tap: () => update({ antennae: v === 'auto' ? undefined : v }),
+    }))),
+  ];
+}
+
 // --- Wear ----------------------------------------------------------------------------
 
-// Hat packs are separate modules, fetched the first time their tab is opened.
+// One collection of things to wear. Each goes in a spot (head, eyes, ears,
+// neck, chest) that holds one thing, so picking a thing swaps out whatever
+// was there; picking it again takes it off. The library's wear list is the
+// model: the studio keeps the flat options it maps to.
+const WORN_KEYS = ['hat', 'glasses', 'headphones', 'bowTie', 'scarf', 'badge'];
+/** Studio options for a wear list: defaults left out, the badge keeps its text. */
+function wearPatch(list) {
+  const p = parseWear(list);
+  return {
+    hat: p.hat === 'none' ? undefined : p.hat,
+    glasses: p.glasses === 'none' ? undefined : p.glasses,
+    headphones: p.headphones || undefined,
+    bowTie: p.bowTie || undefined,
+    scarf: p.scarf || undefined,
+    badge: p.badge === undefined ? undefined : (opts.badge && p.badge === 'AI' ? opts.badge : p.badge),
+  };
+}
+const worn = () => wornList(opts);
+const nameOf = (entry) => (entry.startsWith('badge') ? 'badge' : entry);
+function toggleWear(name) {
+  const list = worn();
+  const on = list.some((e) => nameOf(e) === name);
+  update(wearPatch(on ? list.filter((e) => nameOf(e) !== name) : [...list, name]));
+}
+const OUTFITS = [
+  ['Party', 'party-hat bow-tie'], ['Cozy', 'beanie bandana'], ['Nerd', 'round-glasses bow-tie'],
+  ['DJ', 'headphones shades'], ['Royal', 'crown bandana'], ['Agent', 'cap headphones badge'],
+];
+const itemTile = (w) => ({
+  key: `wear:${w.name}`, label: w.label, look: () => ({ ...parseWear([w.name]), ...ZOOM[w.spot] }),
+  on: () => worn().some((e) => nameOf(e) === w.name), tap: () => toggleWear(w.name),
+});
+
+// Seasonal packs add hats; they load the first time the Wear tab opens.
 const PACKS = [
   { id: 'halloween', label: 'Halloween' },
   { id: 'winter', label: 'Winter' },
@@ -595,103 +682,25 @@ async function ensureHat(name) {
     } catch { /* pack not in this build */ }
   }
 }
-
-const hatLabel = (n) => (n === 'tophat' ? 'Top hat' : n === 'none' ? 'None' : title(n));
-
-// The wardrobe: an outfit row, then four slots of picture tiles (the bot,
-// in its own shape and colour, wearing each thing). Tap to wear, tap again
-// to take it off. Head, Eyes and Neck hold one thing each; Extras mix.
-const WEAR_KEYS = ['hat', 'glasses', 'headphones', 'bowTie', 'scarf', 'ears', 'antennae', 'badge'];
-const OUTFITS = [
-  { name: 'Party', o: { hat: 'party', bowTie: true } },
-  { name: 'Cozy', o: { hat: 'beanie', scarf: true } },
-  { name: 'Spooky', o: { hat: 'witch', ears: 'cat' } },
-  { name: 'Nerd', o: { glasses: 'round', bowTie: true } },
-  { name: 'DJ', o: { headphones: true, glasses: 'shades' } },
-  { name: 'Royal', o: { hat: 'crown', scarf: true } },
-];
-const cleared = () => Object.fromEntries(WEAR_KEYS.map((k) => [k, undefined]));
-const neckOf = (o) => (o.bowTie ? 'bowTie' : o.scarf ? 'scarf' : 'none');
-/** Each tile: what it puts on, whether it's on now, and what tapping does. */
-const SLOTS = {
-  head: () => [{ v: 'none', label: 'None' }, ...HATS.filter((n) => n !== 'none').map((v) => ({ v, label: hatLabel(v) }))].map(({ v, label }) => ({
-    key: `hat:${v}`, label, wear: { hat: v === 'none' ? undefined : v },
-    on: () => (opts.hat || 'none') === v, tap: () => update({ hat: v === 'none' || opts.hat === v ? undefined : v }),
-  })),
-  eyes: () => GLASSES.map((v) => ({
-    key: `glasses:${v}`, label: v === 'none' ? 'None' : title(v), wear: { glasses: v, thumbZoom: 2.8, thumbDy: -0.07 },
-    on: () => (opts.glasses || 'none') === v, tap: () => update({ glasses: v === 'none' || opts.glasses === v ? undefined : v }),
-  })),
-  neck: () => [['none', 'None'], ['bowTie', 'Bow tie'], ['scarf', 'Bandana']].map(([v, label]) => ({
-    key: `neck:${v}`, label, wear: { bowTie: v === 'bowTie', scarf: v === 'scarf', thumbZoom: 2.1, thumbDy: 0.3 },
-    on: () => neckOf(opts) === v, tap: () => { const off = neckOf(opts) === v; update({ bowTie: (!off && v === 'bowTie') || undefined, scarf: (!off && v === 'scarf') || undefined }); },
-  })),
-  extras: () => [
-    ...EAR_STYLES.filter((v) => v !== 'none').map((v) => ({
-      key: `ears:${v}`, label: `${title(v)} ears`, wear: { ears: v },
-      on: () => opts.ears === v, tap: () => update({ ears: opts.ears === v ? undefined : v }),
-    })),
-    { key: 'headphones', label: 'Headphones', wear: { headphones: true }, on: () => !!opts.headphones, tap: () => update({ headphones: opts.headphones ? undefined : true }) },
-    ...[['one', 'Antenna'], ['two', 'Antennae']].map(([v, label]) => ({
-      key: `antennae:${v}`, label, wear: { antennae: v },
-      on: () => opts.antennae === v, tap: () => update({ antennae: opts.antennae === v ? undefined : v }),
-    })),
-    { key: 'badge', label: 'Badge', wear: { badge: opts.badge || 'AI' }, on: () => !!opts.badge, tap: () => update({ badge: opts.badge ? undefined : 'AI' }) },
-  ],
-};
-
-const wearTiles = []; // { b, img, item }
-function slotGrid(items) {
-  const grid = h('div', { class: 'thumbs wear-grid' });
-  for (const item of items) {
-    const [b, img] = thumbBtn(item.label, () => item.tap());
-    grid.append(b);
-    wearTiles.push({ b, img, item });
-  }
-  return grid;
-}
-// Pack hats join the Head slot in their own labelled rows, loaded when the tab first opens.
-function packRows() {
+function seasonal() {
   const box = h('div', {});
   for (const p of PACKS) {
     const slot = h('div', {}); // keeps the packs in order, whichever loads first
     box.append(slot);
     loadPack(p.id).then((pack) => {
       if (!pack.hats.length) return;
-      slot.append(h('div', { class: 'wear-sub' }, p.label), slotGrid(pack.hats.map((x) => ({
-        key: `hat:${x.name}`, label: x.label || hatLabel(x.name), wear: { hat: x.name },
-        on: () => opts.hat === x.name, tap: () => update({ hat: opts.hat === x.name ? undefined : x.name }),
-      }))));
-      refreshWear(true);
+      const byName = new Map(wearables().map((w) => [w.name, w]));
+      const items = pack.hats.map((x) => byName.get(x.name) || { name: x.name, spot: 'head', label: x.label || title(x.name) });
+      slot.append(h('div', { class: 'wear-sub' }, p.label), tileGrid(items.map((w) => ({ ...itemTile(w), label: w.label }))));
     }).catch(() => { /* pack not in this build */ });
   }
   return box;
 }
-// Tiles are drawn on the current shape and colours, in idle time.
-let wearBase = '', wearTimer = 0;
-function refreshWear(force) {
-  if (!wearTiles.length) return;
-  const base = { type: opts.type, color: opts.color, brightness: opts.brightness, saturation: opts.saturation, path: opts.path, face: opts.face,
-    accessoryColor: opts.accessoryColor };
-  const key = JSON.stringify(base);
-  if (key === wearBase && !force) return;
-  wearBase = key;
-  clearTimeout(wearTimer);
-  wearTimer = setTimeout(() => {
-    for (const { img, item } of wearTiles) thumbInto(img, `wear:${item.key}:${key}`, { ...base, ...item.wear }, false);
-  }, 250);
-}
-syncs.push(() => {
-  for (const { b, item } of wearTiles) b.setAttribute('aria-pressed', String(item.on()));
-  refreshWear();
-});
 
 /** One colour for everything worn; 'auto' gives each its own default. */
 function wearColors() {
   const swatches = ['#2B2833', '#F4EFE6', '#E85D4A', '#5B5BF7', '#2FCB7A', '#F2C14E', '#FF8FC8'];
-  // The bandana and badge follow accessoryColor unless given their own.
   const set = (c) => update({ accessoryColor: c, scarfColor: undefined, badgeColor: undefined }, { coalesce: 'wearColor' });
-  const lid = nextId('lbl');
   const autoBtn = h('button', { type: 'button', class: 'swatch auto', title: 'Each its own', 'aria-label': 'Each its own colour', onclick: () => set(undefined) });
   const btns = swatches.map((c) => h('button', { type: 'button', class: 'swatch', style: `background:${c}`, title: c, 'aria-label': c, onclick: () => set(c) }));
   const picker = h('input', { type: 'color', class: 'picker', 'aria-label': 'Custom colour', title: 'Custom colour' });
@@ -703,27 +712,37 @@ function wearColors() {
     picker.classList.toggle('on', !!v && !swatches.some((x) => x.toLowerCase() === v.toLowerCase()));
     if (v && /^#[0-9a-f]{6}$/i.test(v)) picker.value = v;
   });
-  return row('Colour', h('div', { class: 'swatches', role: 'group', 'aria-labelledby': lid }, autoBtn, ...btns, picker));
+  return row('Colour', h('div', { class: 'swatches', role: 'group' }, autoBtn, ...btns, picker));
 }
 
-const sameOutfit = (o) => WEAR_KEYS.every((k) => (opts[k] || undefined) === (o[k] || undefined));
 tabPanel('wear', () => {
-  const outfitBtns = OUTFITS.map((x) => h('button', { type: 'button', class: 'chip', onclick: () => { update({ ...cleared(), ...x.o, badge: opts.badge }); bot.react?.('happy'); } }, x.name));
-  const clearBtn = h('button', { type: 'button', class: 'chip', onclick: () => update(cleared()) }, 'Nothing');
-  syncs.push(() => OUTFITS.forEach((x, i) => outfitBtns[i].setAttribute('aria-pressed', String(sameOutfit({ ...x.o, badge: opts.badge })))));
+  // What's on now, each with a way to take it off.
+  const wearing = h('div', { class: 'chips wearing', 'aria-live': 'polite' });
+  const labelOf = new Map();
+  syncs.push(() => {
+    for (const w of wearables()) labelOf.set(w.name, w.label);
+    const list = worn();
+    wearing.replaceChildren(...(list.length
+      ? [...list.map((e) => h('button', { type: 'button', class: 'chip on', title: 'Take off', onclick: () => toggleWear(nameOf(e)) },
+          `${labelOf.get(nameOf(e)) || title(nameOf(e))} ✕`)),
+        h('button', { type: 'button', class: 'chip ghost', onclick: () => update(wearPatch([])) }, 'Take all off')]
+      : [h('span', { class: 'note' }, 'Nothing yet. Pick an outfit or tap anything below.')]));
+  });
+  const outfitBtns = OUTFITS.map(([name, list]) => h('button', { type: 'button', class: 'chip', onclick: () => { update(wearPatch(list)); bot.react?.('happy'); } }, name));
+  syncs.push(() => OUTFITS.forEach(([, list], i) => {
+    const want = wornList(parseWear(list)).map(nameOf).sort().join();
+    outfitBtns[i].setAttribute('aria-pressed', String(worn().map(nameOf).sort().join() === want));
+  }));
   const badgeText = text('badge', 'Badge text', 'e.g. AI');
   syncs.push(() => { badgeText.hidden = !opts.badge; });
-  const panel = [
-    grp('Outfits', h('div', { class: 'chips' }, ...outfitBtns, clearBtn)),
-    grp('Head', slotGrid(SLOTS.head()), packRows()),
-    grp('Eyes', slotGrid(SLOTS.eyes())),
-    grp('Neck', slotGrid(SLOTS.neck())),
-    grp('Extras', slotGrid(SLOTS.extras()), badgeText),
+  return [
+    grp('Wearing', wearing),
+    grp('Outfits', h('div', { class: 'chips' }, ...outfitBtns)),
+    grp('Things to wear', tileGrid(wearables().filter((w) => !hatPack.has(w.name) && BUILT_IN_WEAR.has(w.name)).map(itemTile)), badgeText, seasonal()),
     grp('', wearColors()),
   ];
-  queueMicrotask(() => refreshWear(true));
-  return panel;
 });
+const BUILT_IN_WEAR = new Set(wearables().map((w) => w.name));
 
 // --- Material & light ----------------------------------------------------------------
 

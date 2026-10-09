@@ -12,5 +12,7 @@
   "file": {
     "features/*.js": 6,
     "packs/*.js": 4
-  }
+  },
+  "//wear": "1.1: +0.7 KB for the wear vocabulary (wear lists resolve synchronously, so it can't load lazily).",
+  "//character": "1.2: +1.4 KB for temperaments and habits (the simulation needs them from the first frame), +1.2 KB in the renderer for glass, lantern and quirks."
 }

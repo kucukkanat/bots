@@ -10,6 +10,8 @@
 
 import { mulberry32 } from './engine.js';
 import { presets } from './shapes.js';
+import { parseWear } from './wear.js';
+export { parseWear };
 
 // --- Groups ------------------------------------------------------------------
 
@@ -50,34 +52,6 @@ function flattenGroup(group, value, out, prefix = '') {
       flattenGroup(group, v, out, path);
     } else if (map[path]) out[map[path]] = v;
   }
-}
-
-// --- Wearing things by name ----------------------------------------------------
-
-const WEAR_ITEMS = {
-  'party-hat': { hat: 'party' }, 'top-hat': { hat: 'tophat' }, 'witch-hat': { hat: 'witch' },
-  glasses: { glasses: 'round' }, 'round-glasses': { glasses: 'round' }, 'square-glasses': { glasses: 'square' }, shades: { glasses: 'shades' },
-  'bow-tie': { bowTie: true, scarf: false }, bandana: { scarf: true, bowTie: false }, scarf: { scarf: true, bowTie: false },
-  headphones: { headphones: true },
-  'cat-ears': { ears: 'cat' }, 'bunny-ears': { ears: 'bunny' }, 'bear-ears': { ears: 'bear' }, 'round-ears': { ears: 'round' },
-  antenna: { antennae: 'one' }, antennae: { antennae: 'two' },
-};
-
-/**
- * Options from a list of things to wear: `'party-hat round-glasses bow-tie'`
- * or an array. Any other name is a hat ('beanie', 'crown', a pack's 'santa');
- * `badge:AI` pins a badge. Later items win (one hat, one pair of glasses,
- * one thing round the neck).
- */
-export function parseWear(list) {
-  const out = {};
-  for (const raw of Array.isArray(list) ? list : String(list).split(/[\s,]+/)) {
-    const item = String(raw).trim().toLowerCase();
-    if (!item || item === 'none') continue;
-    if (item.startsWith('badge')) out.badge = String(raw).trim().slice(6) || 'AI';
-    else Object.assign(out, WEAR_ITEMS[item] || { hat: item });
-  }
-  return out;
 }
 
 // --- Style presets -------------------------------------------------------------
@@ -227,6 +201,11 @@ export function normalizeOptions(opts = {}) {
   for (const k of Object.keys(flat)) if (flat[k] === undefined) delete flat[k];
   if (Array.isArray(flat.quirk)) flat.quirk = flat.quirk.join(' ');
   if (worn) { delete flat.wear; flat = { ...worn, ...flat }; }
+  // wearColor is the friendlier name for accessoryColor.
+  if ('wearColor' in flat) {
+    if (flat.accessoryColor === undefined) flat.accessoryColor = flat.wearColor;
+    delete flat.wearColor;
+  }
   const fromId = flat.identity ? lookFromId(flat.identity) : {};
   const fromDna = flat.dna ? decodeDNA(flat.dna) : {};
   const preset = STYLES[flat.preset ?? fromDna.preset] || {};
