@@ -1,4 +1,4 @@
-export { BotAvatar, createBot, resolveLook, DEFAULTS, SHADINGS, HATS, GLASSES, STATES } from './bot.js';
+export { BotAvatar, createBot, resolveLook, DEFAULTS, SHADINGS, HATS, GLASSES, STATES, renderSettings, renderStats } from './bot.js';
 export { BotAvatarElement, defineBotAvatar } from './element.js';
 export { BotSim, restPose, jumpCurve } from './engine.js';
 export { drawBot, OVERSCAN, BODY, RISE } from './render.js';

@@ -1,10 +1,13 @@
 // The avatar controller: owns a canvas, resolves options into a look, runs the
-// simulation on a shared animation loop and handles pointer play.
+// simulation on a shared animation loop and handles pointer play. Drawing
+// happens in a worker thread when the browser allows (see pool.js), with
+// WebGL2 when it's there and the 2D canvas otherwise.
 
 import { adjust, autoInk } from './color.js';
 import { BotSim, restPose, STATES } from './engine.js';
 import { drawBot, OVERSCAN, BODY, RISE } from './render.js';
 import { presets, getShape, shapeFromSvgPath } from './shapes.js';
+import { workerPool, mainThreadGpu, stats } from './pool.js';
 
 export const DEFAULTS = Object.freeze({
   type: 'clover',
@@ -24,6 +27,8 @@ export const DEFAULTS = Object.freeze({
   paused: false,
   interactive: true,
   theme: 'auto',
+  renderer: 'auto',
+  quality: 'auto',
 });
 
 export const SHADINGS = ['fabric', 'plastic', 'smooth', 'crisp', 'flat'];
@@ -31,6 +36,18 @@ export const HATS = ['none', 'beanie', 'party', 'crown', 'beret', 'tophat'];
 export const GLASSES = ['none', 'round', 'square', 'shades'];
 
 const FACE_KEYS = ['lookX', 'lookY', 'eyeOpen', 'happy', 'smile', 'mouthOpen'];
+
+/**
+ * The look as the worker thread receives it: plain data, with the shape as its
+ * type (or, for a custom path, its points).
+ */
+function lookMessage(look) {
+  const { shape, pose, ...rest } = look;
+  const spec = look.path
+    ? { key: `${look.type}:${look.path}`, points: shape.points, meta: { type: shape.type, faceY: shape.faceY, faceScale: shape.faceScale, extras: shape.extras } }
+    : { type: shape.type };
+  return { ...rest, shape: spec };
+}
 
 const STATE_WORDS = { default: 'idle', working: 'working', sleeping: 'sleeping' };
 
@@ -116,7 +133,6 @@ export class BotAvatar {
       target.appendChild(this.canvas);
     }
     this.canvas.setAttribute('role', 'img');
-    this.ctx = this.canvas.getContext('2d');
     this.sim = new BotSim(this.options.seed ?? Math.random(), this.options.state, this.options);
     this.visible = true;
     this.look = resolveLook(this.options);
@@ -131,9 +147,50 @@ export class BotAvatar {
       this._io.observe(this.canvas);
     }
     bindPointer();
+    // Avatars that own their canvas are drawn on a worker thread once one has
+    // started; until then (or if none can) they wait, then draw here.
+    const pool = this._ownCanvas && workerPool();
+    if (pool) {
+      this._waiting = true;
+      pool.ready.then((ok) => (this._destroyed ? null : ok ? this._attachWorker(pool) : this._attachMain()));
+    } else this._attachMain();
     this._layout();
     this._sync();
+  }
+
+  _attachMain() {
+    this._waiting = false;
+    this.ctx = this.canvas.getContext('2d');
+    this.gpu = this.options.renderer === 'canvas' ? null : mainThreadGpu();
+    this._layout();
     this.draw();
+  }
+
+  _attachWorker(pool) {
+    this._waiting = false;
+    this.pool = pool;
+    this._layout(false);
+    const offscreen = this.canvas.transferControlToOffscreen();
+    this.handle = pool.attach(offscreen, { look: lookMessage(this.look), size: this.options.size, dpr: this.dpr, ...this._renderOpts() });
+    this.draw();
+  }
+
+  /** Whether frames are painted with WebGL. */
+  get webgl() {
+    if (this.options.renderer === 'canvas') return false;
+    return this.pool ? this.pool.gpu : !!this.gpu;
+  }
+
+  /**
+   * quality 'auto' spends detail only where the 2D canvas needs it: without
+   * WebGL, light is re-computed after slightly larger movements, high-density
+   * screens draw at 1.5× instead of 2×, and small avatars (48px or less) at
+   * half the frame rate. With WebGL, or quality 'high', nothing is traded.
+   */
+  _economy() { return this.options.quality !== 'high' && !this.webgl; }
+
+  _renderOpts() {
+    return { useGpu: this.options.renderer !== 'canvas', relaxed: this._economy() };
   }
 
   /** Update options; anything not passed is kept. */
@@ -143,7 +200,11 @@ export class BotAvatar {
     if (options.state && options.state !== this.sim.state) this.sim.setState(options.state);
     this.sim.setOptions(this.options);
     this.look = resolveLook(this.options);
-    if (options.size !== undefined && options.size !== prev.size) this._layout();
+    if (this.handle) {
+      this.pool.post(this.handle, { op: 'look', look: lookMessage(this.look) });
+      this.pool.post(this.handle, { op: 'opts', ...this._renderOpts() });
+    } else if (this.ctx && options.renderer !== undefined) this.gpu = this.options.renderer === 'canvas' ? null : mainThreadGpu();
+    if ((options.size !== undefined && options.size !== prev.size) || options.renderer !== undefined || options.quality !== undefined) this._layout();
     this._sync();
     this.draw();
     return this;
@@ -153,13 +214,18 @@ export class BotAvatar {
   /** Hop and turn round, as a click does. */
   poke() { this.sim.poke(); }
 
-  _layout() {
+  _layout(resize = true) {
     const size = this.options.size;
-    const dpr = Math.min(2, (typeof devicePixelRatio !== 'undefined' && devicePixelRatio) || 1);
+    const dpr = Math.min(this._economy() ? 1.5 : 2, (typeof devicePixelRatio !== 'undefined' && devicePixelRatio) || 1);
     const full = size * OVERSCAN;
+    const w = Math.round(full * dpr);
     this.dpr = dpr;
-    this.canvas.width = Math.round(full * dpr);
-    this.canvas.height = Math.round(full * dpr);
+    if (this.handle) {
+      if (resize) this.pool.post(this.handle, { op: 'size', w, h: w, size, dpr });
+    } else {
+      this.canvas.width = w;
+      this.canvas.height = w;
+    }
     Object.assign(this.canvas.style, {
       width: `${full}px`,
       height: `${full}px`,
@@ -190,6 +256,7 @@ export class BotAvatar {
       this.sim.setPointer(d < 5 && d > 0.05 ? { x: Math.max(-1, Math.min(1, dx / 2.5)), y: Math.max(-1, Math.min(1, dy / 2.5)) } : null);
     } else this.sim.setPointer(null);
     this.sim.update(dt);
+    if (this.options.size <= 48 && this._economy() && (this._ticks = (this._ticks || 0) + 1) % 2) return;
     if (drawTurn && this._changed()) this.draw();
   }
 
@@ -219,8 +286,14 @@ export class BotAvatar {
   }
 
   draw() {
-    this._drawn = this.pose;
-    drawBot(this.ctx, { size: this.options.size, dpr: this.dpr, pose: this.pose, look: this.look, time: this.sim.time });
+    if (this._waiting) return;
+    const pose = this.pose;
+    this._drawn = pose;
+    if (this.handle) this.pool.frame(this.handle, { pose, time: this.sim.time });
+    else {
+      drawBot(this.ctx, { size: this.options.size, dpr: this.dpr, pose, look: this.look, time: this.sim.time }, { gpu: this.gpu, relaxed: this._economy() });
+      stats.drawn++;
+    }
   }
 
   /** PNG data URL of the current frame, cropped to the avatar's box unless `full`. */
@@ -239,6 +312,8 @@ export class BotAvatar {
   }
 
   destroy() {
+    this._destroyed = true;
+    if (this.handle) this.pool.remove(this.handle);
     stopLoop(this);
     this._io?.disconnect();
     this.canvas.removeEventListener('click', this._onClick);
@@ -253,3 +328,4 @@ export function createBot(target, options) {
 }
 
 export { STATES };
+export { settings as renderSettings, stats as renderStats } from './pool.js';

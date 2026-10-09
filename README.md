@@ -2,7 +2,7 @@
 
 # bots
 
-Animated bot avatars for AI agents. Eighteen plush 3D shapes with living faces that look around, hop while they work and doze off between tasks — plus hats, glasses, headphones and bow ties. Drawn on a plain 2D canvas: no WebGL, no build step, no dependencies.
+Animated bot avatars for AI agents. Eighteen plush 3D shapes with living faces that look around, hop while they work and doze off between tasks — plus hats, glasses, headphones and bow ties. Drawn with WebGL in worker threads, with a plain 2D canvas fallback wherever either is missing: no build step, no dependencies.
 
 **[Live site](https://hackdonalds.github.io/bots/) · [Playground](https://hackdonalds.github.io/bots/playground/)**
 
@@ -78,6 +78,8 @@ import { BotAvatar } from '@hackdonalds/bots/react';
 | `paused`, `pose` | freeze; hold a pose such as `{ yaw: 0.8 }` | `false` |
 | `interactive` | eyes follow the pointer, click to hop | `true` |
 | `seed` | 0–1, offsets blinks and glances | random |
+| `renderer` | `auto` (WebGL when there's a hardware GPU), `canvas` (always 2D) | `auto` |
+| `quality` | `auto` (2D only: trades a little detail for speed, see below), `high` | `auto` |
 
 `prefers-reduced-motion` shows each state's still pose. All avatars share one animation loop and pause when off screen.
 
@@ -89,7 +91,11 @@ import { BotAvatar } from '@hackdonalds/bots/react';
 
 ## How it renders
 
-Every frame is plain 2D canvas, built to stay cheap with many avatars on a page:
+**Where.** Each avatar's canvas is handed to a worker thread (`OffscreenCanvas`), so drawing runs off the main thread and avatars spread over up to four cores; the page itself keeps its frame rate however many there are. A worker is only used once it has started and said so; without worker support (or for a canvas you pass in yourself) the same renderer runs on the main thread. Each worker has at most one batch of frames in flight, so a slow one draws less often instead of falling behind. `renderSettings.workers = false` turns workers off.
+
+**WebGL.** With a hardware GPU, the body is drawn with WebGL2: the stacked silhouette rasterised once (multisampled), every light pass a GPU blur of it at its own scale (from the silhouette's mipmap, ~13 taps a pass), and one shader laying down body colour, fur skin, turn shading, light, highlights and edge fuzz, then the outline hairs as one batch of thin quads. Faces and things worn are painted on top in 2D. It matches the 2D renderer to within a fraction of a level per pixel. Software-emulated WebGL (no GPU, or a blocked one) is refused, a lost context falls back, and a thread whose GPU turns out too slow switches to 2D — so every browser gets the fastest path it really has.
+
+**2D canvas.** The fallback, built to stay cheap with many avatars on a page:
 
 - **Adaptive depth.** The body is its outline stacked through its depth, but only with as many slices as the turn needs: one when facing you, more (about 3 device pixels apart) as front and back pull apart.
 - **No clips, no layers.** The body goes down first on the empty frame, so everything on it (fur, turn shading, light, face) is painted with `source-atop` and stays inside the silhouette without a clip; what sits behind it (fuzz, ears, antennae, floor shadow) follows with `destination-over`.
@@ -98,7 +104,9 @@ Every frame is plain 2D canvas, built to stay cheap with many avatars on a page:
 - **Only draw what changed.** A frame is skipped when the pose has moved less than a quarter of a device pixel, so a resting avatar breathing in sub-pixel steps is mostly free. Off-screen and reduced-motion avatars don't animate.
 - **Frame budget.** All avatars share one animation loop. When the page can't keep up, they take turns redrawing while their simulations keep real time, so the page keeps its frame rate.
 
-`/bench/grid.html?n=30&size=96` (with `npm start` running) renders a grid of avatars and reports the frame rate.
+- **Economies, 2D only.** With `quality: 'auto'` and no WebGL, light is re-computed after slightly larger movements, high-density screens draw at 1.5× instead of 2×, and avatars of 48px or less animate at half rate. With WebGL, or `quality: 'high'`, nothing is traded.
+
+`/bench/grid.html?n=30&size=96` (with `npm start` running) renders a grid of avatars and reports the page's frame rate and each avatar's; `workers=off`, `renderer=canvas`, `quality=high` and `budget=off` compare the paths.
 
 ## Develop
 

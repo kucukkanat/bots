@@ -5,6 +5,7 @@
 
 import { shade, rgba, clamp, luminance } from './color.js';
 import { mulberry32, smoothstep } from './engine.js';
+import { cssRgba, fringeQuads, invert } from './gpu.js';
 
 /** The canvas is this much larger than the avatar's box, so hops never clip. */
 export const OVERSCAN = 1.5;
@@ -13,8 +14,17 @@ export const BODY = 0.4;
 /** How far below the box centre the body's centre sits, as a fraction of the box. */
 export const RISE = 0.04;
 
-const LAYERS = 15;
 const MIN_TURN = 0.14;
+/** Light buffers' resolution relative to the canvas, for the 2D renderer. */
+const LIGHT_Q = 0.7;
+let quadScratch = null;
+
+/** Body frame -> skin texture uv, for the GPU. */
+function skinUv({ T, S, P, e }) {
+  const k = P / S;
+  const [a, b, c, d, ex, f] = invert(T);
+  return [a * k, b * k, c * k, d * k, (ex + e) * k, (f + e) * k];
+}
 
 const profile = (u) => 0.5 + 0.5 * Math.sqrt(Math.max(0, 1 - u * u));
 
@@ -99,8 +109,9 @@ function innerShadowInto(g, M, q, path, { color, blur, ox, oy }, dpr, w, h) {
  * @param owner  the frame's context: the cache belongs to its canvas
  * @param key    everything the passes depend on besides the pose
  * @param pose   [yaw, pitch, roll, sx, sy] and the device-px scale of each
+ * @param tolerance  how far (light buffer px) the outline may move before re-lighting
  */
-function lightLayer(lc, owner, name, path, passes, dpr, q, key, pose, reach) {
+function lightLayer(lc, owner, name, path, passes, dpr, q, key, pose, reach, tolerance = 0.6) {
   const M = lc.getTransform();
   const { width: W, height: H } = owner.canvas;
   const w = Math.ceil(W * q) + 2, h = Math.ceil(H * q) + 2;
@@ -117,7 +128,7 @@ function lightLayer(lc, owner, name, path, passes, dpr, q, key, pose, reach) {
     moved = 0;
     for (let i = 0; i < pose.length; i++) moved += Math.abs(pose[i] - e.pose[i]) * reach[i];
   }
-  if (moved * q > 0.6) {
+  if (moved * q > tolerance) {
     const g = e.ctx;
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, w, h);
@@ -364,8 +375,11 @@ function roundRect(ctx, x, y, w, h, r) {
  * Draw one frame.
  * @param {CanvasRenderingContext2D} ctx  a context on a canvas `size * OVERSCAN * dpr` px square
  * @param {object} f  { size, dpr, pose, look, time }
+ * @param {object} [opts]
+ * @param {import('./gpu.js').GpuBody} [opts.gpu]  paint the body on the GPU when it can
+ * @param {boolean} [opts.relaxed]  2D only: re-light after larger movements (cheaper)
  */
-export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }) {
+export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = null, relaxed = false } = {}) {
   const full = size * OVERSCAN;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, full, full);
@@ -512,61 +526,46 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }) {
   // front and back pull apart — about 3 device pixels apart.
   const order = c0 * cp >= 0 ? 1 : -1;
   const span = 2 * D * R * dpr * Math.hypot(s, c0 * sp);
-  const stack = (outline, px) => {
-    const p = new Path2D();
-    const slices = px < 0.75 ? 1 : clamp(2 * Math.ceil(px / 6) + 1, 3, 21);
-    for (let i = 0; i < slices; i++) {
-      const u = slices === 1 ? 0 : order * (-1 + (2 * i) / (slices - 1));
+  const sliceList = (px) => {
+    const n = px < 0.75 ? 1 : clamp(2 * Math.ceil(px / 6) + 1, 3, 21);
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const u = n === 1 ? 0 : order * (-1 + (2 * i) / (n - 1));
       const k = profile(u);
       const z = u * D;
-      p.addPath(outline, new DOMMatrix([R * k * c, -R * k * s * sp, 0, R * k * cp, R * z * s, R * z * c0 * sp]));
+      out.push([R * k * c, -R * k * s * sp, 0, R * k * cp, R * z * s, R * z * c0 * sp]);
     }
+    return out;
+  };
+  const stack = (outline, mats) => {
+    const p = new Path2D();
+    // A plain transform object: DOMMatrix isn't in every worker.
+    for (const m of mats) p.addPath(outline, { a: m[0], b: m[1], c: m[2], d: m[3], e: m[4], f: m[5] });
     return p;
   };
-  const body = stack(shapePath(shape), span);
-  // The light buffers are a fraction of the canvas resolution: they get a
-  // lighter silhouette, a third of the outline's points and slices spaced for
-  // their own pixels, which rasterises far faster and looks the same blurred.
-  const LIGHT_Q = 0.7;
-  const bodyLo = stack(shapePath(shape, 3), span * LIGHT_Q);
+  const slices = sliceList(span);
+  let bodyPath = null;
+  const body = () => (bodyPath ??= stack(shapePath(shape), slices));
   const darkC = shade(base, -0.3, 6, 1.15);
 
-  // The body goes down first on the empty frame, so everything on it is
-  // painted with 'source-atop', which keeps it inside the silhouette without
-  // a clip; what sits behind it follows with 'destination-over'.
-  const W = ctx.canvas.width, H = ctx.canvas.height;
-  const lc = ctx;
-  lc.save();
-  lc.fillStyle = base;
-  lc.fill(body);
-  lc.globalCompositeOperation = 'source-atop';
-  // Gradients over the body only need to cover its box, not the overscan.
-  const { minX: bx, maxX: bX, minY: by, maxY: bY } = shape.bounds;
-  const cover = () => lc.fillRect((bx - D - 0.1) * R, (by - D - 0.1) * R, (bX - bx + 2 * D + 0.2) * R, (bY - by + 2 * D + 0.2) * R);
-  const Rpx = R * dpr;
-  const poseSig = [pose.yaw, pose.pitch, pose.roll, pose.sx, pose.sy];
-  const moves = [Rpx * (1 + D), Rpx * (1 + D), Rpx * 2, Rpx, Rpx * 2];
-  const lightKey = `${shape._id ??= ++shapeIds}|${R}|${D}|${dpr}|${la}|${base}|${look.shading}|${shadowK}|${highK}|${rimK}|${look.spread}`;
-
+  // Everything laid on the body, described once and painted either on the GPU
+  // or with the 2D canvas.
+  let skin = null;
   if (fabric) {
-    // The baked skin rides on the front of the body with the turn.
-    const skin = furSkin(shape, look, la, R * dpr);
-    // One copy at a constant strength, so the fur never changes the body's
-    // tone as it turns. It follows the turn, but is never squeezed narrower
-    // than half width: edge on, it still covers the side that shows.
+    // The baked skin rides on the front of the body with the turn. One copy at
+    // a constant strength, so the fur never changes the body's tone as it
+    // turns; never squeezed narrower than half width, so edge on it still
+    // covers the side that shows. It's blended with the body colour once
+    // (overlay, and multiply on pale colours, which overlay can't darken).
+    const sk = furSkin(shape, look, la, R * dpr);
     const zf = D * 0.6, e = SKIN_EXT;
     const cx2 = Math.sign(c) * Math.max(Math.abs(c), 0.5);
-    // The skin is blended with the body colour once (overlay, and multiply
-    // on pale colours, which overlay can't darken) and then laid on with a
-    // plain draw instead of a per-pixel blend every frame.
-    const tinted = tintedSkin(skin, base);
-    lc.save();
-    lc.transform(R * cx2, -R * s * sp, 0, R * cp, R * zf * s, R * zf * c0 * sp);
-    lc.drawImage(tinted, 0, 0, skin.S, skin.S, -e, -e, skin.S / skin.P, skin.S / skin.P);
-    lc.restore();
+    const T = [R * cx2, -R * s * sp, 0, R * cp, R * zf * s, R * zf * c0 * sp];
+    skin = { canvas: tintedSkin(sk, base), T, S: sk.S, P: sk.P, e };
   }
 
   // Turn shading: the side that shows as the head turns.
+  let turn = null;
   {
     const reveal = Math.abs(s);
     if (reveal > 0.02) {
@@ -574,32 +573,30 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }) {
       const lit = sideDir * lx;
       const frontX = R * D * s;
       const edge = frontX + sideDir * R * (Math.abs(c) * 0.55 + 0.3);
-      const g = lc.createLinearGradient(frontX, 0, edge + sideDir * R * 0.7, 0);
-      const col = lit > 0 ? `rgba(255,255,255,${0.16 * lit * reveal})` : rgba(darkC, 0.5 * -lit * reveal + 0.12 * reveal);
-      g.addColorStop(0, 'rgba(0,0,0,0)');
-      g.addColorStop(0.45, lit > 0 ? 'rgba(255,255,255,0)' : rgba(darkC, 0.08 * reveal));
-      g.addColorStop(1, col);
-      lc.fillStyle = g;
-      cover();
+      turn = {
+        x0: frontX, x1: edge + sideDir * R * 0.7,
+        stops: ['rgba(0,0,0,0)', lit > 0 ? 'rgba(255,255,255,0)' : rgba(darkC, 0.08 * reveal),
+          lit > 0 ? `rgba(255,255,255,${0.16 * lit * reveal})` : rgba(darkC, 0.5 * -lit * reveal + 0.12 * reveal)],
+      };
     }
   }
 
+  const passes = [], highs = [];
+  let lq = 1;
+  const W = ctx.canvas.width, H = ctx.canvas.height;
   if (look.shading !== 'flat') {
-
     const q = clamp(120 / Math.max(W, H), 0.2, 0.5);
+    lq = q;
     const blur = R * (fabric ? 0.55 : look.shading === 'smooth' ? 0.7 : 0.45) * (look.spread ?? 1.4) / 1.4;
-    const passes = [
-      // Shade side: an inner shadow pushed toward the light.
-      { color: rgba(darkC, clamp(0.7 * shadowK, 0, 1)), blur, ox: lx * R * 0.32, oy: ly * R * 0.32, q },
-      // Occlusion all round the edge for the inflated look.
-      { color: rgba(darkC, clamp(0.38 * shadowK, 0, 1)), blur: R * 0.2, ox: 0, oy: 0, q },
-    ];
+    // Shade side: an inner shadow pushed toward the light.
+    passes.push({ color: rgba(darkC, clamp(0.7 * shadowK, 0, 1)), blur, ox: lx * R * 0.32, oy: ly * R * 0.32, q });
+    // Occlusion all round the edge for the inflated look.
+    passes.push({ color: rgba(darkC, clamp(0.38 * shadowK, 0, 1)), blur: R * 0.2, ox: 0, oy: 0, q });
     // Plush is a cushion: it falls off broadly toward every edge.
     if (fabric) passes.push({ color: rgba(darkC, clamp(0.3 * shadowK, 0, 1)), blur: R * 0.6, ox: 0, oy: R * 0.05, q });
     // Back light / Fresnel rim on the far side from the key, finer than the
     // rest. Velvet and plush scatter most at grazing angles, so the fabric rim
     // is a soft sheen.
-    let lq = q;
     if (rimK > 0 && look.shading !== 'smooth') {
       lq = Math.min(1, q * 1.5);
       passes.push({
@@ -609,38 +606,137 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }) {
         q: lq,
       });
     }
-    lightLayer(lc, ctx, 'light', bodyLo, passes, dpr, lq, lightKey, poseSig, moves);
-
-    // Lit side.
-    const hx = lx * R * 0.42 + R * D * s * 0.8, hy = ly * R * 0.42;
+    // Lit side. Plush lights in its own colour (white would grey it), and pale
+    // bodies, already near white, take less of it.
     const spread = look.spread ?? 1.4;
-    const g = lc.createRadialGradient(hx, hy, 0, hx, hy, R * 0.95 * spread);
     const hiA = (fabric ? 0.2 : look.shading === 'plastic' ? 0.3 : 0.26) * highK;
-    // Plush lights in its own colour; white would grey it.
-    const hiC = fabric ? shade(base, 0.32, 0, 1.05) : '#ffffff';
-    // Pale bodies are already near white: they take less of it.
     const hiF = fabric ? 1.3 * (1 - 0.9 * luminance(base)) : 1;
-    g.addColorStop(0, rgba(hiC, clamp(hiA * hiF)));
-    g.addColorStop(1, rgba(hiC, 0));
-    lc.fillStyle = g;
-    cover();
-
+    highs.push({ x: lx * R * 0.42 + R * D * s * 0.8, y: ly * R * 0.42, r: R * 0.95 * spread, color: fabric ? shade(base, 0.32, 0, 1.05) : '#ffffff', a: clamp(hiA * hiF) });
+    // Plastic: a hot spot (and a window reflection, painted after).
     if (look.shading === 'plastic') {
-      // Hot spot and a window reflection.
+      highs.push({ x: lx * R * 0.48 + R * D * s * 0.9, y: ly * R * 0.5 + R * D * sp, r: R * 0.22 * spread, color: '#ffffff', a: clamp(0.85 * highK / 1.3) });
+    }
+  }
+
+  // The pile seen edge on: a soft, semi-transparent band of fuzz just outside
+  // the silhouette, behind the body.
+  const fuzz = fabric && {
+    color: rgba(shade(base, -0.18, 2, 0.6), 0.5),
+    blur: R * 0.035 * (look.furFuzz ?? 0.9) * (look.furLength ?? 1),
+    ox: -lx * R * 0.01, oy: -ly * R * 0.01,
+  };
+
+  // Outline hairs: fine strands standing off the silhouette, toned by the light.
+  let fringe = null;
+  if (fabric) {
+    const fl = look.furLength ?? 1;
+    const fz = look.furFuzz ?? 0.9;
+    const grav = look.furGravity ?? 0.9;
+    const curl = look.furCurl ?? 0.7;
+    const list = strands(shape, Math.round(2400 * (look.furDensity ?? 1.6) / 1.6 * (0.4 + fz)));
+    const TONES = 3;
+    const segs = Array.from({ length: TONES }, () => []);
+    const swayT = time * 2.2;
+    for (const st of list) {
+      const w = Math.sqrt(1 - st.u * st.u);
+      const k = profile(st.u);
+      // Normal of the cushion at that point, then turned with the head.
+      const Nx = st.nx * w, Ny = st.ny * w, Nz = st.u;
+      const nx1 = Nx * c0 + Nz * s, nz1 = -Nx * s + Nz * c0;
+      const ny1 = Ny * cp + nz1 * sp, nzv = nz1 * cp - Ny * sp;
+      const a = Math.abs(nzv);
+      if (a > 0.55) continue;
+      const [X, Y] = proj(st.x * k * 0.97, st.y * k * 0.97, st.u * D);
+      let dx = nx1 + st.jitter * 0.5, dy = ny1 + grav * 0.45 + Math.sin(swayT + st.tone * 6) * 0.04;
+      const l = Math.hypot(dx, dy) || 1;
+      dx /= l; dy /= l;
+      const len = R * 0.055 * fl * st.len * (0.6 + fz * 0.6) * (1 - a * 1.2);
+      const bx = -dy * st.bend * curl * len * 0.8, by = dx * st.bend * curl * len * 0.8;
+      const lit = clamp(0.5 + 0.5 * (nx1 * lx + ny1 * ly) + (st.tone - 0.5) * 0.5, 0, 0.999);
+      // Short enough that a straight stroke with a bent tip reads as a curl.
+      segs[Math.floor(lit * TONES)].push(X - dx * len * 0.7, Y - dy * len * 0.7, X + dx * len + bx, Y + dy * len + by);
+    }
+    fringe = {
+      segs,
+      width: Math.max(0.4, R * 0.006),
+      tones: [rgba(shade(base, -0.24, 3, 0.85), 0.45), rgba(shade(base, -0.1, 0, 0.9), 0.45), rgba(shade(base, 0.04, 0, 0.95), 0.45)],
+    };
+  }
+
+  const lc = ctx;
+  lc.save();
+  const M = lc.getTransform();
+  let quads = null;
+  if (gpu && gpu.ok && fringe) quads = quadScratch = fringeQuads(fringe.segs, fringe.tones.map(cssRgba), fringe.width, quadScratch?.data);
+  const onGpu = gpu && gpu.ok && gpu.draw(ctx, {
+    W, H, M: [M.a, M.b, M.c, M.d, M.e, M.f], shape, slices,
+    base: cssRgba(base),
+    skin: skin && { canvas: skin.canvas, uv: skinUv(skin) },
+    turn: turn && { x0: turn.x0, x1: turn.x1, stops: turn.stops.map(cssRgba) },
+    passes: passes.map((p) => ({ rgba: cssRgba(p.color), sigma: (p.blur * dpr) / 2, ox: p.ox * dpr, oy: p.oy * dpr })),
+    highs: highs.map((h) => ({ x: h.x, y: h.y, r: h.r, rgba: [...cssRgba(h.color).slice(0, 3), h.a] })),
+    fuzz: fuzz && { rgba: cssRgba(fuzz.color), sigma: (fuzz.blur * dpr) / 2, ox: fuzz.ox * dpr, oy: fuzz.oy * dpr },
+    fringe: quads,
+  });
+
+  if (!onGpu) {
+    // The body goes down first on the empty frame, so everything on it is
+    // painted with 'source-atop', which keeps it inside the silhouette
+    // without a clip; what sits behind it follows with 'destination-over'.
+    lc.fillStyle = base;
+    lc.fill(body());
+  }
+  lc.globalCompositeOperation = 'source-atop';
+  // Gradients over the body only need to cover its box, not the overscan.
+  const { minX: bx, maxX: bX, minY: by, maxY: bY } = shape.bounds;
+  const cover = () => lc.fillRect((bx - D - 0.1) * R, (by - D - 0.1) * R, (bX - bx + 2 * D + 0.2) * R, (bY - by + 2 * D + 0.2) * R);
+
+  if (!onGpu) {
+    if (skin) {
       lc.save();
-      const px = lx * R * 0.48 + R * D * s * 0.9, py = ly * R * 0.5 + R * D * sp;
-      const hs = lc.createRadialGradient(px, py, 0, px, py, R * 0.22 * spread);
-      hs.addColorStop(0, `rgba(255,255,255,${clamp(0.85 * highK / 1.3)})`);
-      hs.addColorStop(1, 'rgba(255,255,255,0)');
-      lc.fillStyle = hs;
-      cover();
-      lc.translate(px, py);
-      lc.rotate(la + Math.PI / 2);
-      lc.fillStyle = `rgba(255,255,255,${clamp(0.55 * highK / 1.3)})`;
-      roundRect(lc, -R * 0.13, -R * 0.045, R * 0.26, R * 0.09, R * 0.045);
-      lc.fill();
+      lc.transform(...skin.T);
+      lc.drawImage(skin.canvas, 0, 0, skin.S, skin.S, -skin.e, -skin.e, skin.S / skin.P, skin.S / skin.P);
       lc.restore();
     }
+    if (turn) {
+      const g = lc.createLinearGradient(turn.x0, 0, turn.x1, 0);
+      g.addColorStop(0, turn.stops[0]);
+      g.addColorStop(0.45, turn.stops[1]);
+      g.addColorStop(1, turn.stops[2]);
+      lc.fillStyle = g;
+      cover();
+    }
+    if (passes.length) {
+      // The light buffers are a fraction of the canvas resolution: they get a
+      // lighter silhouette, a third of the outline's points and slices spaced
+      // for their own pixels, which rasterises far faster and looks the same
+      // blurred.
+      const Rpx = R * dpr;
+      const poseSig = [pose.yaw, pose.pitch, pose.roll, pose.sx, pose.sy];
+      const moves = [Rpx * (1 + D), Rpx * (1 + D), Rpx * 2, Rpx, Rpx * 2];
+      const lightKey = `${shape._id ??= ++shapeIds}|${R}|${D}|${dpr}|${la}|${base}|${look.shading}|${shadowK}|${highK}|${rimK}|${look.spread}`;
+      const bodyLo = stack(shapePath(shape, 3), sliceList(span * LIGHT_Q));
+      lightLayer(lc, ctx, 'light', bodyLo, passes, dpr, lq, lightKey, poseSig, moves, relaxed ? 1.5 : 0.6);
+    }
+    for (const h of highs) {
+      const g = lc.createRadialGradient(h.x, h.y, 0, h.x, h.y, h.r);
+      g.addColorStop(0, rgba(h.color, h.a));
+      g.addColorStop(1, rgba(h.color, 0));
+      lc.fillStyle = g;
+      cover();
+    }
+  }
+
+  if (look.shading === 'plastic') {
+    // Window reflection.
+    const px = lx * R * 0.48 + R * D * s * 0.9, py = ly * R * 0.5 + R * D * sp;
+    lc.save();
+    lc.translate(px, py);
+    lc.rotate(la + Math.PI / 2);
+    lc.fillStyle = `rgba(255,255,255,${clamp(0.55 * highK / 1.3)})`;
+    roundRect(lc, -R * 0.13, -R * 0.045, R * 0.26, R * 0.09, R * 0.045);
+    lc.fill();
+    lc.restore();
   }
 
   // Face and glasses ride on the front of the body.
@@ -657,34 +753,27 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }) {
     lc.restore();
   }
 
-  if (fabric) {
-    // The pile seen edge on: a soft, semi-transparent band of fuzz just
-    // outside the silhouette, behind the body, darker where it's in shade.
-    // It's the silhouette's own shadow: the shape is drawn far off the canvas
-    // and only its blur lands, slipped underneath the body.
-    const fuzz = (look.furFuzz ?? 0.9) * (look.furLength ?? 1);
-    const M = lc.getTransform();
+  lc.globalCompositeOperation = 'destination-over';
+  if (fuzz && !onGpu) {
+    // The silhouette's own shadow: the shape is drawn far off the canvas and
+    // only its blur lands, slipped underneath the body.
     lc.save();
-    lc.globalCompositeOperation = 'destination-over';
     lc.setTransform(M.a, M.b, M.c, M.d, M.e - FAR, M.f);
-    lc.shadowColor = rgba(shade(base, -0.18, 2, 0.6), 0.5);
-    lc.shadowBlur = R * 0.035 * fuzz * dpr;
-    lc.shadowOffsetX = FAR - lx * R * 0.01 * dpr;
-    lc.shadowOffsetY = -ly * R * 0.01 * dpr;
+    lc.shadowColor = fuzz.color;
+    lc.shadowBlur = fuzz.blur * dpr;
+    lc.shadowOffsetX = FAR + fuzz.ox * dpr;
+    lc.shadowOffsetY = fuzz.oy * dpr;
     lc.fillStyle = '#000';
-    lc.fill(body);
+    lc.fill(body());
     lc.restore();
   }
-  lc.globalCompositeOperation = 'destination-over';
-
   if (look.shading === 'crisp') {
     // Behind the body, so only the silhouette's outline shows, not every slice.
     lc.strokeStyle = rgba(darkC, 0.55);
     lc.lineWidth = Math.max(2, R * 0.05);
-    lc.stroke(body);
+    lc.stroke(body());
   }
   // Behind the body, nearest first.
-  lc.globalCompositeOperation = 'destination-over';
   antennae();
   sideParts.filter((p) => p.z < 0).reverse().forEach((p) => p.draw(true));
   lc.save();
@@ -693,42 +782,15 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }) {
   lc.restore();
   lc.restore();
 
-  // Fur halo at the silhouette: tufts lit from the key side.
-  if (fabric) {
-    const fl = look.furLength ?? 1;
-    const fuzz = look.furFuzz ?? 0.9;
-    const grav = look.furGravity ?? 0.9;
-    const curl = look.furCurl ?? 0.7;
-    const list = strands(shape, Math.round(2400 * (look.furDensity ?? 1.6) / 1.6 * (0.4 + fuzz)));
-    const TONES = 3;
-    const paths = Array.from({ length: TONES }, () => new Path2D());
-    const swayT = time * 2.2;
-    for (const st of list) {
-      const w = Math.sqrt(1 - st.u * st.u);
-      const k = profile(st.u);
-      // Normal of the cushion at that point, then turned with the head.
-      const Nx = st.nx * w, Ny = st.ny * w, Nz = st.u;
-      const nx1 = Nx * c0 + Nz * s, nz1 = -Nx * s + Nz * c0;
-      const ny1 = Ny * cp + nz1 * sp, nzv = nz1 * cp - Ny * sp;
-      const a = Math.abs(nzv);
-      if (a > 0.55) continue;
-      const [X, Y] = proj(st.x * k * 0.97, st.y * k * 0.97, st.u * D);
-      let dx = nx1 + st.jitter * 0.5, dy = ny1 + grav * 0.45 + Math.sin(swayT + st.tone * 6) * 0.04;
-      const l = Math.hypot(dx, dy) || 1;
-      dx /= l; dy /= l;
-      const len = R * 0.055 * fl * st.len * (0.6 + fuzz * 0.6) * (1 - a * 1.2);
-      const bx = -dy * st.bend * curl * len * 0.8, by = dx * st.bend * curl * len * 0.8;
-      const lit = clamp(0.5 + 0.5 * (nx1 * lx + ny1 * ly) + (st.tone - 0.5) * 0.5, 0, 0.999);
-      const p = paths[Math.floor(lit * TONES)];
-      // Short enough that a straight stroke with a bent tip reads as a curl.
-      p.moveTo(X - dx * len * 0.7, Y - dy * len * 0.7);
-      p.lineTo(X + dx * len + bx, Y + dy * len + by);
-    }
+  if (fringe && !onGpu) {
     ctx.lineCap = 'butt';
-    // Tones match the body where each strand grows: shaded, mid and lit.
-    ctx.lineWidth = Math.max(0.4, R * 0.006);
-    const tones = [rgba(shade(base, -0.24, 3, 0.85), 0.45), rgba(shade(base, -0.1, 0, 0.9), 0.45), rgba(shade(base, 0.04, 0, 0.95), 0.45)];
-    paths.forEach((p, i) => { ctx.strokeStyle = tones[i]; ctx.stroke(p); });
+    ctx.lineWidth = fringe.width;
+    fringe.segs.forEach((sg, i) => {
+      const p = new Path2D();
+      for (let j = 0; j < sg.length; j += 4) { p.moveTo(sg[j], sg[j + 1]); p.lineTo(sg[j + 2], sg[j + 3]); }
+      ctx.strokeStyle = fringe.tones[i];
+      ctx.stroke(p);
+    });
   }
 
   if (faceA > 0 && look.bowTie) {

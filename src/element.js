@@ -6,7 +6,7 @@ import { BotAvatar, DEFAULTS } from './bot.js';
 const NUMBERS = ['size', 'brightness', 'saturation', 'depth', 'light', 'shadow', 'highlight', 'rim', 'spread',
   'fur-length', 'fur-density', 'fur-fuzz', 'fur-curl', 'fur-gravity', 'speed', 'seed', 'turn', 'jump-every', 'face-scale', 'eye-size', 'eye-gap'];
 const BOOLEANS = ['headphones', 'bow-tie', 'blush', 'eye-shine', 'paused', 'interactive'];
-const STRINGS = ['type', 'state', 'face', 'color', 'ink', 'shading', 'hat', 'glasses', 'accessory-color', 'path', 'label', 'theme', 'blush-color'];
+const STRINGS = ['type', 'state', 'face', 'color', 'ink', 'shading', 'hat', 'glasses', 'accessory-color', 'path', 'label', 'theme', 'blush-color', 'renderer', 'quality'];
 const ATTRS = [...NUMBERS, ...BOOLEANS, ...STRINGS];
 
 const camel = (s) => s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());

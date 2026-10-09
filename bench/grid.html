@@ -1,24 +1,40 @@
 <!doctype html><meta charset="utf-8"><title>Frame-rate bench</title>
 <!-- Serve the repo (`npm start`) and open /bench/grid.html?n=30&size=96&shading=fabric
-     (add budget=off to measure raw drawing cost without the frame budget).
-     Renders a grid of avatars and reports the page's frame rate after 4 s. -->
-<style>body{margin:0;display:flex;flex-wrap:wrap;gap:8px;background:#f4f2ee;font:14px system-ui}#out{position:fixed;right:8px;bottom:8px}</style>
+     Renders a grid of avatars for 4 s and reports the page's frame rate and how
+     many frames each avatar actually got drawn per second (avatars draw in
+     worker threads, so the two differ). Options:
+       budget=off      no frame budget (main-thread drawing only)
+       workers=off     draw on the main thread
+       renderer=canvas 2D canvas instead of WebGL
+       quality=high    no 2D economies
+       softgl=1        allow software-emulated WebGL (machines without a GPU) -->
+<style>body{margin:0;display:flex;flex-wrap:wrap;gap:8px;background:#f4f2ee;font:14px system-ui}#out{position:fixed;right:8px;bottom:8px;background:#fff;padding:4px 8px}</style>
 <body><output id="out">measuring…</output><script type="module">
-import { BotAvatar, types } from '../src/index.js';
-import { frameBudget } from '../src/bot.js';
+import { renderSettings, renderStats } from '../src/index.js';
 const qs = new URLSearchParams(location.search);
+renderSettings.workers = qs.get('workers') !== 'off';
+renderSettings.softwareWebGL = qs.get('softgl') === '1';
+const { BotAvatar, frameBudget } = await import('../src/bot.js');
+const { types } = await import('../src/shapes.js');
 frameBudget.enabled = qs.get('budget') !== 'off';
 const n = +(qs.get('n') || 30), size = +(qs.get('size') || 96), shading = qs.get('shading') || 'fabric';
 const only = qs.get('types')?.split(',');
+const bots = [];
 for (let i = 0; i < n; i++) {
   const d = document.createElement('div');
   d.style.width = d.style.height = size + 'px';
   document.body.append(d);
-  new BotAvatar(d, { type: (only || types)[i % (only || types).length], size, seed: i / n, shading, interactive: false, state: only ? (qs.get('state') || 'sleeping') : i % 3 === 1 ? 'working' : 'default' });
+  bots.push(new BotAvatar(d, {
+    type: (only || types)[i % (only || types).length], size, seed: i / n, shading, interactive: false,
+    renderer: qs.get('renderer') || 'auto', quality: qs.get('quality') || 'auto',
+    state: only ? (qs.get('state') || 'sleeping') : i % 3 === 1 ? 'working' : 'default',
+  }));
 }
-await new Promise((r) => setTimeout(r, 1000));
-let frames = 0; const t0 = performance.now();
+await new Promise((r) => setTimeout(r, 1500));
+let frames = 0; const t0 = performance.now(), d0 = renderStats.drawn;
 await new Promise((res) => { const f = () => { frames++; performance.now() - t0 < 4000 ? requestAnimationFrame(f) : res(); }; requestAnimationFrame(f); });
-window.__result = (frames / ((performance.now() - t0) / 1000)).toFixed(1) + ' fps';
-document.getElementById('out').textContent = window.__result;
+const secs = (performance.now() - t0) / 1000;
+const page = frames / secs, avatar = (renderStats.drawn - d0) / secs / n;
+window.__result = { page: +page.toFixed(1), avatar: +avatar.toFixed(1), webgl: bots[0].webgl, worker: !!bots[0].handle };
+document.getElementById('out').textContent = `page ${page.toFixed(1)} fps · each avatar ${avatar.toFixed(1)} fps · ${bots[0].webgl ? 'WebGL' : '2D'} · ${bots[0].handle ? 'workers' : 'main thread'}`;
 </script>

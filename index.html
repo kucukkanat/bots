@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Bots — animated bot avatars</title>
-  <meta name="description" content="Animated bot avatars with living faces: eighteen plush 3D shapes, three states, things to wear. A plain 2D canvas, no dependencies." />
+  <meta name="description" content="Animated bot avatars with living faces: eighteen plush 3D shapes, three states, things to wear. WebGL with a 2D canvas fallback, drawn off the main thread, no dependencies." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -28,7 +28,7 @@
     <section class="hero">
       <div class="wrap">
         <h1>Bot avatars</h1>
-        <p class="lead">Animated avatars for your AI agents. Eighteen plush 3D shapes with living faces that look around, hop while they work and doze off between tasks. Drawn on a plain 2D canvas: no WebGL, no dependencies.</p>
+        <p class="lead">Animated avatars for your AI agents. Eighteen plush 3D shapes with living faces that look around, hop while they work and doze off between tasks. Drawn with WebGL in worker threads, falling back to a plain 2D canvas wherever that's missing. No dependencies.</p>
         <div class="actions">
           <a class="btn primary" href="playground/">Make your own bot →</a>
           <a class="btn" href="#usage">Get started</a>

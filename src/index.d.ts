@@ -60,6 +60,10 @@ export interface BotOptions {
   theme?: 'auto' | 'light' | 'dark';
   label?: string;
   floorShadow?: boolean;
+  /** 'auto': WebGL2 when there's a hardware GPU, else 2D. 'canvas': always 2D. */
+  renderer?: 'auto' | 'canvas';
+  /** 'auto': without WebGL, trade a little detail for speed. 'high': never. */
+  quality?: 'auto' | 'high';
 }
 
 export declare class BotAvatar {
@@ -73,7 +77,14 @@ export declare class BotAvatar {
   draw(): void;
   toDataURL(opts?: { full?: boolean; scale?: number }): string;
   destroy(): void;
+  /** Whether this avatar's frames are painted with WebGL. */
+  readonly webgl: boolean;
 }
+
+/** Global rendering switches; set them before the first avatar is created. */
+export declare const renderSettings: { workers: boolean; maxWorkers: number; softwareWebGL: boolean };
+/** Frames drawn so far on every thread (for benchmarks). */
+export declare const renderStats: { drawn: number };
 
 export declare function createBot(target: HTMLElement | HTMLCanvasElement | string, options?: BotOptions): BotAvatar;
 
@@ -96,7 +107,7 @@ export interface BotShape {
   faceScale: number;
 }
 
-export declare function drawBot(ctx: CanvasRenderingContext2D, frame: { size: number; dpr?: number; pose: BotPose; look: ReturnType<typeof resolveLook>; time?: number }): void;
+export declare function drawBot(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, frame: { size: number; dpr?: number; pose: BotPose; look: ReturnType<typeof resolveLook>; time?: number }, opts?: { gpu?: unknown; relaxed?: boolean }): void;
 export declare function resolveLook(options: BotOptions): BotOptions & { shape: BotShape; color: string; ink: string; label: string };
 export declare function restPose(state: BotState): BotPose;
 export declare function jumpCurve(p: number, height: number, opts?: { squash?: number; stretch?: number }): { y: number; sx: number; sy: number; spin: number };
