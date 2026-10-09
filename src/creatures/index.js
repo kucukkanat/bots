@@ -14,8 +14,5 @@ import octo from './octo.js';
 import toaster from './toaster.js';
 import snail from './snail.js';
 import comet from './comet.js';
-import swarm from './swarm.js';
-import orb from './orb.js';
-import glyph from './glyph.js';
 
-export const creatures = [fox, owl, jelly, moth, sprout, octo, toaster, snail, comet, swarm, orb, glyph];
+export const creatures = [fox, owl, jelly, moth, sprout, octo, toaster, snail, comet];

@@ -38,7 +38,7 @@ export const DEFAULTS = Object.freeze({
   quality: 'auto',
 });
 
-export const SHADINGS = ['fabric', 'plastic', 'smooth', 'crisp', 'flat', 'glass', 'lantern', 'line', 'swarm'];
+export const SHADINGS = ['fabric', 'plastic', 'smooth', 'crisp', 'flat', 'glass', 'lantern', 'line'];
 export const QUIRKS = ['patch', 'cowlick', 'scuff', 'stitches'];
 export const HATS = HAT_STYLES;
 export const GLASSES = ['none', 'round', 'square', 'shades'];

@@ -20,6 +20,8 @@ export default {
     parts: [
       // Small wings folded at the sides; the rest flap is subtle and they beat while it thinks.
       { kind: 'wings', y: 0.4, size: 0.45, style: 'leaf', color: '#86684B', layer: 'back' },
+      // A small hooked beak under the eyes; it opens with the mouth.
+      { kind: 'beak', y: 0.19, size: 0.11, color: '#E0A040', layer: 'front' },
     ],
   },
   temperament: 'scholar',
@@ -29,6 +31,8 @@ export default {
   defaults: {
     shading: 'fabric', furLength: 0.7, furDensity: 1.4, furFuzz: 0.3,
     eyeSize: 1.35, eyeStyle: 'round', brows: 'soft', mouthStyle: 'o',
+    // Plump through the depth, so it is still an owl when its head is turned side on mid-swivel.
+    depth: 1.3,
     furPattern: 'belly', furColor2: '#E0CFB2',
   },
 };

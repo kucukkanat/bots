@@ -556,33 +556,6 @@ function stagedShape(shape, age) {
   return blendShapes(st[i], st[i + 1], q / AGE_STEPS, `a${q}`);
 }
 
-/** Dots filling a silhouette, for the swarm: a jittered grid, kept per shape. */
-const swarmCache = new WeakMap();
-function swarmDots(shape) {
-  let d = swarmCache.get(shape);
-  if (d) return d;
-  const rand = mulberry32(0.4242);
-  const pts = shape.points;
-  const inside = (x, y) => {
-    let c = false;
-    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-      const [xi, yi] = pts[i], [xj, yj] = pts[j];
-      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c;
-    }
-    return c;
-  };
-  d = [];
-  const step = 0.125;
-  for (let y = shape.bounds.minY + step * 0.5; y < shape.bounds.maxY; y += step) {
-    for (let x = shape.bounds.minX + step * 0.5; x < shape.bounds.maxX; x += step) {
-      const px = x + (rand() - 0.5) * step * 0.7, py = y + (rand() - 0.5) * step * 0.7;
-      if (inside(px * 1.04, py * 1.04)) d.push({ x: px, y: py, r: 0.6 + rand() * 0.6, ph: rand() * Math.PI * 2, u: rand() * 2 - 1 });
-    }
-  }
-  swarmCache.set(shape, d);
-  return d;
-}
-
 export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = null, relaxed = false } = {}) {
   const full = size * OVERSCAN;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -599,9 +572,9 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
   const lx = Math.sin(la), ly = -Math.cos(la);
   const fabric = look.shading === 'fabric';
   const glass = look.shading === 'glass', lantern = look.shading === 'lantern';
-  // Line (a stroked outline, no body) and swarm (dots) have no solid body at all.
-  const line = look.shading === 'line', swarm = look.shading === 'swarm';
-  const hollow = line || swarm;
+  // Line art (a stroked outline) has no solid body at all.
+  const line = look.shading === 'line';
+  const hollow = line;
   // Glass is see-through: its body is painted at part alpha, which the GPU body doesn't do.
   if (glass || hollow) gpu = null;
   // Line art draws in the body colour, flipped to light on a dark page when the colour is dark.
@@ -964,25 +937,6 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
       lc.strokeStyle = lineC;
       lc.lineWidth = Math.max(1.5, R * 0.06);
       lc.stroke(stack(shapePath(shape), [slices[slices.length - 1]]));
-    } else {
-      // The swarm: dots fill the silhouette, drifting a little, spreading when it's low.
-      const dots = swarmDots(shape);
-      const spread = 0.15 * pose.sleep + 0.4 * Math.max(0, -pose.smile - 0.3) + 0.08 * pose.think;
-      const dim = 1 - spread * 0.5;
-      const rr = R * (look.swarmSize ?? 0.05);
-      const fy = shape.faceY, fsw = 0.42 * shape.faceScale;
-      for (const d of dots) {
-        // Dots thin out round the face, so the eyes read through the cloud.
-        const nearFace = clamp(1 - Math.hypot(d.x / 1.3, (d.y - fy) / 0.9) / fsw, 0, 1);
-        const wx = Math.sin(time * 1.3 + d.ph) * 0.02 + d.u * spread * 0.5 * (0.6 + 0.4 * Math.sin(time * 0.7 + d.ph));
-        const wy = Math.cos(time * 1.1 + d.ph * 1.3) * 0.02 + spread * 0.3 * Math.sin(d.ph);
-        const [X, Y] = proj(d.x * (1 + spread * 0.6) + wx, d.y * (1 + spread * 0.4) + wy, d.u * D * 0.5);
-        const lit = 0.5 + 0.5 * (d.x * lx + d.y * ly);
-        lc.fillStyle = rgba(shade(base, -0.2 + 0.35 * lit), (0.75 + 0.25 * d.r) * dim * (1 - nearFace * 0.7));
-        lc.beginPath();
-        lc.arc(X, Y, rr * d.r * (1 + d.u * D * 0.3 * s) * (1 - nearFace * 0.45), 0, Math.PI * 2);
-        lc.fill();
-      }
     }
   }
   // Hollow bodies have no silhouette to paint inside: everything goes on top.
