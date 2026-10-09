@@ -1,7 +1,7 @@
 {
   "name": "@kucukkanat/bots",
   "version": "1.1.0",
-  "description": "Animated bot avatars: eighteen plush 3D shapes with living faces, three states, hats and glasses. WebGL with a 2D canvas fallback, in worker threads, no dependencies. Web component, JS API and React wrapper.",
+  "description": "Plush animated avatars for AI agents: eighteen 3D shapes with living faces, agent states, lip-sync from text, moods and hats. WebGL with a 2D fallback, in worker threads, no dependencies. Web component, JS API, React, Vue and Svelte.",
   "type": "module",
   "main": "./dist/bots.js",
   "module": "./dist/bots.js",
@@ -29,6 +29,7 @@
     "test": "node --test test/*.test.js",
     "size": "node scripts/size.mjs",
     "perf": "node scripts/perf.mjs",
+    "release-branch": "node scripts/release-branch.mjs",
     "start": "python3 -m http.server 8000",
     "prepublishOnly": "npm test && npm run build && npm run size"
   },

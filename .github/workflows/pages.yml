@@ -82,6 +82,45 @@ jobs:
         with:
           path: _site
 
+  release-branch:
+    name: Publish to the release branch
+    needs: [check, perf]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: release-branch
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run release-branch
+      - name: Commit to the release branch
+        # History is kept (no force push), so installs pinned to a commit keep working.
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          VERSION=$(node -p "require('./package.json').version")
+          if git fetch origin release 2>/dev/null; then
+            git worktree add rel origin/release
+            git -C rel checkout -B release
+          else
+            git worktree add --orphan -b release rel
+          fi
+          find rel -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r release/. rel/
+          cd rel
+          git add -A
+          if git diff --cached --quiet; then echo "release branch is up to date"; exit 0; fi
+          git commit -m "v$VERSION from ${GITHUB_SHA::7}"
+          git push origin release
+
   deploy:
     needs: build
     runs-on: ubuntu-latest

@@ -19,6 +19,14 @@ All eighteen types, idle with eyes (left) and working with a mouth (right):
   <img src="docs/gallery-working.png" alt="All eighteen bot types, working with mouths, light theme" width="49%" />
 </p>
 
+## Install
+
+```sh
+npm i github:kucukkanat/bots#release
+```
+
+The `release` branch holds the built package (`dist/` plus the source), published by CI on every change to main; import it as `@kucukkanat/bots`. Pin a version with a commit of that branch: `github:kucukkanat/bots#<commit>`. No build step? Use the script tag below.
+
 ## Use it
 
 ### Custom element

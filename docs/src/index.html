@@ -10,10 +10,11 @@
 </div>
 
 <h2>Install</h2>
-<p>From npm, for projects with a bundler:</p>
+<p>From GitHub, for projects with a bundler. The <code>release</code> branch holds the built package, updated on every change to main:</p>
 ```sh
-npm i @kucukkanat/bots
+npm i github:kucukkanat/bots#release
 ```
+<p>Import it as <code>@kucukkanat/bots</code> (and <code>/react</code>, <code>/vue</code>, <code>/svelte</code>, <code>/export</code>, <code>/packs/…</code>). To pin a version, use a commit of that branch: <code>github:kucukkanat/bots#&lt;commit&gt;</code>.</p>
 <p>Or straight from a CDN, with no build step at all. The module registers the <code>&lt;bot-avatar&gt;</code> element as soon as it loads:</p>
 ```html
 <script type="module" src="https://kucukkanat.github.io/bots/dist/bots.js"></script>

@@ -57,8 +57,9 @@
 </div>
 
 <h2 id="install">Install<a class="anchor" href="#install" aria-label="Link to this section">#</a></h2>
-<p>From npm, for projects with a bundler:</p>
-<pre class="code" data-lang="sh">npm i @kucukkanat/bots</pre>
+<p>From GitHub, for projects with a bundler. The <code>release</code> branch holds the built package, updated on every change to main:</p>
+<pre class="code" data-lang="sh">npm i github:kucukkanat/bots#release</pre>
+<p>Import it as <code>@kucukkanat/bots</code> (and <code>/react</code>, <code>/vue</code>, <code>/svelte</code>, <code>/export</code>, <code>/packs/…</code>). To pin a version, use a commit of that branch: <code>github:kucukkanat/bots#&lt;commit&gt;</code>.</p>
 <p>Or straight from a CDN, with no build step at all. The module registers the <code>&lt;bot-avatar&gt;</code> element as soon as it loads:</p>
 <pre class="code" data-lang="html">&lt;script type="module" src="https://kucukkanat.github.io/bots/dist/bots.js"&gt;&lt;/script&gt;</pre>
 <p class="note"><b>Self-hosting?</b> Copy the <code>src/</code> folder anywhere your site serves static files. The renderer starts its worker threads from that folder, so keep the files together.</p>
