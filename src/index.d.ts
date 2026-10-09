@@ -40,7 +40,10 @@ export interface BotOptions {
   light?: number | { angle?: number; color?: string; fill?: string; fillStrength?: number; rimColor?: string; shadow?: number; highlight?: number; rim?: number; spread?: number };
   material?: { shading?: BotShading; roundness?: number; gloss?: number; depth?: number };
   motion?: { speed?: number; turn?: number; blinkRate?: number; glanceRate?: number; breathing?: number; jiggle?: number; whirl?: number; whirlColor?: string; jump?: { every?: number; height?: number; time?: number; spin?: number; squash?: number; stretch?: number; lean?: number } };
-  /** Things to wear: a list ('party-hat round-glasses bow-tie', or an array), or the grouped object. */
+  /**
+   * Everything worn, as a list of names: 'party-hat round-glasses bow-tie' (or an array).
+   * One thing per spot (head, eyes, ears, neck, chest); see wearables(). `badge:XYZ` pins a badge.
+   */
   wear?: string | string[] | { hat?: BotHat; glasses?: BotGlasses; headphones?: boolean; bowTie?: boolean; color?: string; scarf?: boolean; scarfColor?: string; badge?: string; badgeColor?: string; ears?: string; antennae?: string; accessories?: BotAccessory[] };
   furClumps?: number;
   furPattern?: BotFurPattern;
@@ -104,6 +107,8 @@ export interface BotOptions {
   glasses?: BotGlasses;
   headphones?: boolean;
   bowTie?: boolean;
+  /** One colour for everything worn (same as accessoryColor). */
+  wearColor?: string;
   accessoryColor?: string;
   blush?: boolean;
   blushColor?: string;
@@ -283,5 +288,15 @@ export interface StickerOptions {
   fps?: number;
 }
 
-/** Options from a list of things to wear: 'party-hat round-glasses bow-tie' or an array; other names are hats; 'badge:AI' pins a badge. */
+export type BotSpot = 'head' | 'eyes' | 'ears' | 'neck' | 'chest';
+export interface Wearable { name: string; spot: BotSpot; label: string; set: BotOptions }
+/** Where things are worn; each holds one thing. */
+export declare const SPOTS: BotSpot[];
+/** Everything that can be worn: built-in things, then hats registered by packs and plugins. */
+export declare function wearables(): Wearable[];
+/** Options from a list of things to wear (the whole outfit: unmentioned spots are empty). */
 export declare function parseWear(list: string | string[]): BotOptions;
+/** The list of things worn, from options (the inverse of parseWear). */
+export declare function wornList(options: BotOptions): string[];
+/** Where a thing goes. */
+export declare function spotOf(name: string): BotSpot;
