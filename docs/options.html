@@ -133,15 +133,23 @@
 <p>Expression channels: <code>brow</code>, <code>browTilt</code>, <code>eyeWide</code>, <code>squint</code>, <code>smile</code> (−1 frown … 1), <code>mouthOpen</code>, <code>happy</code>, <code>dizzy</code>, <code>blushPulse</code>.</p>
 
 <h2 id="things-to-wear">Things to wear<a class="anchor" href="#things-to-wear" aria-label="Link to this section">#</a></h2>
-<p>The quick way is one <code>wear</code> list, like dressing the bot: one hat, one pair of glasses, one thing round the neck, plus any extras.</p>
+<p>Dress the bot with one list. Each thing goes in a spot (head, eyes, ears, neck or chest) that holds one thing, so a later thing replaces an earlier one in the same spot. One colour, <code>wearColor</code>, covers everything worn.</p>
 <pre class="code" data-lang="html">&lt;bot-avatar wear="party-hat round-glasses bow-tie"&gt;&lt;/bot-avatar&gt;
-&lt;bot-avatar wear="beanie bandana headphones cat-ears badge:AI" accessory-color="#5b5bf7"&gt;&lt;/bot-avatar&gt;</pre>
-<p>Names: <code>party-hat</code>, <code>top-hat</code>, <code>witch-hat</code> or any hat name (<code>beanie</code>, <code>crown</code>, a pack's <code>santa</code>…); <code>round-glasses</code>, <code>square-glasses</code>, <code>shades</code>; <code>bow-tie</code> or <code>bandana</code>; <code>headphones</code>; <code>cat-ears</code>, <code>bunny-ears</code>, <code>bear-ears</code>, <code>round-ears</code>; <code>antenna</code>, <code>antennae</code>; <code>badge:XYZ</code>. In JavaScript, <code>wear</code> also takes an array. The options below set the same things one by one, and win over the list.</p>
+&lt;bot-avatar wear="beanie headphones bandana badge:AI" wear-color="#5b5bf7"&gt;&lt;/bot-avatar&gt;</pre>
+<div class="table-wrap"><table class="props"><thead><tr><th scope="col">Spot</th><th scope="col">Things</th></tr></thead><tbody>
+<tr><td data-label="Spot">head</td><td data-label="Things"><code>beanie</code>, <code>party-hat</code>, <code>crown</code>, <code>beret</code>, <code>top-hat</code>, <code>cap</code>, <code>witch-hat</code>, <code>halo</code>, <code>bow</code>, and hats from packs (<code>pumpkin</code>, <code>santa</code>…) or <code>registerHat</code></td></tr>
+<tr><td data-label="Spot">eyes</td><td data-label="Things"><code>round-glasses</code>, <code>square-glasses</code>, <code>shades</code></td></tr>
+<tr><td data-label="Spot">ears</td><td data-label="Things"><code>headphones</code></td></tr>
+<tr><td data-label="Spot">neck</td><td data-label="Things"><code>bow-tie</code>, <code>bandana</code></td></tr>
+<tr><td data-label="Spot">chest</td><td data-label="Things"><code>badge</code>, or <code>badge:XYZ</code> with up to 3 characters</td></tr>
+</tbody></table></div>
+<p>In JavaScript <code>wear</code> also takes an array, and <code>wearables()</code> lists everything with its spot and label. Ears and antennae are parts of the body, not worn: see <code>ears</code> and <code>antennae</code> below.</p>
+<p>Fine control: the options below set the same things one by one (and win over the list).</p>
 <div class="table-wrap"><table class="props"><thead><tr><th scope="col">Option</th><th scope="col">Values</th><th scope="col">Default</th></tr></thead><tbody>
 <tr><td data-label="Option"><code>hat</code></td><td data-label="Values"><code>none</code>, <code>beanie</code>, <code>party</code>, <code>crown</code>, <code>beret</code>, <code>tophat</code>, <code>cap</code>, <code>witch</code>, <code>halo</code>, <code>bow</code>, or from a pack or your own</td><td data-label="Default"><code>none</code></td></tr>
 <tr><td data-label="Option"><code>glasses</code></td><td data-label="Values"><code>none</code>, <code>round</code>, <code>square</code>, <code>shades</code></td><td data-label="Default"><code>none</code></td></tr>
 <tr><td data-label="Option"><code>headphones</code>, <code>bowTie</code></td><td data-label="Values">boolean</td><td data-label="Default"><code>false</code></td></tr>
-<tr><td data-label="Option"><code>accessoryColor</code></td><td data-label="Values">one colour for everything worn: hats, headphones, bow tie, bandana and badge</td><td data-label="Default">each its own</td></tr>
+<tr><td data-label="Option"><code>wearColor</code> (or <code>accessoryColor</code>)</td><td data-label="Values">one colour for everything worn: hats, headphones, bow tie, bandana and badge</td><td data-label="Default">each its own</td></tr>
 <tr><td data-label="Option"><code>scarf</code>, <code>scarfColor</code></td><td data-label="Values">boolean; a colour of its own (else <code>accessoryColor</code>, else red)</td><td data-label="Default"><code>false</code></td></tr>
 <tr><td data-label="Option"><code>badge</code>, <code>badgeColor</code></td><td data-label="Values">up to 3 characters on the body; a colour of its own (else <code>accessoryColor</code>, else white)</td><td data-label="Default">—</td></tr>
 <tr><td data-label="Option"><code>ears</code></td><td data-label="Values"><code>none</code>, <code>cat</code>, <code>bunny</code>, <code>bear</code>, <code>round</code></td><td data-label="Default"><code>none</code></td></tr>

@@ -409,3 +409,6 @@ textarea.path { font-family: "JetBrains Mono", ui-monospace, monospace; font-siz
 .thumbs.wear-grid .thumb { font-size: 10.5px; border-radius: 12px; }
 .thumbs.wear-grid .thumb img { width: 44px; height: 44px; }
 .wear-sub { margin: 10px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--st-muted, #6b6875); }
+.chips.wearing .chip.on { background: var(--st-text); color: var(--st-bg); border-color: transparent; }
+.chips.wearing .chip.ghost { background: none; border-style: dashed; }
+.thumbs.wear-grid .thumb span { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.15; text-align: center; font-size: 10px; letter-spacing: -0.01em; padding: 0 1px; }

@@ -129,6 +129,8 @@ el.addEventListener('bot-blink', (e) =&gt; console.log(e.detail));   // the same
 <tr><td data-label="Export"><code>BotAvatar</code>, <code>BotAvatarElement</code>, <code>defineBotAvatar(name?)</code></td><td data-label="What it is">The controller class, the element class, and a way to define the element under another tag name.</td></tr>
 <tr><td data-label="Export"><code>encodeDNA(options)</code>, <code>decodeDNA(code)</code></td><td data-label="What it is">Options ⇄ DNA codes.</td></tr>
 <tr><td data-label="Export"><code>lookFromId(id)</code></td><td data-label="What it is">The look <code>identity</code> would give an id.</td></tr>
+<tr><td data-label="Export"><code>wearables()</code></td><td data-label="What it is">Everything that can be worn: <code>{ name, spot, label }</code>, built-ins then hats from packs and plugins.</td></tr>
+<tr><td data-label="Export"><code>parseWear(list)</code>, <code>wornList(options)</code></td><td data-label="What it is">A wear list ⇄ options. <code>spotOf(name)</code> says where a thing goes.</td></tr>
 <tr><td data-label="Export"><code>normalizeOptions(options)</code></td><td data-label="What it is">Flat options from grouped ones, presets, DNA and identity.</td></tr>
 <tr><td data-label="Export"><code>exportBot(bot, options)</code></td><td data-label="What it is">The function behind <code>bot.export()</code>.</td></tr>
 <tr><td data-label="Export"><code>renderSettings</code></td><td data-label="What it is">Global switches, set before the first avatar: <code>workers</code> (default <code>true</code>), <code>maxWorkers</code> (default 4), <code>softwareWebGL</code>.</td></tr>

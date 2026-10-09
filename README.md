@@ -94,7 +94,7 @@ An action, so it works in Svelte 4 and 5 with no compile step. The avatar's even
 
 ## Options
 
-Dress it with one list: `wear="party-hat round-glasses bow-tie"` (one hat, one pair of glasses, one thing round the neck, plus `headphones`, `cat-ears`, `antenna`, `badge:AI`…), coloured by `accessory-color`. The options below set the same things one by one.
+Dress it with one list: `wear="party-hat round-glasses bow-tie"`. Each thing has a spot (head, eyes, ears, neck, chest) that holds one, and `wear-color` colours them all; `wearables()` lists everything, including hats from packs. Ears and antennae are parts of the body: `ears="cat"`, `antennae="two"`. The options below set the same things one by one.
 
 | Option | Values | Default |
 | --- | --- | --- |

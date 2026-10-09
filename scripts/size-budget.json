@@ -1,10 +1,10 @@
 {
   "//": "Gzipped KB (level 9, each file on its own, as served). 'eager' is an entry plus every chunk it imports statically: what a page fetches before the entry runs. 'file' is one output file alone. Set from measured sizes plus ~5%; npm run size fails above them.",
   "eager": {
-    "bots.js": 18.5,
-    "react.js": 17.2,
-    "vue.js": 17.5,
-    "svelte.js": 17.5,
+    "bots.js": 19.3,
+    "react.js": 17.8,
+    "vue.js": 18.1,
+    "svelte.js": 17.9,
     "worker.js": 29,
     "render.js": 28.5,
     "export.js": 31
@@ -12,5 +12,6 @@
   "file": {
     "features/*.js": 6,
     "packs/*.js": 4
-  }
+  },
+  "//wear": "1.1: +0.7 KB for the wear vocabulary (wear lists resolve synchronously, so it can't load lazily)."
 }

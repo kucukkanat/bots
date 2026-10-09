@@ -85,6 +85,8 @@ el.addEventListener('bot-blink', (e) => console.log(e.detail));   // the same, a
 `BotAvatar`, `BotAvatarElement`, `defineBotAvatar(name?)` | The controller class, the element class, and a way to define the element under another tag name.
 `encodeDNA(options)`, `decodeDNA(code)` | Options ⇄ DNA codes.
 `lookFromId(id)` | The look `identity` would give an id.
+`wearables()` | Everything that can be worn: `{ name, spot, label }`, built-ins then hats from packs and plugins.
+`parseWear(list)`, `wornList(options)` | A wear list ⇄ options. `spotOf(name)` says where a thing goes.
 `normalizeOptions(options)` | Flat options from grouped ones, presets, DNA and identity.
 `exportBot(bot, options)` | The function behind `bot.export()`.
 `renderSettings` | Global switches, set before the first avatar: `workers` (default `true`), `maxWorkers` (default 4), `softwareWebGL`.

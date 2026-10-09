@@ -7,11 +7,14 @@ All notable changes to `@kucukkanat/bots` are recorded here. The format follows
 ## [Unreleased] - 1.1.0
 
 ### Added
-- `wear` takes a list of things by name: `wear="party-hat round-glasses bow-tie"`
-  (or an array; `parseWear()` is exported). The bandana and badge follow
-  `accessoryColor` unless they have colours of their own. The Studio's Wear
-  tab is a wardrobe: outfits, then Head / Eyes / Neck / Extras picture tiles,
-  one colour; its code snippets use the `wear` list.
+- Things to wear, simplified: `wear` takes a list by name
+  (`wear="party-hat round-glasses bow-tie"`, or an array). Each thing has a
+  spot (head, eyes, ears, neck, chest) holding one thing; `wearColor` colours
+  everything worn (the bandana and badge too, unless given their own).
+  `wearables()`, `parseWear()`, `wornList()` and `spotOf()` are exported.
+  Ears and antennae are body options. In the Studio, the Body tab holds body
+  parts and the Wear tab is one collection with a "Wearing" row, outfits and
+  seasonal hats; code snippets use the `wear` list.
 - The site is a PWA: installable (manifest, icons rendered from the plush bot),
   and offline after the first visit. Each deploy precaches the whole site as
   one versioned set (`scripts/precache.mjs` writes it into `sw.js`), so pages
@@ -46,7 +49,7 @@ All notable changes to `@kucukkanat/bots` are recorded here. The format follows
   a renderer and has drawn its first frame.
 - `npm run size` prints the gzipped size of every file in `dist/` and of each
   entry's eagerly loaded graph, and fails above the budgets in
-  `scripts/size-budget.json` (the library entry: 18.5 KB gzipped).
+  `scripts/size-budget.json` (the library entry: 19.3 KB gzipped).
 - `npm run perf` (scripts/perf.mjs): draw time against v1.0.0, or between two
   option sets.
 - CI runs tests, the build, the size budgets and the draw-time gate before

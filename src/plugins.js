@@ -41,3 +41,8 @@ export function registerHat(name, def) {
 export function hatDef(name, look) {
   return look?.hatDef || hats.get(name) || null;
 }
+
+/** Registered hats as [name, label] pairs (for the wardrobe). */
+export function registeredHats() {
+  return [...hats.entries()].map(([name, def]) => [name, def.label || name.charAt(0).toUpperCase() + name.slice(1)]);
+}
