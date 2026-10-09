@@ -67,7 +67,7 @@ const REPLIES = [
   { re: /error|fail|wrong|break|bug/i, end: 'error', then: () => has(bot, 'react') && bot.react('worried'),
     text: "Uh-oh. When a tool call fails I show it with setState('error'). Call setState('success') once things recover." },
   { re: /install|npm|cdn|use you|get you|setup|set up/i,
-    text: "One line: npm i @kucukkanat/bots, or one script tag from a CDN. Then drop a <bot-avatar> anywhere. No build step, no dependencies." },
+    text: "One line: npm i github:kucukkanat/bots#release, or one script tag from a CDN. Then drop a <bot-avatar> anywhere. No build step, no dependencies." },
   { re: /sleep|tired|nap|bye/i, end: 'sleeping',
     text: "Between tasks I doze off. setState('sleeping') and I'll snore quietly until the next message." },
   { re: /react|vue|svelte|framework/i,
