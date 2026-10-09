@@ -11,7 +11,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 const dir = new URL('./', import.meta.url);
 export const PAGES = [
-  ['Start', [['index', 'Getting started'], ['options', 'Options'], ['agents', 'Agent recipes']]],
+  ['Start', [['index', 'Getting started'], ['options', 'Options'], ['agents', 'Agent recipes'], ['creatures', 'The cast']]],
   ['Reference', [['api', 'API'], ['frameworks', 'Frameworks']]],
   ['Guides', [['plugins', 'Plugins & packs'], ['export', 'Export & stickers'], ['performance', 'Performance']]],
 ];

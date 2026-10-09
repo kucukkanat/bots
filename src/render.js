@@ -7,6 +7,8 @@ import { shade, rgba, clamp, luminance, mix, parseColor } from './color.js';
 import { mulberry32, smoothstep } from './engine.js';
 import { cssRgba, fringeQuads, invert } from './gpu.js';
 import { hatDef } from './plugins.js';
+import { drawParts } from './parts.js';
+import { buildShape } from './shapes.js';
 import { OVERSCAN, BODY, RISE, FUR_PATTERNS, EYE_STYLES, MOUTH_STYLES, BROWS, EAR_STYLES, HAT_STYLES } from './constants.js';
 export { OVERSCAN, BODY, RISE, FUR_PATTERNS, EYE_STYLES, MOUTH_STYLES, BROWS, EAR_STYLES, HAT_STYLES };
 
@@ -519,12 +521,77 @@ function roundRect(ctx, x, y, w, h, r) {
  * @param {import('./gpu.js').GpuBody} [opts.gpu]  paint the body on the GPU when it can
  * @param {boolean} [opts.relaxed]  2D only: re-light after larger movements (cheaper)
  */
+// --- Bodies that change shape ----------------------------------------------------
+//
+// A creature with another outline (rolled into a ball, retreated into a shell)
+// blends toward it by pose.morph; one with a lifecycle blends between its stage
+// outlines by look.age. Blends are quantised and cached per base shape, and
+// keep the base shape's fur skin, so morphing costs a handful of outlines, not
+// a bake per frame.
+const blendCache = new WeakMap();
+function blendShapes(a, b, t, key) {
+  let m = blendCache.get(a);
+  if (!m) blendCache.set(a, (m = new Map()));
+  if (m.has(key)) return m.get(key);
+  const pts = a.points.map(([x, y], i) => { const [bx, by] = b.points[i]; return [x + (bx - x) * t, y + (by - y) * t]; });
+  const lerp = (k) => (a[k] ?? 0) + ((b[k] ?? 0) - (a[k] ?? 0)) * t;
+  const shape = buildShape(pts, { type: a.type, faceY: lerp('faceY'), faceScale: lerp('faceScale'), extras: a.extras, faceOn: a.faceOn, furSource: a.furSource || a, custom: a.custom });
+  m.set(key, shape);
+  return shape;
+}
+const MORPH_STEPS = 12;
+function morphedShape(shape, morph) {
+  const q = Math.round(clamp(morph, 0, 1) * MORPH_STEPS);
+  if (q === 0) return shape;
+  return blendShapes(shape, shape.alt, q / MORPH_STEPS, `m${q}`);
+}
+const AGE_STEPS = 10;
+function stagedShape(shape, age) {
+  const st = shape.stages;
+  const pos = clamp(age, 0, 1) * (st.length - 1);
+  const i = Math.min(st.length - 2, Math.floor(pos));
+  const q = Math.round((pos - i) * AGE_STEPS);
+  if (q === 0) return st[i];
+  if (q === AGE_STEPS) return st[i + 1];
+  return blendShapes(st[i], st[i + 1], q / AGE_STEPS, `a${q}`);
+}
+
+/** Dots filling a silhouette, for the swarm: a jittered grid, kept per shape. */
+const swarmCache = new WeakMap();
+function swarmDots(shape) {
+  let d = swarmCache.get(shape);
+  if (d) return d;
+  const rand = mulberry32(0.4242);
+  const pts = shape.points;
+  const inside = (x, y) => {
+    let c = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const [xi, yi] = pts[i], [xj, yj] = pts[j];
+      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c;
+    }
+    return c;
+  };
+  d = [];
+  const step = 0.125;
+  for (let y = shape.bounds.minY + step * 0.5; y < shape.bounds.maxY; y += step) {
+    for (let x = shape.bounds.minX + step * 0.5; x < shape.bounds.maxX; x += step) {
+      const px = x + (rand() - 0.5) * step * 0.7, py = y + (rand() - 0.5) * step * 0.7;
+      if (inside(px * 1.04, py * 1.04)) d.push({ x: px, y: py, r: 0.6 + rand() * 0.6, ph: rand() * Math.PI * 2, u: rand() * 2 - 1 });
+    }
+  }
+  swarmCache.set(shape, d);
+  return d;
+}
+
 export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = null, relaxed = false } = {}) {
   const full = size * OVERSCAN;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, full, full);
 
-  const shape = look.shape;
+  let shape = look.shape;
+  if (shape.stages && look.age != null) shape = stagedShape(shape, look.age);
+  if (shape.alt && pose.morph > 0.001) shape = morphedShape(shape, pose.morph);
+  const parts = shape.extras?.parts || null;
   const R = size * BODY;
   const D = clamp(look.depth ?? 0.65, 0.2, 2) * 0.5;
   const base = look.color;
@@ -532,8 +599,13 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
   const lx = Math.sin(la), ly = -Math.cos(la);
   const fabric = look.shading === 'fabric';
   const glass = look.shading === 'glass', lantern = look.shading === 'lantern';
+  // Line (a stroked outline, no body) and swarm (dots) have no solid body at all.
+  const line = look.shading === 'line', swarm = look.shading === 'swarm';
+  const hollow = line || swarm;
   // Glass is see-through: its body is painted at part alpha, which the GPU body doesn't do.
-  if (glass) gpu = null;
+  if (glass || hollow) gpu = null;
+  // Line art draws in the body colour, flipped to light on a dark page when the colour is dark.
+  const lineC = line ? (look.theme === 'dark' && luminance(base) < 0.25 ? '#ECEAF4' : base) : null;
   const shadowK = look.shadow ?? (fabric ? 1.15 : glass ? 0.4 : lantern ? 0.45 : 0.6);
   const highK = look.highlight ?? (fabric ? 1.2 : glass ? 1.1 : lantern ? 0.9 : 1.3);
   const rimK = look.rim ?? (fabric ? 0.6 : glass ? 1.2 : lantern ? 0.35 : 0.5);
@@ -587,6 +659,8 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
 
   const extras = shape.extras || {};
   const lightSide = (sign) => clamp(0.6 + 0.4 * sign * lx, 0.2, 1);
+  // Everything a part needs to draw itself in this frame.
+  const partsEnv = () => ({ R, proj, c0, s, sp, cp, D, base, ink: look.ink, look, pose, time, lx, ly, shape });
 
   // Parts behind the body are drawn after it with 'destination-over', which
   // stacks each new shape underneath: their own layers go in reverse.
@@ -705,22 +779,22 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
   // Everything laid on the body, described once and painted either on the GPU
   // or with the 2D canvas.
   let skin = null;
-  if (fabric) {
+  if (fabric && !hollow) {
     // The baked skin rides on the front of the body with the turn. One copy at
     // a constant strength, so the fur never changes the body's tone as it
     // turns; never squeezed narrower than half width, so edge on it still
     // covers the side that shows. It's blended with the body colour once
     // (overlay, and multiply on pale colours, which overlay can't darken).
-    const sk = furSkin(shape, look, la, R * dpr);
+    const sk = furSkin(shape.furSource || shape, look, la, R * dpr);
     const zf = D * 0.6, e = SKIN_EXT;
     const cx2 = Math.sign(c) * Math.max(Math.abs(c), 0.5);
     const T = [R * cx2, -R * s * sp, 0, R * cp, R * zf * s, R * zf * c0 * sp];
-    skin = { canvas: tintedSkin(sk, base, furPatternOf(look, shape)), T, S: sk.S, P: sk.P, e, src: sk };
+    skin = { canvas: tintedSkin(sk, base, furPatternOf(look, shape.furSource || shape)), T, S: sk.S, P: sk.P, e, src: sk };
   }
 
   // Turn shading: the side that shows as the head turns.
   let turn = null;
-  {
+  if (!hollow) {
     const reveal = Math.abs(s);
     if (reveal > 0.02) {
       const sideDir = s > 0 ? -1 : 1; // the side faces away from where the face moved
@@ -738,7 +812,7 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
   const passes = [], highs = [];
   let lq = 1;
   const W = ctx.canvas.width, H = ctx.canvas.height;
-  if (look.shading !== 'flat') {
+  if (look.shading !== 'flat' && !hollow) {
     const q = clamp(120 / Math.max(W, H), 0.2, 0.5);
     lq = q;
     const blur = R * (fabric ? 0.55 : look.shading === 'smooth' ? 0.7 : 0.45) * (look.spread ?? 1.4) / 1.4;
@@ -789,7 +863,7 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
 
   // The pile seen edge on: a soft, semi-transparent band of fuzz just outside
   // the silhouette, behind the body.
-  const fuzz = fabric && {
+  const fuzz = fabric && !hollow && {
     color: rgba(shade(base, -0.18, 2, 0.6), 0.5),
     blur: R * 0.035 * (look.furFuzz ?? 0.9) * (look.furLength ?? 1),
     ox: -lx * R * 0.01, oy: -ly * R * 0.01,
@@ -797,7 +871,7 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
 
   // Outline hairs: fine strands standing off the silhouette, toned by the light.
   let fringe = null;
-  if (fabric) {
+  if (fabric && !hollow) {
     const fl = look.furLength ?? 1;
     const fz = look.furFuzz ?? 0.9;
     const grav = look.furGravity ?? 0.9;
@@ -858,12 +932,45 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     // The body goes down first on the empty frame, so everything on it is
     // painted with 'source-atop', which keeps it inside the silhouette
     // without a clip; what sits behind it follows with 'destination-over'.
-    lc.fillStyle = base;
-    if (glass) lc.globalAlpha = look.opacity ?? 0.8;
-    lc.fill(body());
-    lc.globalAlpha = 1;
+    if (!hollow) {
+      lc.fillStyle = base;
+      if (glass) lc.globalAlpha = look.opacity ?? 0.8;
+      lc.fill(body());
+      lc.globalAlpha = 1;
+    } else if (line) {
+      // Line art: the front outline in ink, the back outline faint behind it when turned.
+      lc.lineJoin = 'round';
+      if (slices.length > 1) {
+        lc.strokeStyle = rgba(lineC, 0.28);
+        lc.lineWidth = Math.max(1, R * 0.03);
+        lc.stroke(stack(shapePath(shape), [slices[0]]));
+      }
+      lc.strokeStyle = lineC;
+      lc.lineWidth = Math.max(1.5, R * 0.06);
+      lc.stroke(stack(shapePath(shape), [slices[slices.length - 1]]));
+    } else {
+      // The swarm: dots fill the silhouette, drifting a little, spreading when it's low.
+      const dots = swarmDots(shape);
+      const spread = 0.15 * pose.sleep + 0.4 * Math.max(0, -pose.smile - 0.3) + 0.08 * pose.think;
+      const dim = 1 - spread * 0.5;
+      const rr = R * (look.swarmSize ?? 0.05);
+      const fy = shape.faceY, fsw = 0.42 * shape.faceScale;
+      for (const d of dots) {
+        // Dots thin out round the face, so the eyes read through the cloud.
+        const nearFace = clamp(1 - Math.hypot(d.x / 1.3, (d.y - fy) / 0.9) / fsw, 0, 1);
+        const wx = Math.sin(time * 1.3 + d.ph) * 0.02 + d.u * spread * 0.5 * (0.6 + 0.4 * Math.sin(time * 0.7 + d.ph));
+        const wy = Math.cos(time * 1.1 + d.ph * 1.3) * 0.02 + spread * 0.3 * Math.sin(d.ph);
+        const [X, Y] = proj(d.x * (1 + spread * 0.6) + wx, d.y * (1 + spread * 0.4) + wy, d.u * D * 0.5);
+        const lit = 0.5 + 0.5 * (d.x * lx + d.y * ly);
+        lc.fillStyle = rgba(shade(base, -0.2 + 0.35 * lit), (0.75 + 0.25 * d.r) * dim * (1 - nearFace * 0.7));
+        lc.beginPath();
+        lc.arc(X, Y, rr * d.r * (1 + d.u * D * 0.3 * s) * (1 - nearFace * 0.45), 0, Math.PI * 2);
+        lc.fill();
+      }
+    }
   }
-  lc.globalCompositeOperation = 'source-atop';
+  // Hollow bodies have no silhouette to paint inside: everything goes on top.
+  lc.globalCompositeOperation = hollow ? 'source-over' : 'source-atop';
   // Gradients over the body only need to cover its box, not the overscan.
   const { minX: bx, maxX: bX, minY: by, maxY: bY } = shape.bounds;
   const cover = () => lc.fillRect((bx - D - 0.1) * R, (by - D - 0.1) * R, (bX - bx + 2 * D + 0.2) * R, (bY - by + 2 * D + 0.2) * R);
@@ -947,7 +1054,8 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     lc.fillStyle = g;
     cover();
   }
-  if (quirk('scuff')) {
+  if (parts && !hollow) drawParts(lc, parts, 'skin', partsEnv());
+  if (quirk('scuff') && !hollow) {
     // A worn spot where the pile has thinned, up on the light side.
     const [X, Y] = proj(-0.28 * (lx < 0 ? -1 : 1), -0.12, D);
     const g = lc.createRadialGradient(X, Y, 0, X, Y, R * 0.34);
@@ -960,7 +1068,11 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
 
   const whirlOn = look.whirl > 0 && pose.whirl > 0.02;
   // Face and glasses ride on the front of the body.
-  const faceA = smoothstep((facing - 0.18) / 0.3);
+  let faceA = smoothstep((facing - 0.18) / 0.3);
+  // Some faces only show while something is going on (the orb): talk, a look, a feeling.
+  if ((look.faceOn || shape.faceOn) === 'talk') {
+    faceA *= clamp(pose.talk + pose.mouthOpen * 0.6 + pose.happy + pose.think * 0.8 + pose.eyeWide + Math.max(0, pose.brow) * 0.9 + pose.blushPulse + Math.max(0, -pose.smile) * 1.5 + pose.sleep * 0.5, 0, 1);
+  }
   const fs = shape.faceScale * (look.faceScale ?? 1);
   if (faceA > 0 && (quirk('stitches') || quirk('patch'))) {
     // Sewn things ride on the front with the face.
@@ -979,7 +1091,7 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     const fx = pose.lookX * 0.09 + (look.faceX ?? 0), fy = shape.faceY + pose.lookY * 0.07 + (look.faceY ?? 0);
     const [X, Y] = proj(fx, fy, Math.min(1, D * 1.4));
     lc.transform(R * c0, -R * s * sp, 0, R * cp, X, Y);
-    drawFace(lc, look, pose, fs, R);
+    drawFace(lc, line ? { ...look, ink: lineC } : look, pose, fs, R);
     if (look.glasses && look.glasses !== 'none') drawGlasses(lc, look.glasses, acc, fs);
     lc.restore();
   }
@@ -1015,6 +1127,7 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
   }
   // Behind the body, nearest first.
   if (whirlOn) drawWhirl(ctx, R, pose, look, time, base, -1);
+  if (parts) drawParts(lc, parts, 'back', partsEnv());
   if (look.accessories) drawAccessories(ctx, look.accessories, 'back', proj, R, c0, s, sp, cp, D, 1);
   antennae();
   if (look.ears && look.ears !== 'none') drawEars(ctx, look.ears, shape, proj, R, c0, base, look);
@@ -1071,6 +1184,7 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
   }
 
   sideParts.filter((p) => p.z >= 0).forEach((p) => p.draw());
+  if (parts) drawParts(ctx, parts, 'front', partsEnv());
   if (look.accessories) drawAccessories(ctx, look.accessories, 'front', proj, R, c0, s, sp, cp, D, faceA);
 
   // Headphone band over the top of the head.

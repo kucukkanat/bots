@@ -38,7 +38,7 @@ export const DEFAULTS = Object.freeze({
   quality: 'auto',
 });
 
-export const SHADINGS = ['fabric', 'plastic', 'smooth', 'crisp', 'flat', 'glass', 'lantern'];
+export const SHADINGS = ['fabric', 'plastic', 'smooth', 'crisp', 'flat', 'glass', 'lantern', 'line', 'swarm'];
 export const QUIRKS = ['patch', 'cowlick', 'scuff', 'stitches'];
 export const HATS = HAT_STYLES;
 export const GLASSES = ['none', 'round', 'square', 'shades'];
@@ -67,7 +67,11 @@ function lookMessage(look) {
   const { shape, pose, ...rest } = look;
   // Custom outlines and registered shapes travel as points; built-ins by name.
   const spec = look.path || presets[shape.type]?.custom
-    ? { key: `${look.type}:${look.path || 'registered'}`, points: shape.points, meta: { type: shape.type, faceY: shape.faceY, faceScale: shape.faceScale, extras: shape.extras } }
+    ? { key: `${look.type}:${look.path || 'registered'}`, points: shape.points, meta: {
+      type: shape.type, faceY: shape.faceY, faceScale: shape.faceScale, extras: shape.extras, faceOn: shape.faceOn || null,
+      alt: shape.alt ? { points: shape.alt.points, faceY: shape.alt.faceY, faceScale: shape.alt.faceScale } : null,
+      stages: shape.stages ? shape.stages.map((st) => ({ points: st.points, faceY: st.faceY, faceScale: st.faceScale })) : null,
+    } }
     : { type: shape.type };
   const msg = { ...rest, shape: spec };
   const hd = look.hat && hatDef(look.hat);
@@ -83,6 +87,10 @@ const STATE_WORDS = { default: 'idle', working: 'working', sleeping: 'sleeping',
 /** What the simulation needs on top of the options: the temperament underneath, the expression's face. */
 function simOptions(o) {
   o = applyTemperament(o);
+  // Creatures with parts get secondary motion; ones with another outline morph into it in those states.
+  const p = presets[o.type];
+  if (p?.extras?.parts) o = { ...o, parts: true };
+  if (p?.morph?.states) o = { ...o, morphStates: p.morph.states };
   const e = o.expression;
   const face = !e || e === 'neutral' ? null : typeof e === 'object' ? e : EXPRESSIONS[e] || null;
   return face ? { ...o, expressionFace: face } : o;
@@ -607,7 +615,7 @@ export function createBot(target, options) {
 }
 
 export { STATES };
-export { registerShape, registerHat, registerState } from './plugins.js';
+export { registerShape, registerHat, registerState, registerCreature } from './plugins.js';
 export { STYLES, EXPRESSIONS, encodeDNA, decodeDNA, lookFromId, normalizeOptions, parseWear } from './options.js';
 export { settings as renderSettings, stats as renderStats } from './pool.js';
 

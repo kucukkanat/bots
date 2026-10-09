@@ -185,19 +185,21 @@ function whenNear(el, mount) { el._mount = mount; lazy.observe(el); }
 // Crew strip
 const CREW = [
   { label: 'Clover', role: 'Assistant', look: { type: 'clover' } },
-  { label: 'Ada', role: 'Research', look: { type: 'cat', glasses: 'round', bowTie: true } },
+  { label: 'Ada', role: 'Research', look: { type: 'owl', glasses: 'round' } },
   { label: 'Bo', role: 'Voice', look: { type: 'droid', headphones: true, accessoryColor: '#f4efe6' } },
-  { label: 'Dot', role: 'Support', look: { type: 'ghost', blush: true } },
-  { label: 'Echo', role: 'Ops', look: { type: 'alien', antennae: 'two' } },
+  { label: 'Dot', role: 'Support', look: { type: 'axolotl' } },
+  { label: 'Echo', role: 'Orchestrator', look: { type: 'octo' } },
   { label: 'Fizz', role: 'Sales', look: { type: 'star', hat: 'crown' } },
   { label: 'Gus', role: 'Code review', look: { type: 'mech', hat: 'beanie', accessoryColor: '#e85d4a' } },
   { label: 'Hana', role: 'Writer', look: { type: 'flower', scarf: true, scarfColor: '#ffcf4a' } },
   { label: 'Iggy', role: 'Design', look: { type: 'blob', ears: 'bunny', preset: 'velvet' } },
   { label: 'Juno', role: 'Planner', look: { type: 'cloud', hat: 'beret' } },
   { label: 'Kit', role: 'Data', look: { type: 'pebble', badge: 'AI' } },
-  { label: 'Lux', role: 'Security', look: { type: 'drop', glasses: 'shades' } },
+  { label: 'Lux', role: 'Security', look: { type: 'pangolin', glasses: 'shades' } },
   { label: 'Mo', role: 'Finance', look: { type: 'hexagon', hat: 'tophat', bowTie: true } },
-  { label: 'Pip', role: 'Tutor', look: { type: 'pill', preset: 'felt', glasses: 'square' } },
+  { label: 'Pip', role: 'Tutor', look: { type: 'sprout', age: 0.55 } },
+  { label: 'Rex', role: 'Sales', look: { type: 'fox' } },
+  { label: 'Toast', role: 'Reminders', look: { type: 'toaster' } },
 ];
 const WEAR_RESET = { hat: 'none', glasses: 'none', headphones: false, bowTie: false, blush: false, scarf: false, ears: 'none', antennae: 'auto', badge: undefined, preset: undefined, accessoryColor: undefined, scarfColor: undefined };
 const crewEl = $('crew');

@@ -7,6 +7,8 @@
 // machine, `showOff` spins more. The type picks one (`temperament: 'auto'`),
 // any can be asked for by name, and what you set yourself always wins.
 
+import { creatures } from './creatures/index.js';
+
 export const TEMPERAMENTS = {
   eager: { motion: { glanceRate: 1.2, jumpEvery: 6, breathing: 1.1 }, face: { smile: 0.05 } },
   sunny: { motion: { jumpEvery: 6, glanceRate: 1.1 }, face: { smile: 0.15, brow: 0.05 } },
@@ -26,7 +28,7 @@ export const TEMPERAMENTS = {
   chipper: { motion: { jumpEvery: 7, jumpSpin: 1, glanceRate: 1.2 }, face: { smile: 0.1 } },
   sleepy: { motion: { speed: 0.9, blinkRate: 0.7, glanceRate: 0.7, jumpEvery: 20, breathing: 1.2 }, face: { squint: 0.15, brow: -0.08 } },
 };
-export const TEMPERAMENT_NAMES = Object.keys(TEMPERAMENTS);
+// (names are listed after the cast has added its own, below)
 
 /** The temperament each built-in type is born with. */
 export const BY_TYPE = {
@@ -34,6 +36,12 @@ export const BY_TYPE = {
   drop: 'nervous', star: 'showOff', droid: 'precise', mech: 'steady', alien: 'curious', hexagon: 'serious', cat: 'aloof',
   cloud: 'dreamy', pill: 'chipper', pebble: 'sleepy', puddle: 'wobbly',
 };
+// The cast: each creature names its temperament and may bring a new one.
+for (const c of creatures) {
+  if (c.temperaments) Object.assign(TEMPERAMENTS, c.temperaments);
+  if (c.temperament) BY_TYPE[c.type] = c.temperament;
+}
+export const TEMPERAMENT_NAMES = Object.keys(TEMPERAMENTS);
 
 const EMPTY = { motion: {}, face: {} };
 
@@ -56,6 +64,6 @@ export function applyTemperament(o) {
   const t = temperamentFor(o);
   const out = { ...t.motion, ...o };
   if (t.face && Object.keys(t.face).length) out.temperamentFace = t.face;
-  for (const k of ['aloof', 'shy', 'float', 'snap', 'showOff']) if (t[k]) out[k] = t[k];
+  for (const k of ['aloof', 'shy', 'float', 'snap', 'showOff', 'swivel']) if (t[k]) out[k] = t[k];
   return out;
 }

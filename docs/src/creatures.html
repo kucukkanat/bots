@@ -1,0 +1,50 @@
+<!-- The cast | Fourteen creatures beyond the first eighteen shapes: parts with motion of their own, temperaments, materials, a lifecycle, and how to make your own. -->
+<h1>The cast</h1>
+<p class="sub">The first eighteen bodies are outlines with a face. The cast are someones: each has parts that move on their own, a temperament, a register, and in some cases a second body it becomes.</p>
+
+<h2>Who they are</h2>
+::table Creature | What it is | Temperament | Parts and habits
+`fox` | The sly one: tall ears, cheek fluff, a brush of a tail with a pale tip | `sly` (smug, looks away) | tail that trails behind every move
+`pangolin` | The guardian: plated armour in a smooth material | `stoic` | plates; rolls into a ball on error and to sleep
+`owl` | The scholar: brow tufts, big eyes, folded wings | `scholar` (slow blinks, no hopping) | its head turns right round while it thinks
+`axolotl` | The support agent: pink, blushing, gills | `curious` | frills that fan out when it listens and droop when it is sad
+`jelly` | The ambient companion: a glass bell | `dreamy` (floats) | tendrils that hang, sway and lag
+`moth` | The night companion: fuzzy, dazed | `drawn` (floats) | wings that flutter while it thinks, feathery antennae
+`sprout` | The one that grows: seed, hatchling, grown | `eager` | a lifecycle blended by `age`; a sprig that grows
+`octo` | The orchestrator: eight arms | `busy` | an arm lights up for every running tool (`observe('tool')`)
+`toaster` | The appliance | `perky` | a slot, a lever, and toast that pops on success
+`snail` | The patient one: eyes on stalks, a shell | `patient` (slow) | retreats into its shell on error and to sleep
+`comet` | The fast-mode mascot: a lantern star | `showOff` (spins) | a streak that lengthens with speed
+`swarm` | The crew: dots that gather into one shape | `hive` (floats) | the `swarm` material; scatters when it is low
+`orb` | The serious family: a glass sphere | `serene` (floats, still) | no face until it speaks, reacts or looks (`faceOn: 'talk'`)
+`glyph` | The monochrome line family | `precise` (snap blinks) | the `line` material: an outline in its colour, light on dark pages
+::end
+<p>Use them like any type: <code>&lt;bot-avatar type="owl"&gt;</code>, <code>createBot(el, { type: 'octo' })</code>. Each brings its own defaults (the jelly is glass, the comet a lantern, the glyph a line); anything you set wins. <code>identity</code> keeps picking from the first eighteen, so an id keeps the bot it always had.</p>
+
+<h2>Parts</h2>
+<p>A part is drawn round the body in one of three layers (painted on it, behind it, in front of it) and moves from the pose: trailing parts lag with a spring the simulation runs, wings and frills beat faster when the bot is busy or airborne, arms light up with running tools, a popup rises on success, a shell shrinks away as the body morphs. The kinds: <code>tail</code>, <code>tendrils</code>, <code>wings</code>, <code>frills</code>, <code>arms</code>, <code>shell</code>, <code>plates</code>, <code>slot</code>, <code>popup</code>, <code>sprig</code>, <code>knob</code>, <code>spiral</code>, <code>streak</code>. Parts are plain data on the creature, so they travel to the drawing threads and into exports.</p>
+
+<h2>Bodies that change</h2>
+<p>A creature can have another outline it becomes in some states (<code>morph</code>): the pangolin's ball, the snail's shell. The body blends between the two over a moment, keeping its fur. A creature can also have a lifecycle (<code>stages</code>): the sprout is a seed at <code>age: 0</code>, a hatchling at <code>0.5</code>, grown at <code>1</code>. Age is yours to keep (a count of sessions, days since it hatched); pass it back and it grows.</p>
+```html
+<bot-avatar type="sprout" age="0.2"></bot-avatar>
+<bot-avatar type="orb" state="speaking"></bot-avatar>   <!-- the face appears -->
+```
+
+<h2>Your own creature</h2>
+<p>The built-in cast lives in <code>src/creatures/</code>, one module each, and <code>registerCreature()</code> takes the same format:</p>
+```js
+import { registerCreature, geometry } from '@kucukkanat/bots';
+const { circle, poly, polarUnion, chaikin } = geometry;
+
+registerCreature({
+  type: 'newt', label: 'Newt', color: '#7BC9A5', faceY: 0.1,
+  outline: () => chaikin(polarUnion([circle(0, 0.1, 0.8), poly([[-0.9, 0.4], [-0.2, 0.9], [-0.9, 0.9]])]), 2),
+  extras: { parts: [{ kind: 'tail', anchor: [0.5, 0.6], side: 1, len: 0.9, width: 0.22 }] },
+  temperament: 'nervous',                              // or bring one: temperaments: { skittish: { motion: {…}, face: {…}, shy: 1 } }
+  defaults: { eyeStyle: 'dot', shading: 'smooth' },
+  morph: { states: ['sleeping'], outline: () => polarUnion([circle(0, 0.05, 0.85)]) },   // curled up to sleep
+});
+createBot('#x', { type: 'newt' });
+```
+<p>Outlines are closed point lists in a box of about −1..1 (y down), resampled to 200 points from the top centre, so a morph outline lines up with the main one. Habits a temperament can carry: <code>aloof</code>, <code>shy</code>, <code>float</code>, <code>snap</code>, <code>showOff</code>, <code>swivel</code>.</p>

@@ -39,9 +39,11 @@ createBot('#agent', { type: 'cat', face: 'mouth', hat: 'party', bowTie: true, ac
 `color` | body colour, any CSS hex colour | the shape's own
 `ink` | face colour | auto: dark on light bodies
 `brightness`, `saturation` | 0–2 | `1`
-`shading` | `fabric` (plush fur), `plastic`, `smooth`, `crisp`, `flat`, `glass` (see-through, light pooling on the far side, a Fresnel rim), `lantern` (lit from within: glows brighter while it thinks, talks or laughs) | `fabric`
+`shading` | `fabric` (plush fur), `plastic`, `smooth`, `crisp`, `flat`, `glass` (see-through, light pooling on the far side, a Fresnel rim), `lantern` (lit from within: glows brighter while it thinks, talks or laughs), `line` (an outline only, in the body colour, light on dark pages), `swarm` (dots that gather into the shape and scatter when it is low) | `fabric`
 `glow`, `glowColor` | lantern: strength 0–2, colour | `1`, a lighter body tint
 `opacity` | glass: how see-through, 0–1 | `0.8`
+`age` | a lifecycle creature's age, 0 (seed) to 1 (grown) | `1`
+`faceOn` | `talk`: the face shows only while something is going on | —
 `quirk` | imperfections, one or more: `patch` (sewn-on, coloured by `patchColor`), `cowlick`, `scuff`, `stitches` | —
 `preset` | `plush`, `teddy`, `velvet`, `mohair`, `felt`, `vinyl`, `clay`, `sticker`, `paper`, `glass`, `lantern`, `ragdoll`: a named look that sets many options at once | —
 `roundness` | 1 a pillow, 0 a slab | per shading
@@ -118,7 +120,7 @@ chest | `badge`, or `badge:XYZ` with up to 3 characters
 
 <h2>Motion</h2>
 ::table Option | Values | Default
-`temperament` | `auto` (the type's own), `none`, or one of `eager`, `sunny`, `sharp`, `stoic`, `wobbly`, `shy`, `calm`, `nervous`, `showOff`, `precise`, `steady`, `curious`, `serious`, `aloof`, `dreamy`, `chipper`, `sleepy` | `auto`
+`temperament` | `auto` (the type's own), `none`, or one of `eager`, `sunny`, `sharp`, `stoic`, `wobbly`, `shy`, `calm`, `nervous`, `showOff`, `precise`, `steady`, `curious`, `serious`, `aloof`, `dreamy`, `chipper`, `sleepy`, and the cast's `sly`, `scholar`, `drawn`, `busy`, `perky`, `patient`, `hive`, `serene` | `auto`
 `speed` | animation speed multiplier | `1`
 `turn` | how far it looks round | `1`
 `blinkRate`, `glanceRate` | multipliers | `1`

@@ -39,7 +39,7 @@
         <details id="side-menu">
           <summary><span class="side-sum">Docs</span><span class="side-cur">API</span></summary>
           <p class="side-h">Start</p>
-          <ul><li><a href="./">Getting started</a></li><li><a href="options.html">Options</a></li><li><a href="agents.html">Agent recipes</a></li></ul>
+          <ul><li><a href="./">Getting started</a></li><li><a href="options.html">Options</a></li><li><a href="agents.html">Agent recipes</a></li><li><a href="creatures.html">The cast</a></li></ul>
           <p class="side-h">Reference</p>
           <ul><li><a href="api.html" aria-current="page">API</a></li><li><a href="frameworks.html">Frameworks</a></li></ul>
           <p class="side-h">Guides</p>
@@ -136,7 +136,9 @@ el.addEventListener('bot-blink', (e) =&gt; console.log(e.detail));   // the same
 <tr><td data-label="Export"><code>exportBot(bot, options)</code></td><td data-label="What it is">The function behind <code>bot.export()</code>.</td></tr>
 <tr><td data-label="Export"><code>renderSettings</code></td><td data-label="What it is">Global switches, set before the first avatar: <code>workers</code> (default <code>true</code>), <code>maxWorkers</code> (default 4), <code>softwareWebGL</code>.</td></tr>
 <tr><td data-label="Export"><code>renderStats</code></td><td data-label="What it is"><code>{ drawn }</code>: frames drawn so far on every thread, for benchmarks.</td></tr>
-<tr><td data-label="Export"><code>types</code>, <code>presets</code>, <code>palette</code></td><td data-label="What it is">Shape names, their labels and colours.</td></tr>
+<tr><td data-label="Export"><code>types</code>, <code>presets</code>, <code>palette</code></td><td data-label="What it is">Shape names, their labels and colours. <code>BASE_TYPES</code> is the first eighteen; <code>creatures</code> the cast's modules.</td></tr>
+<tr><td data-label="Export"><code>registerCreature(def)</code></td><td data-label="What it is">Add a creature in the cast's own format: outline, parts, temperament, defaults, morph, stages. See <a href="creatures.html">The cast</a>.</td></tr>
+<tr><td data-label="Export"><code>geometry</code></td><td data-label="What it is">The outline helpers the cast is built with: <code>circle</code>, <code>poly</code>, <code>polarUnion</code>, <code>polar</code>, <code>param</code>, <code>superellipse</code>, <code>roundPoly</code>, <code>chaikin</code>.</td></tr>
 <tr><td data-label="Export"><code>STATES</code>, <code>SHADINGS</code>, <code>HATS</code>, <code>GLASSES</code>, <code>EYE_STYLES</code>, <code>MOUTH_STYLES</code>, <code>BROWS</code>, <code>EAR_STYLES</code>, <code>FUR_PATTERNS</code>, <code>STYLES</code>, <code>EXPRESSIONS</code></td><td data-label="What it is">The accepted values, for building UIs.</td></tr>
 <tr><td data-label="Export"><code>DEFAULTS</code></td><td data-label="What it is">The default options.</td></tr>
 <tr><td data-label="Export"><code>BotSim</code>, <code>drawBot</code>, <code>resolveLook</code>, <code>restPose</code></td><td data-label="What it is">The simulation and the 2D renderer, for drawing frames yourself.</td></tr>
@@ -153,7 +155,7 @@ el.addEventListener('bot-blink', (e) =&gt; console.log(e.detail));   // the same
 <p>Usage for each is in <a href="frameworks.html">Frameworks</a>.</p>
       </article>
       <nav class="pager" aria-label="Previous and next page">
-          <a class="prev" href="agents.html"><span>Previous</span>Agent recipes</a>
+          <a class="prev" href="creatures.html"><span>Previous</span>The cast</a>
           <a class="next" href="frameworks.html"><span>Next</span>Frameworks</a>
         </nav>
     </main>

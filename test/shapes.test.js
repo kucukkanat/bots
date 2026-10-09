@@ -1,9 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { types, presets, palette, getShape, shapeToSvgPath, OUTLINE_POINTS } from '../src/shapes.js';
+import { types, presets, palette, getShape, shapeToSvgPath, OUTLINE_POINTS, BASE_TYPES } from '../src/shapes.js';
+import { creatures } from '../src/creatures/index.js';
 
-test('there are eighteen types, each with a colour', () => {
-  assert.equal(types.length, 18);
+test('the first eighteen come first, then the cast, each with a colour', () => {
+  assert.equal(BASE_TYPES.length, 18);
+  assert.equal(types.length, 18 + creatures.length);
+  for (const c of creatures) assert.ok(types.includes(c.type), c.type);
   for (const t of types) assert.match(palette[t], /^#[0-9a-f]{6}$/i);
 });
 

@@ -5,12 +5,12 @@ import { Affect, toneOf, SLOW, CELEBRATE, SLEEP_AFTER, SULK } from '../src/featu
 import { phrase } from '../src/features/announce.js';
 import { BotSim, restPose, REST } from '../src/engine.js';
 import { normalizeOptions, encodeDNA, decodeDNA, STYLES } from '../src/options.js';
-import { presets } from '../src/shapes.js';
+import { presets, BASE_TYPES } from '../src/shapes.js';
 
 // --- Temperament -------------------------------------------------------------------
 
 test('every built-in type has a temperament, and every temperament exists', () => {
-  for (const t of Object.keys(presets)) assert.ok(TEMPERAMENTS[BY_TYPE[t]], `${t} → ${BY_TYPE[t]}`);
+  for (const t of BASE_TYPES) assert.ok(TEMPERAMENTS[BY_TYPE[t]], `${t} → ${BY_TYPE[t]}`);
 });
 
 test('temperamentFor: the type\'s own, by name, or none', () => {

@@ -5,7 +5,7 @@
 // applies a change, so dragging a slider costs one bot.set() per frame.
 
 import {
-  createBot, BotAvatar, types, presets, DEFAULTS, SHADINGS, QUIRKS, TEMPERAMENT_NAMES, HATS, GLASSES, STATES, STYLES, EXPRESSIONS,
+  createBot, BotAvatar, types, presets, BASE_TYPES, creatures, DEFAULTS, SHADINGS, QUIRKS, TEMPERAMENT_NAMES, HATS, GLASSES, STATES, STYLES, EXPRESSIONS,
   EYE_STYLES, MOUTH_STYLES, BROWS, EAR_STYLES, FUR_PATTERNS, lookFromId, decodeDNA, shapeToSvgPath,
   loadRenderer, resolveLook, restPose, OVERSCAN, wearables, parseWear, wornList,
 } from '../src/index.js';
@@ -48,7 +48,7 @@ const canSay = () => FORCE || typeof BotAvatar.prototype.say === 'function';
 // The design being edited: a flat options object.
 
 /** The material in effect: set, from the preset, or the default plush. */
-const shadingOf = (o) => o.shading ?? STYLES[o.preset]?.shading ?? 'fabric';
+const shadingOf = (o) => o.shading ?? STYLES[o.preset]?.shading ?? presets[o.type]?.defaults?.shading ?? 'fabric';
 const fabricOr = (a, b, more = {}) => (o) => { const sh = shadingOf(o); return sh === 'fabric' ? a : (more[sh] ?? b); };
 const NUMERIC = {
   brightness: { min: 0.3, max: 2, step: 0.01, def: 1 },
@@ -61,6 +61,8 @@ const NUMERIC = {
   highlight: { min: 0, max: 2, step: 0.01, def: fabricOr(1.2, 1.3, { glass: 1.1, lantern: 0.9 }) },
   rim: { min: 0, max: 2, step: 0.01, def: fabricOr(0.6, 0.5, { glass: 1.2, lantern: 0.35 }) },
   glow: { min: 0, max: 2, step: 0.01, def: 1 },
+  opacity: { min: 0.2, max: 1, step: 0.01, def: 0.8 },
+  age: { min: 0, max: 1, step: 0.01, def: 1 },
   spread: { min: 0.4, max: 2.5, step: 0.01, def: 1.4 },
   depth: { min: 0.2, max: 2, step: 0.01, def: 0.65 },
   furLength: { min: 0.3, max: 2.5, step: 0.01, def: 1 },
@@ -100,7 +102,7 @@ const STRS = {
   lightColor: undefined, fillColor: undefined, rimColor: undefined, eyeStyle: 'round', irisColor: undefined, brows: 'auto',
   mouthStyle: 'smile', expression: 'neutral', whirlColor: undefined, scarfColor: undefined, badge: undefined, badgeColor: undefined,
   ears: 'none', antennae: 'auto', blushColor: undefined, status: 'none', mood: 'auto',
-  quirk: undefined, temperament: 'auto', glowColor: undefined,
+  quirk: undefined, temperament: 'auto', glowColor: undefined, faceOn: undefined,
 };
 // `sounds` is a boolean or a volume (0–1).
 const SPECIAL = { sounds: false };
@@ -112,6 +114,9 @@ const defaultOf = (key, o) => {
   // A preset's values are the starting point its controls show.
   const fromPreset = STYLES[o.preset]?.[key];
   if (fromPreset !== undefined) return fromPreset;
+  // A creature's own defaults (its material, its eyes) are what its controls start from.
+  const fromCreature = presets[o.type]?.defaults?.[key];
+  if (fromCreature !== undefined) return fromCreature;
   if (NEW_KEYS.includes(key) && key in DEFAULTS) return DEFAULTS[key];
   if (key in NUMERIC) { const d = NUMERIC[key].def; return typeof d === 'function' ? d(o) : d; }
   if (key in BOOLS) return BOOLS[key];
@@ -525,13 +530,22 @@ pathArea.addEventListener('input', () => update({ path: pathArea.value.trim() ||
 syncs.push(() => { if (document.activeElement !== pathArea) pathArea.value = opts.path || ''; });
 const chip = (label, onclick, attrs = {}) => h('button', { type: 'button', class: 'chip', onclick, ...attrs }, label);
 
+// A lifecycle creature grows with `age`; a face that only shows while something is going on.
+const ageRow = range('age', 'Age', { fmt: (v) => (v < 0.34 ? 'seed' : v < 0.67 ? 'hatchling' : 'grown') });
+syncs.push(() => { ageRow.hidden = !presets[opts.type]?.stages; });
+const faceOnInput = h('input', { type: 'checkbox', role: 'switch' });
+faceOnInput.addEventListener('change', () => update({ faceOn: faceOnInput.checked ? 'talk' : undefined }));
+syncs.push(() => { faceOnInput.checked = (opts.faceOn ?? presets[opts.type]?.faceOn) === 'talk'; });
+const faceOnToggle = h('label', { class: 'toggle', title: 'The face fades in when it talks, reacts or looks, and hides at rest' }, faceOnInput, h('span', {}, 'Face only while something is going on'));
+
 tabPanel('look', () => [
   grp('Colour',
     colors('color', 'Body', BODY_SWATCHES, { auto: "The type's own colour" }),
     range('brightness', 'Brightness'),
     range('saturation', 'Saturation')),
   grp('Finish',
-    select('preset', 'Preset', ['', ...Object.keys(STYLES)], ['Custom', ...Object.keys(STYLES).map(title)])),
+    select('preset', 'Preset', ['', ...Object.keys(STYLES)], ['Custom', ...Object.keys(STYLES).map(title)]),
+    ageRow),
   grp('Body parts', ...bodyParts()),
   grp('Custom outline',
     h('label', { class: 'lbl block', for: 'path' }, 'Your own SVG path, drawn in place of the shape'),
@@ -550,6 +564,7 @@ tabPanel('face', () => [
   grp('Features',
     seg('face', 'Show', ['eyes', 'mouth'], ['Eyes', 'Eyes + mouth']),
     select('eyeStyle', 'Eye style', EYE_STYLES, EYE_STYLES.map(title)),
+    toggles(faceOnToggle),
     select('mouthStyle', 'Mouth', MOUTH_STYLES, ['Smile', 'Cat  :3', 'Line', 'O', 'Teeth', 'Tongue']),
     select('brows', 'Brows', BROWS, ['With expressions', 'Never', 'Soft', 'Thick', 'Line']),
     select('expression', 'Expression', Object.keys(EXPRESSIONS), Object.keys(EXPRESSIONS).map(title)),
@@ -747,7 +762,8 @@ const BUILT_IN_WEAR = new Set(wearables().map((w) => w.name));
 // --- Material & light ----------------------------------------------------------------
 
 const glowRows = [range('glow', 'Glow'), colors('glowColor', 'Glow colour', ['#FFD27A', '#FF8FC8', '#7AD7FF', '#B6FF7A', '#FFFFFF'], { auto: 'Body tint' })];
-syncs.push(() => glowRows.forEach((r) => { r.hidden = shadingOf(opts) !== 'lantern'; }));
+const opacityRow = range('opacity', 'See-through');
+syncs.push(() => { glowRows.forEach((r) => { r.hidden = shadingOf(opts) !== 'lantern'; }); opacityRow.hidden = shadingOf(opts) !== 'glass'; });
 const quirkSet = () => new Set((opts.quirk || '').split(/\s+/).filter(Boolean));
 const QUIRK_LABELS = { patch: 'Patch', cowlick: 'Cowlick', scuff: 'Scuff', stitches: 'Stitches' };
 const quirkChips = QUIRKS.map((q) => {
@@ -762,11 +778,11 @@ const quirkChips = QUIRKS.map((q) => {
 
 tabPanel('light', () => [
   grp('Material',
-    chipRow('shading', 'Material', SHADINGS, ['Plush', 'Plastic', 'Smooth', 'Crisp', 'Flat', 'Glass', 'Lantern']),
+    chipRow('shading', 'Material', SHADINGS, ['Plush', 'Plastic', 'Smooth', 'Crisp', 'Flat', 'Glass', 'Lantern', 'Line', 'Swarm']),
     range('roundness', 'Roundness'),
     range('gloss', 'Gloss'),
     range('depth', 'Depth'),
-    ...glowRows),
+    ...glowRows, opacityRow),
   grp('Quirks',
     h('div', { class: 'chips' }, ...quirkChips),
     note('Imperfections that make it someone: a sewn-on patch, a tuft that won’t lie down, a worn spot, a seam.')),
@@ -1113,11 +1129,14 @@ const lookBtns = LOOKS.map((l) => {
 });
 syncs.push(() => lookBtns.forEach((b, i) => b.setAttribute('aria-pressed', String(sameLook(LOOKS[i].o)))));
 
+// Picking a creature drops the options its own defaults set, so it arrives as itself.
+const CREATURE_KEYS = [...new Set(creatures.flatMap((c) => Object.keys(c.defaults || {})))];
+const pickType = (t) => update({ ...Object.fromEntries(CREATURE_KEYS.map((k) => [k, undefined])), type: t, color: undefined, path: undefined, age: undefined, faceOn: undefined });
 const shapeBtns = types.map((t) => {
-  const [b, img] = thumbBtn(presets[t].label, () => update({ type: t, color: undefined, path: undefined }), { title: presets[t].label });
+  const [b, img] = thumbBtn(presets[t].label, () => pickType(t), { title: presets[t].label });
   b.style.setProperty('--ph', presets[t].color);
   thumbInto(img, `shape:${t}`, { type: t }, true);
-  $('shapes').append(b);
+  $(BASE_TYPES.includes(t) ? 'shapes' : 'creatures').append(b);
   return b;
 });
 syncs.push(() => shapeBtns.forEach((b, i) => b.setAttribute('aria-pressed', String(!opts.path && types[i] === opts.type))));

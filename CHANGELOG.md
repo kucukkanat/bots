@@ -4,6 +4,37 @@ All notable changes to `@kucukkanat/bots` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-10-09
+
+The cast release: fourteen creatures beyond the first eighteen shapes, and the
+three pieces of anatomy they needed.
+
+### Added
+- **Creatures** (`src/creatures/`, one module each): fox, pangolin, owl,
+  axolotl, jelly, moth, sprout, octo, toaster, snail, comet, swarm, orb and
+  glyph. Each is a preset plus parts, a temperament, option defaults, and for
+  some a second outline or a lifecycle. `creatures` and `BASE_TYPES` are
+  exported; `identity` keeps picking from the first eighteen.
+- **Parts** (`src/parts.js`): tails, tendrils, wings, frills, arms, shells,
+  plates, slots, popups, sprigs, knobs, spirals and streaks, drawn in a layer
+  on, behind or in front of the body. Trailing parts lag with a spring the
+  simulation runs (`pose.lagX/lagY`), wings and frills beat with `pose.flap`,
+  arms light up with running tools (`pose.tools`, from the affect engine),
+  a popup rises with `pose.pop` on success.
+- **Bodies that change**: `morph` (another outline the body blends into in
+  some states, `pose.morph`) and `stages` (a lifecycle blended by the `age`
+  option). Blends are quantised and cached and keep the base fur skin.
+- **Registers**: `shading: 'line'` (an outline only, flipping to light on
+  dark pages) and `shading: 'swarm'` (dots that gather into the shape and
+  scatter when it is low); `faceOn: 'talk'` hides the face until something
+  is going on. Habit `swivel` (the owl's head turns right round while it
+  thinks).
+- `registerCreature(def)` and the `geometry` export (outline helpers moved to
+  `src/geometry.js`), so creatures of your own use the same format.
+- Studio: a Creatures section, an Age slider for lifecycle creatures, Line
+  and Swarm materials, a see-through slider for glass, a face-only-while-busy
+  toggle. Docs: "The cast".
+
 ## [1.2.0] - 2026-10-09
 
 The character release: the bots stop being eighteen outlines with the same

@@ -92,7 +92,9 @@ el.addEventListener('bot-blink', (e) => console.log(e.detail));   // the same, a
 `exportBot(bot, options)` | The function behind `bot.export()`.
 `renderSettings` | Global switches, set before the first avatar: `workers` (default `true`), `maxWorkers` (default 4), `softwareWebGL`.
 `renderStats` | `{ drawn }`: frames drawn so far on every thread, for benchmarks.
-`types`, `presets`, `palette` | Shape names, their labels and colours.
+`types`, `presets`, `palette` | Shape names, their labels and colours. `BASE_TYPES` is the first eighteen; `creatures` the cast's modules.
+`registerCreature(def)` | Add a creature in the cast's own format: outline, parts, temperament, defaults, morph, stages. See <a href="creatures.html">The cast</a>.
+`geometry` | The outline helpers the cast is built with: `circle`, `poly`, `polarUnion`, `polar`, `param`, `superellipse`, `roundPoly`, `chaikin`.
 `STATES`, `SHADINGS`, `HATS`, `GLASSES`, `EYE_STYLES`, `MOUTH_STYLES`, `BROWS`, `EAR_STYLES`, `FUR_PATTERNS`, `STYLES`, `EXPRESSIONS` | The accepted values, for building UIs.
 `DEFAULTS` | The default options.
 `BotSim`, `drawBot`, `resolveLook`, `restPose` | The simulation and the 2D renderer, for drawing frames yourself.
