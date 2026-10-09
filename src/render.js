@@ -797,6 +797,8 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     const second = pat && pat.kind !== 'tips' && strandColours(list, pat, base, skin.src);
     const segs = Array.from({ length: second ? TONES * 2 : TONES }, () => []);
     const swayT = time * 2.2;
+    // Petting ruffle: the hairs lean along the stroke and fluff up a little.
+    const rf = pose.ruffle > 0.002 ? pose.ruffle : 0, rx = rf * (pose.ruffleX || 0), ry = rf * (pose.ruffleY || 0);
     for (let si = 0; si < list.length; si++) {
       const st = list[si];
       const w = Math.sqrt(1 - st.u * st.u);
@@ -809,9 +811,10 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
       if (a > 0.55) continue;
       const [X, Y] = proj(st.x * k * 0.97, st.y * k * 0.97, st.u * D);
       let dx = nx1 + st.jitter * 0.5, dy = ny1 + grav * 0.45 + Math.sin(swayT + st.tone * 6) * 0.04;
+      if (rf) { const k = 0.6 + st.tone * 1.4; dx += rx * k + rf * st.jitter * 1.6; dy += ry * k + rf * st.bend * 1.2; }
       const l = Math.hypot(dx, dy) || 1;
       dx /= l; dy /= l;
-      const len = R * 0.055 * fl * st.len * (0.6 + fz * 0.6) * (1 - a * 1.2);
+      const len = R * 0.055 * fl * st.len * (0.6 + fz * 0.6) * (1 - a * 1.2) * (1 + rf * 0.7 * st.tone);
       const bx = -dy * st.bend * curl * len * 0.8, by = dx * st.bend * curl * len * 0.8;
       const lit = clamp(0.5 + 0.5 * (nx1 * lx + ny1 * ly) + (st.tone - 0.5) * 0.5, 0, 0.999);
       // Short enough that a straight stroke with a bent tip reads as a curl.

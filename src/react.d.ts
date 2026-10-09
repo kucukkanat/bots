@@ -2,6 +2,8 @@ import type { CSSProperties } from 'react';
 import type { BotOptions, BotAvatar as Controller } from './index';
 
 type BotEvent = { type: string; bot: Controller; state?: string };
+type BotTossEvent = BotEvent & { vx: number; vy: number; speed: number };
+type BotPetEvent = BotEvent & { contentment: number };
 
 export interface BotAvatarProps extends BotOptions {
   className?: string;
@@ -13,6 +15,12 @@ export interface BotAvatarProps extends BotOptions {
   onJump?: (e: BotEvent) => void;
   onLand?: (e: BotEvent) => void;
   onState?: (e: BotEvent) => void;
+  /** Picked up (`toss` option). */
+  onGrab?: (e: BotEvent) => void;
+  /** Let go, with the throw velocity in body radii per second (`toss` option). */
+  onToss?: (e: BotTossEvent) => void;
+  /** Contentment peaked while being petted (`petting` option). */
+  onPet?: (e: BotPetEvent) => void;
 }
 export declare function BotAvatar(props: BotAvatarProps): JSX.Element;
 export default BotAvatar;

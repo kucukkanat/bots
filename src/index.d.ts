@@ -18,6 +18,8 @@ export interface BotPose {
   yaw: number; pitch: number; roll: number; x: number; y: number; sx: number; sy: number;
   lookX: number; lookY: number; eyeOpen: number; happy: number; smile: number; mouthOpen: number; sleep: number;
   brow: number; browTilt: number; eyeWide: number; squint: number; dizzy: number; think: number; blushPulse: number; whirl: number;
+  /** Fur ruffle from petting: amount 0–1 and the stroke direction. */
+  ruffle?: number; ruffleX?: number; ruffleY?: number;
 }
 
 export interface BotOptions {
@@ -121,6 +123,12 @@ export interface BotOptions {
   renderer?: 'auto' | 'canvas';
   /** 'auto': without WebGL, trade a little detail for speed. 'high': never. */
   quality?: 'auto' | 'high';
+  /** Pick it up with the pointer and throw it; it bounces inside its canvas. Events 'grab', 'toss'. */
+  toss?: boolean;
+  /** Slow strokes over it build contentment: happy eyes, blush, a lean, ruffled fur. Event 'pet'. */
+  petting?: boolean;
+  /** Synthesized sounds (squeak, boing, whoosh, purr, blip): true, or a volume 0–1. Off by default. */
+  sounds?: boolean | number;
 }
 
 export declare class BotAvatar {
@@ -144,7 +152,13 @@ export declare class BotAvatar {
   setVoice(level: number | null): this;
   /** Keep an eye on an element or a client-space point; null to stop. */
   lookAt(target: Element | { x: number; y: number } | null): this;
-  on(event: 'poke' | 'blink' | 'jump' | 'land' | 'state', fn: (e: { type: string; bot: BotAvatar; state?: string }) => void): () => void;
+  on(event: 'poke' | 'blink' | 'jump' | 'land' | 'state' | 'grab', fn: (e: { type: string; bot: BotAvatar; state?: string }) => void): () => void;
+  /** Let go after a drag; velocity in body radii per second. */
+  on(event: 'toss', fn: (e: { type: 'toss'; bot: BotAvatar; vx: number; vy: number; speed: number }) => void): () => void;
+  /** Contentment peaked while being petted. */
+  on(event: 'pet', fn: (e: { type: 'pet'; bot: BotAvatar; contentment: number }) => void): () => void;
+  /** Load a lazily loaded feature ('toss', 'petting', 'sounds', …) and get its controller. */
+  feature(name: string): Promise<unknown>;
   /** The whole design as a short code. */
   readonly dna: string;
   export(options?: { format?: 'gif' | 'apng' | 'webm' | 'sprite' | 'png' | 'webp'; duration?: number; fps?: number; scale?: number; background?: string }): Promise<Blob>;

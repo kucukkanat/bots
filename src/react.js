@@ -6,14 +6,14 @@
 import { createElement, useEffect, useRef } from 'react';
 import { BotAvatar as Controller } from './bot.js';
 
-const EVENTS = { onPoke: 'poke', onBlink: 'blink', onJump: 'jump', onLand: 'land', onState: 'state' };
+const EVENTS = { onPoke: 'poke', onBlink: 'blink', onJump: 'jump', onLand: 'land', onState: 'state', onGrab: 'grab', onToss: 'toss', onPet: 'pet' };
 
-export function BotAvatar({ className, style, onReady, onPoke, onBlink, onJump, onLand, onState, ...options }) {
+export function BotAvatar({ className, style, onReady, onPoke, onBlink, onJump, onLand, onState, onGrab, onToss, onPet, ...options }) {
   const host = useRef(null);
   const bot = useRef(null);
   const last = useRef('');
   const handlers = useRef({});
-  handlers.current = { onPoke, onBlink, onJump, onLand, onState };
+  handlers.current = { onPoke, onBlink, onJump, onLand, onState, onGrab, onToss, onPet };
   useEffect(() => {
     const b = (bot.current = new Controller(host.current, options));
     last.current = JSON.stringify(options);

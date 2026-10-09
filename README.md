@@ -171,6 +171,37 @@ Frames are rendered offline from a copy of the avatar's simulation; the exporter
 
 `<bot-avatar>` reads `--bot-color`, `--bot-ink`, `--bot-accessory-color`, `--bot-blush-color`, `--bot-fur-color`, `--bot-light-color`, `--bot-fill-color`, `--bot-rim-color` and `--bot-iris-color` where no attribute sets them; call `el.refresh()` after changing them.
 
+## Play
+
+Three opt-in ways to touch the bots, each a small module that loads only when switched on:
+
+```html
+<bot-avatar type="cat" toss petting sounds="0.4"></bot-avatar>
+```
+
+```js
+const bot = createBot('#me', { toss: true, petting: true, sounds: true });
+bot.on('grab', () => {});                       // picked up
+bot.on('toss', ({ vx, vy, speed }) => {});      // let go (body radii per second)
+bot.on('pet', ({ contentment }) => {});         // contentment peaked
+```
+
+- **`toss`** — drag the bot: it stretches toward your hand and dangles as you move; let go and it's thrown, bounces off the edges of its own canvas, lands with a squash and walks home. A click without a drag still pokes. Touches that start on the bot drag it instead of scrolling the page (`touch-action: none` on its canvas while `toss` is on).
+- **`petting`** — slow strokes over the bot build contentment: its eyes close happily, it blushes, leans into the stroke, and the fur ruffles along it and settles back. Fast swipes don't count.
+- **`sounds`** — `true` or a volume `0`–`1`: a squeak on poke, a boing on jump, a whoosh on toss, a purr while petted, a blip on state changes. All synthesized with Web Audio (no files); the audio starts on the first click or key press, as browsers require.
+
+### Seasonal packs
+
+Side-effect imports that register more hats:
+
+```js
+import '@kucukkanat/bots/packs/halloween';   // 'pumpkin', 'devil', 'bat'
+import '@kucukkanat/bots/packs/winter';      // 'santa', 'earmuffs', 'antlers'
+import { pack } from '@kucukkanat/bots/packs/party';   // 'confetti', 'sombrero', 'propeller'
+createBot('#x', { type: 'ghost', hat: 'pumpkin' });
+pack.hats;    // the names it added; pack.looks has a few suggested looks
+```
+
 ## Playground
 
 <p align="center"><img src="docs/playground.png" alt="The playground: a cat bot wearing a party hat, round glasses and a bow tie" width="100%" /></p>

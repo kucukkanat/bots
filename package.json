@@ -9,10 +9,11 @@
   "exports": {
     ".": { "types": "./src/index.d.ts", "default": "./src/index.js" },
     "./react": { "types": "./src/react.d.ts", "default": "./src/react.js" },
+    "./packs/*": { "types": "./src/packs/pack.d.ts", "default": "./src/packs/*.js" },
     "./package.json": "./package.json"
   },
   "files": ["src"],
-  "sideEffects": ["./src/index.js"],
+  "sideEffects": ["./src/index.js", "./src/packs/*.js"],
   "scripts": {
     "test": "node --test test/*.test.js",
     "start": "python3 -m http.server 8000"
