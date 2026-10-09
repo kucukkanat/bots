@@ -1,10 +1,13 @@
 <!doctype html><meta charset="utf-8"><title>Frame-rate bench</title>
-<!-- Serve the repo (`npm start`) and open /bench/grid.html?n=30&size=96&shading=fabric.
+<!-- Serve the repo (`npm start`) and open /bench/grid.html?n=30&size=96&shading=fabric
+     (add budget=off to measure raw drawing cost without the frame budget).
      Renders a grid of avatars and reports the page's frame rate after 4 s. -->
 <style>body{margin:0;display:flex;flex-wrap:wrap;gap:8px;background:#f4f2ee;font:14px system-ui}#out{position:fixed;right:8px;bottom:8px}</style>
 <body><output id="out">measuring…</output><script type="module">
 import { BotAvatar, types } from '../src/index.js';
+import { frameBudget } from '../src/bot.js';
 const qs = new URLSearchParams(location.search);
+frameBudget.enabled = qs.get('budget') !== 'off';
 const n = +(qs.get('n') || 30), size = +(qs.get('size') || 96), shading = qs.get('shading') || 'fabric';
 const only = qs.get('types')?.split(',');
 for (let i = 0; i < n; i++) {

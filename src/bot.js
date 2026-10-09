@@ -66,12 +66,15 @@ let raf = 0, last = 0;
 // stride of 2 each one redraws every other frame, so the page holds its frame
 // rate and every avatar still moves in real time, just in fewer steps.
 let stride = 1, turn = 0, interval = 1000 / 60, calm = 0;
+/** Set `enabled` to false to measure raw drawing cost (benchmarks). */
+export const frameBudget = { enabled: true };
 function frame(now) {
   const ms = last ? now - last : 1000 / 60;
   const dt = ms / 1000;
   last = now;
   interval += (Math.min(ms, 100) - interval) * 0.1;
-  if (interval > 24 && stride < 4) { stride++; interval = 1000 / 60; calm = 0; }
+  if (!frameBudget.enabled) stride = 1;
+  else if (interval > 24 && stride < 4) { stride++; interval = 1000 / 60; calm = 0; }
   else if (stride > 1 && interval < 18) { if ((calm += ms) > 3000) { stride--; calm = 0; } }
   else calm = 0;
   let i = turn++;
