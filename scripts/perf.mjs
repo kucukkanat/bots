@@ -19,7 +19,9 @@ const port = +(process.env.PORT || 8123), runs = +(process.env.RUNS || 6);
 const args = process.argv.slice(2);
 const ab = args[0] === '--ab';
 if (!ab && !existsSync(root + 'bench/_base/render.js')) {
-  execSync(`mkdir -p bench/_base && git archive v1.0.0 src | tar -x --strip-components=1 -C bench/_base`, { cwd: root });
+  // The v1.0.0 commit, for clones without the tag.
+  const ref = (() => { try { execSync('git rev-parse -q --verify v1.0.0^{commit}', { cwd: root, stdio: 'ignore' }); return 'v1.0.0'; } catch { return '4176b6e1a88df6c5e4dc0ebdec296a57b0d4a1e9'; } })();
+  execSync(`mkdir -p bench/_base && git archive ${ref} src | tar -x --strip-components=1 -C bench/_base`, { cwd: root });
 }
 const server = spawn('python3', ['-m', 'http.server', String(port)], { cwd: root, stdio: 'ignore' });
 await new Promise((r) => setTimeout(r, 800));
