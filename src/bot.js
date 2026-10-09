@@ -55,7 +55,7 @@ export function defineFeature(name, load, option) {
   if (option) FEATURE_OPTIONS[option] = name;
 }
 
-const FACE_KEYS = ['lookX', 'lookY', 'eyeOpen', 'happy', 'smile', 'mouthOpen', 'brow', 'browTilt', 'eyeWide', 'squint', 'dizzy', 'blushPulse'];
+const FACE_KEYS = ['lookX', 'lookY', 'eyeOpen', 'happy', 'smile', 'mouthOpen', 'brow', 'browTilt', 'eyeWide', 'squint', 'dizzy', 'blushPulse', 'talk'];
 
 /**
  * The look as the worker thread receives it: plain data, with the shape as its

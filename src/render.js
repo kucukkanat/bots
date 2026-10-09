@@ -1234,7 +1234,10 @@ function drawFace(ctx, look, pose, fs, R) {
   }
 
   const mouthStyle = look.mouthStyle && look.mouthStyle !== 'smile' ? look.mouthStyle : null;
-  if (look.face === 'mouth' || mouthStyle) {
+  // Eyes-only faces grow a mouth while talking (it fades with the speaking state).
+  const talkOnly = !(look.face === 'mouth' || mouthStyle) && pose.talk > 0.01;
+  if (look.face === 'mouth' || mouthStyle || talkOnly) {
+    if (talkOnly) { ctx.save(); ctx.globalAlpha *= Math.min(1, pose.talk); }
     const my = ry * 1.55;
     const w = 0.1 * fs;
     ctx.lineWidth = lw;
@@ -1302,6 +1305,7 @@ function drawFace(ctx, look, pose, fs, R) {
       ctx.quadraticCurveTo(0, my + 0.08 * fs * pose.smile, w * 0.75, my);
       ctx.stroke();
     }
+    if (talkOnly) ctx.restore();
   }
 }
 

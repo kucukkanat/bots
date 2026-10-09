@@ -11,7 +11,7 @@ export const STATES = ['default', 'working', 'sleeping', 'listening', 'thinking'
 export const REST = Object.freeze({
   yaw: 0, pitch: 0, roll: 0, x: 0, y: 0, sx: 1, sy: 1,
   lookX: 0, lookY: 0, eyeOpen: 1, happy: 0, smile: 0.25, mouthOpen: 0, sleep: 0,
-  brow: 0, browTilt: 0, eyeWide: 0, squint: 0, dizzy: 0, think: 0, blushPulse: 0, whirl: 0,
+  brow: 0, browTilt: 0, eyeWide: 0, squint: 0, dizzy: 0, think: 0, blushPulse: 0, whirl: 0, talk: 0,
 });
 const KEYS = Object.keys(REST);
 
@@ -322,7 +322,7 @@ class Speaking {
       yaw: lx * 0.4 + Math.sin(t * 1.3) * 0.06, pitch: ly * 0.2 + v * 0.06, roll: Math.sin(t * 1.1) * 0.04,
       sx: 1 + v * 0.015, sy: 1 - v * 0.01,
       lookX: lx, lookY: ly, eyeOpen: this.blink.update(dt),
-      smile: 0.55, mouthOpen: 0.08 + 0.85 * v, brow: 0.15 + v * 0.35,
+      smile: 0.55, mouthOpen: 0.08 + 0.85 * v, brow: 0.15 + v * 0.35, talk: 1,
     };
   }
 }
@@ -453,7 +453,7 @@ export function restPose(state) {
   if (state === 'sleeping') return { ...REST, pitch: 0.3, roll: 0.08, y: 0.05, eyeOpen: 0, smile: 0, mouthOpen: 0.25, lookY: 0.35, sleep: 1 };
   if (state === 'listening') return { ...REST, pitch: -0.07, roll: 0.04, smile: 0.45, brow: 0.35, eyeWide: 0.15 };
   if (state === 'thinking') return { ...REST, yaw: 0.25, pitch: -0.14, lookX: 0.55, lookY: -0.55, smile: 0.05, mouthOpen: 0.08, brow: 0.45, browTilt: 0.35, squint: 0.2, think: 1 };
-  if (state === 'speaking') return { ...REST, smile: 0.55, mouthOpen: 0.45, brow: 0.3 };
+  if (state === 'speaking') return { ...REST, smile: 0.55, mouthOpen: 0.45, brow: 0.3, talk: 1 };
   if (state === 'error') return { ...REST, pitch: 0.08, y: 0.02, smile: -0.6, brow: 0.1, browTilt: -0.8 };
   if (state === 'success') return { ...REST, happy: 0.6, smile: 1, mouthOpen: 0.4, brow: 0.4 };
   if (custom.has(state)) { const d = custom.get(state); return { ...REST, ...(d.pose || d.keyframes?.[0]?.pose) }; }
