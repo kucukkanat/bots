@@ -3,131 +3,277 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Bots — animated bot avatars</title>
-  <meta name="description" content="Animated bot avatars with living faces: eighteen plush 3D shapes, three states, things to wear. WebGL with a 2D canvas fallback, drawn off the main thread, no dependencies." />
+  <title>bots — a face for your AI agent</title>
+  <meta name="description" content="Plush, animated 3D avatars for AI agents and apps. They listen, think, talk with lip-sync from text and doze off between tasks. Eighteen shapes, WebGL in worker threads with a 2D fallback, no dependencies." />
+  <meta property="og:title" content="bots — a face for your AI agent" />
+  <meta property="og:description" content="Plush, animated 3D avatars for AI agents. Dependency-free, WebGL in worker threads." />
+  <meta property="og:image" content="https://kucukkanat.github.io/bots/docs/hero.png" />
+  <meta name="theme-color" content="#f5f4f0" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#111016" media="(prefers-color-scheme: dark)" />
+  <script>try{var t=localStorage.getItem('bots-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="assets/site.css" />
+  <link rel="stylesheet" href="assets/home.css" />
+  <link rel="modulepreload" href="src/index.js" />
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
 </head>
 <body>
+  <a class="skip" href="#main">Skip to content</a>
   <header class="top">
     <div class="wrap">
-      <a class="brand" href="./"><bot-avatar type="clover" size="32" interactive="false"></bot-avatar> bots</a>
-      <nav class="nav">
-        <a class="hide-sm" href="#usage">Docs</a>
-        <a href="playground/">Playground</a>
-        <a class="hide-sm" href="https://github.com/kucukkanat/bots">GitHub</a>
-        <button id="theme" type="button" aria-label="Toggle theme">◐</button>
+      <a class="brand" href="./"><img src="assets/favicon.svg" alt="" width="28" height="28" /> bots</a>
+      <nav class="nav" aria-label="Main">
+        <a class="hide-sm" href="./" aria-current="page">Home</a>
+        <a href="docs/">Docs</a>
+        <a href="playground/">Studio</a>
+        <a class="icon" href="https://github.com/kucukkanat/bots" aria-label="GitHub"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
+        <button id="theme" class="icon" type="button" aria-label="Toggle theme"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 2.75a7.25 7.25 0 0 1 0 14.5z" fill="currentColor"/></svg></button>
       </nav>
     </div>
   </header>
 
-  <main>
-    <section class="hero">
+  <main id="main">
+    <!-- Hero: one live bot, wired to a pretend agent chat -->
+    <section class="hero" aria-labelledby="hero-title">
       <div class="wrap">
-        <h1>Bot avatars</h1>
-        <p class="lead">Animated avatars for your AI agents. Eighteen plush 3D shapes with living faces that look around, hop while they work and doze off between tasks. Drawn with WebGL in worker threads, falling back to a plain 2D canvas wherever that's missing. No dependencies.</p>
-        <div class="actions">
-          <a class="btn primary" href="playground/">Make your own bot →</a>
-          <a class="btn" href="#usage">Get started</a>
-        </div>
-        <div class="parade" id="parade"></div>
-      </div>
-    </section>
-
-    <section>
-      <div class="wrap">
-        <div class="controls">
-          <div class="seg" id="state-seg" role="group" aria-label="State">
-            <button aria-pressed="true" data-v="default">Idle</button>
-            <button aria-pressed="false" data-v="working">Working</button>
-            <button aria-pressed="false" data-v="sleeping">Sleeping</button>
-          </div>
-          <div class="seg" id="shading-seg" role="group" aria-label="Material">
-            <button aria-pressed="true" data-v="fabric">Plush</button>
-            <button aria-pressed="false" data-v="plastic">Plastic</button>
-            <button aria-pressed="false" data-v="smooth">Smooth</button>
-            <button aria-pressed="false" data-v="flat">Flat</button>
-          </div>
-          <div class="seg" id="face-seg" role="group" aria-label="Face">
-            <button aria-pressed="true" data-v="eyes">Eyes</button>
-            <button aria-pressed="false" data-v="mouth">Mouth</button>
+        <div class="hero-copy">
+          <a class="pill" href="docs/agents.html"><span class="pill-tag">New</span> Lip-sync from text with <code>bot.say()</code> <span aria-hidden="true">→</span></a>
+          <h1 id="hero-title">Give your agent a&nbsp;<span class="glow">face</span>.</h1>
+          <p class="lead">Plush, animated avatars for AI agents and apps. They listen while you type, think while the model works, talk while the answer streams in — and doze off when there's nothing to do. One dependency-free module.</p>
+          <div class="actions">
+            <a class="btn primary big" href="playground/">Design your bot <span aria-hidden="true">→</span></a>
+            <a class="btn big" href="docs/">Read the docs</a>
           </div>
         </div>
-        <div class="grid" id="grid"></div>
-      </div>
-    </section>
 
-    <section class="doc" id="usage">
-      <div class="wrap">
-        <h2>Get started</h2>
-        <p>One ES module. Drop the custom element into any page, drive it from plain JavaScript, or use the React wrapper.</p>
-        <div class="tabs seg" id="code-seg" role="group" aria-label="Code sample">
-          <button aria-pressed="true" data-v="html">HTML</button>
-          <button aria-pressed="false" data-v="js">JavaScript</button>
-          <button aria-pressed="false" data-v="react">React</button>
+        <div class="demo" id="demo">
+          <div class="demo-bar" aria-hidden="true"><i></i><i></i><i></i><span>agent.html</span></div>
+          <div class="demo-body">
+            <div class="stage" id="stage">
+              <div class="stage-bot" id="hero-bot"></div>
+              <div class="stage-meta">
+                <span class="state-chip" id="state-chip"><i></i><span id="state-word">idle</span></span>
+                <code class="ticker" id="ticker" aria-hidden="true">bot.setState('default')</code>
+              </div>
+            </div>
+            <div class="chat">
+              <div class="chat-head">
+                <span class="chat-avatar" id="chat-avatar" aria-hidden="true"></span>
+                <div><b id="agent-name">Clover</b><span class="chat-sub">Demo agent · canned replies, no model</span></div>
+              </div>
+              <div class="messages" id="messages" role="log" aria-live="polite" aria-label="Conversation">
+                <div class="msg bot">Hi! I'm a bot avatar. Type something and watch me listen, think and talk back.</div>
+              </div>
+              <div class="suggest" id="suggest" aria-label="Suggested prompts">
+                <button type="button">What are you?</button>
+                <button type="button">Put on a party hat</button>
+                <button type="button">Show me an error</button>
+                <button type="button">How do I install you?</button>
+              </div>
+              <form class="composer" id="composer" autocomplete="off">
+                <label class="sr-only" for="prompt">Message the demo agent</label>
+                <input id="prompt" name="prompt" placeholder="Message Clover…" maxlength="200" />
+                <button type="submit" id="send" aria-label="Send"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10h11M10.5 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              </form>
+            </div>
+          </div>
         </div>
-        <pre class="code" id="code-html"><span class="k">&lt;script</span> type=<span class="s">"module"</span> src=<span class="s">"https://cdn.jsdelivr.net/gh/kucukkanat/bots@main/src/index.js"</span><span class="k">&gt;&lt;/script&gt;</span>
 
-<span class="t">&lt;bot-avatar</span> type=<span class="s">"clover"</span> state=<span class="s">"working"</span> size=<span class="s">"96"</span><span class="t">&gt;&lt;/bot-avatar&gt;</span>
-<span class="t">&lt;bot-avatar</span> type=<span class="s">"cat"</span> face=<span class="s">"mouth"</span> hat=<span class="s">"party"</span> bow-tie<span class="t">&gt;&lt;/bot-avatar&gt;</span></pre>
-        <pre class="code" id="code-js" hidden><span class="k">import</span> { createBot } <span class="k">from</span> <span class="s">'https://cdn.jsdelivr.net/gh/kucukkanat/bots@main/src/index.js'</span>;
-
-<span class="k">const</span> bot = createBot(<span class="s">'#agent'</span>, { type: <span class="s">'droid'</span>, size: <span class="t">96</span>, glasses: <span class="s">'round'</span> });
-
-<span class="c">// later, when your agent starts and finishes a task</span>
-bot.setState(<span class="s">'working'</span>);
-bot.setState(<span class="s">'sleeping'</span>);
-bot.poke(); <span class="c">// hop and turn round</span></pre>
-        <pre class="code" id="code-react" hidden><span class="k">import</span> { BotAvatar } <span class="k">from</span> <span class="s">'@kucukkanat/bots/react'</span>;
-
-<span class="k">function</span> <span class="t">Agent</span>({ busy }) {
-  <span class="k">return</span> <span class="t">&lt;BotAvatar</span> type=<span class="s">"clover"</span> state={busy ? <span class="s">'working'</span> : <span class="s">'default'</span>} size={<span class="t">64</span>} <span class="t">/&gt;</span>;
-}</pre>
-      </div>
-    </section>
-
-    <section class="doc">
-      <div class="wrap">
-        <h2>Things to wear</h2>
-        <p>Hats, glasses, headphones and a bow tie, placed on the body's own shape and turned with the head.</p>
-        <div class="grid" id="wear"></div>
-      </div>
-    </section>
-
-    <section class="doc">
-      <div class="wrap">
-        <h2>Your own shape</h2>
-        <p><code>path</code> takes SVG path data in a 100×100 box centred on (50, 50). It is inflated, lit and animated like any stock shape.</p>
-        <div class="row">
-          <div class="card" style="flex:0 0 180px"><bot-avatar id="heart" type="circle" size="120" color="#ff5c8a" face="mouth" blush></bot-avatar><span class="name">Heart</span></div>
-          <pre class="code" style="flex:1 1 320px;margin:0"><span class="k">const</span> heart = <span class="s">'M50 88C50 88 12 64 12 38C12 24 23 14 35 14C42 14 47 18 50 23C53 18 58 14 65 14C77 14 88 24 88 38C88 64 50 88 50 88Z'</span>;
-
-<span class="t">&lt;bot-avatar</span> type=<span class="s">"circle"</span> path=<span class="s">"${heart}"</span> color=<span class="s">"#ff5c8a"</span><span class="t">&gt;&lt;/bot-avatar&gt;</span></pre>
+        <div class="install" role="group" aria-label="Install">
+          <div class="seg" role="tablist" aria-label="Install with">
+            <button role="tab" id="t-npm" aria-controls="i-npm" aria-selected="true">npm</button>
+            <button role="tab" id="t-cdn" aria-controls="i-cdn" aria-selected="false">CDN</button>
+          </div>
+          <div class="install-line" id="i-npm" role="tabpanel" aria-labelledby="t-npm"><pre class="code"><span class="c">$</span> npm i @kucukkanat/bots</pre></div>
+          <div class="install-line" id="i-cdn" role="tabpanel" aria-labelledby="t-cdn" hidden><pre class="code" data-lib>&lt;script type="module" src="https://cdn.jsdelivr.net/gh/kucukkanat/bots@main/src/index.js"&gt;&lt;/script&gt;</pre></div>
         </div>
       </div>
     </section>
 
-    <section class="doc">
+    <!-- Crew strip -->
+    <section class="section" aria-labelledby="crew-title">
       <div class="wrap">
-        <h2>Options</h2>
-        <p>Every option works as a JavaScript option (<code>camelCase</code>) or an attribute (<code>kebab-case</code>).</p>
-        <div class="table-scroll">
-          <table class="props">
-            <thead><tr><th>Option</th><th>Values</th><th>Default</th></tr></thead>
-            <tbody id="props"></tbody>
-          </table>
+        <div class="section-head">
+          <p class="eyebrow">Pick your crew</p>
+          <h2 id="crew-title">Eighteen shapes. Endless characters.</h2>
+          <p>Every bot is a shape plus a look: material, fur, face, things to wear. Hire one and it takes over the chat above.</p>
+        </div>
+      </div>
+      <div class="crew-strip" id="crew" role="list"></div>
+      <div class="wrap crew-foot">
+        <a class="link" href="playground/">Design your own in the studio <span aria-hidden="true">→</span></a>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="section" aria-labelledby="feat-title">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="eyebrow">Built for agents</p>
+          <h2 id="feat-title">Everything a face needs to feel alive.</h2>
+          <p>Each of these is an option or a method call. Leave one out and it costs nothing: features load on first use.</p>
+        </div>
+        <div class="features">
+          <article class="feat">
+            <div class="feat-vis"><div class="vis-bot" data-bot='{"type":"droid","face":"mouth","glasses":"round"}' data-demo="states"></div><span class="vis-label" id="states-label">idle</span></div>
+            <h3>Agent states</h3>
+            <p>Idle, listening, thinking, speaking, working, success, error, sleeping. A status badge for typing, loading, done.</p>
+            <code>bot.setState('thinking')</code>
+          </article>
+          <article class="feat">
+            <div class="feat-vis"><div class="vis-bot" data-bot='{"type":"cat","face":"mouth","blush":true}' data-demo="say"></div><button class="vis-btn" type="button" id="say-btn">▶ Say hello</button></div>
+            <h3>Lip-sync from text</h3>
+            <p>Mouth shapes follow the words, streamed or whole. Or hand it a mic, an audio element or a TTS node.</p>
+            <code>bot.say(chunk, { append: true })</code>
+          </article>
+          <article class="feat">
+            <div class="feat-vis"><div class="vis-bot" data-bot='{"type":"star","face":"mouth","mood":"happy"}' data-demo="moods"></div><span class="vis-label" id="mood-label">happy</span></div>
+            <h3>Moods &amp; reactions</h3>
+            <p>A resting mood, or <code>'auto'</code> to follow the conversation. Eleven quick reactions on top.</p>
+            <code>mood: 'auto'</code>
+          </article>
+          <article class="feat">
+            <div class="feat-vis"><div class="vis-bot" data-bot='{"type":"blob","toss":true,"petting":true,"ears":"bunny"}' data-demo="toss"></div><span class="vis-label">drag · throw · stroke</span></div>
+            <h3>Toss &amp; pet</h3>
+            <p>Pick it up and throw it across the page, or stroke it till it purrs. Opt in, off by default.</p>
+            <code>{ toss: true, petting: true }</code>
+          </article>
+          <article class="feat">
+            <div class="feat-vis"><div class="vis-bot" data-bot='{"type":"ghost","hat":"witch","blush":true,"scarf":true,"scarfColor":"#ff8a3d"}'></div></div>
+            <h3>Packs &amp; plugins</h3>
+            <p>Halloween, winter and party packs add hats and props. Register your own shapes, hats and states.</p>
+            <code>import '…/packs/halloween.js'</code>
+          </article>
+          <article class="feat">
+            <div class="feat-vis"><div class="vis-bot" data-bot='{"type":"flower","face":"mouth","hat":"party"}' data-demo="export"></div><button class="vis-btn" type="button" id="gif-btn">⬇ GIF</button></div>
+            <h3>Export &amp; stickers</h3>
+            <p>GIF, APNG, WebM, sprite sheets and PNG, rendered offline. Sticker sets for chat apps in one call.</p>
+            <code>bot.export({ format: 'gif' })</code>
+          </article>
+          <article class="feat">
+            <div class="feat-vis fw" aria-hidden="true"><span>&lt;bot-avatar&gt;</span><span>React</span><span>Vue</span><span>Svelte</span><span>vanilla JS</span></div>
+            <h3>Any framework</h3>
+            <p>A custom element that works everywhere, a JS API, and thin wrappers for React, Vue and Svelte.</p>
+            <code>@kucukkanat/bots/react</code>
+          </article>
+          <article class="feat">
+            <div class="feat-vis gpu"><div class="vis-bot" data-bot='{"type":"mech","headphones":true,"preset":"vinyl"}' data-demo="gpu"></div>
+              <dl class="probe" id="probe"><div><dt>Renderer</dt><dd id="p-gl">…</dd></div><div><dt>Drawing on</dt><dd id="p-thread">…</dd></div><div><dt>CPU threads</dt><dd id="p-cores">…</dd></div></dl></div>
+            <h3>WebGL in worker threads</h3>
+            <p>Bodies are lit on the GPU in a worker thread; the page's main thread stays free. No GPU, no workers? The same look in a 2D canvas.</p>
+            <code>renderer: 'auto'</code>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Performance -->
+    <section class="section perf" aria-labelledby="perf-title">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="eyebrow">Performance</p>
+          <h2 id="perf-title">Cheap enough for a whole sidebar of agents.</h2>
+          <p>Avatars sit next to the work, so they're built to stay out of its way.</p>
+        </div>
+        <div class="stats">
+          <div class="stat"><b>0</b><span>dependencies. No build step, one ES module.</span></div>
+          <div class="stat"><b>≤4</b><span>worker threads draw every avatar with <code>OffscreenCanvas</code>.</span></div>
+          <div class="stat"><b>1</b><span>shared animation loop. Off-screen avatars stop drawing.</span></div>
+          <div class="stat"><b>¼px</b><span>A frame is skipped when nothing moved more than a quarter of a device pixel.</span></div>
+        </div>
+        <div class="bench">
+          <div class="bench-copy">
+            <h3>Try it on this device</h3>
+            <p>Spawns 40 avatars and measures this page's frame rate for three seconds.</p>
+            <button class="btn" type="button" id="bench-run">Run the test</button>
+            <p class="bench-out" id="bench-out" role="status" aria-live="polite"></p>
+          </div>
+          <div class="bench-grid" id="bench-grid" aria-hidden="true"></div>
+        </div>
+        <a class="link" href="docs/performance.html">How it renders <span aria-hidden="true">→</span></a>
+      </div>
+    </section>
+
+    <!-- Code -->
+    <section class="section" aria-labelledby="code-title">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="eyebrow">Drop it in</p>
+          <h2 id="code-title">Five lines, any stack.</h2>
+        </div>
+        <div class="snippets">
+          <div class="seg" role="tablist" aria-label="Framework">
+            <button role="tab" id="t-html" aria-controls="s-html" aria-selected="true">HTML</button>
+            <button role="tab" id="t-js" aria-controls="s-js" aria-selected="false">JavaScript</button>
+            <button role="tab" id="t-react" aria-controls="s-react" aria-selected="false">React</button>
+            <button role="tab" id="t-vue" aria-controls="s-vue" aria-selected="false">Vue</button>
+            <button role="tab" id="t-svelte" aria-controls="s-svelte" aria-selected="false">Svelte</button>
+          </div>
+          <div id="s-html" role="tabpanel" aria-labelledby="t-html"><pre class="code" data-lib>&lt;script type="module" src="https://cdn.jsdelivr.net/gh/kucukkanat/bots@main/src/index.js"&gt;&lt;/script&gt;
+
+&lt;bot-avatar type="clover" state="thinking" size="96"&gt;&lt;/bot-avatar&gt;
+&lt;bot-avatar type="cat" face="mouth" hat="party" mood="happy"&gt;&lt;/bot-avatar&gt;</pre></div>
+          <div id="s-js" role="tabpanel" aria-labelledby="t-js" hidden><pre class="code">import { createBot } from '@kucukkanat/bots';
+
+const bot = createBot('#agent', { type: 'droid', size: 96, status: 'auto' });
+
+bot.setState('thinking');                // while the model works
+for await (const chunk of stream) {
+  bot.say(chunk, { append: true });      // lip-sync as the answer streams in
+}
+bot.setState('success');</pre></div>
+          <div id="s-react" role="tabpanel" aria-labelledby="t-react" hidden><pre class="code">import { BotAvatar } from '@kucukkanat/bots/react';
+
+export function Agent({ busy }) {
+  return &lt;BotAvatar type="clover" state={busy ? 'thinking' : 'default'} size={64} /&gt;;
+}</pre></div>
+          <div id="s-vue" role="tabpanel" aria-labelledby="t-vue" hidden><pre class="code">&lt;script setup&gt;
+import { BotAvatar } from '@kucukkanat/bots/vue';
+defineProps({ busy: Boolean });
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;BotAvatar type="clover" :state="busy ? 'thinking' : 'default'" :size="64" /&gt;
+&lt;/template&gt;</pre></div>
+          <div id="s-svelte" role="tabpanel" aria-labelledby="t-svelte" hidden><pre class="code">&lt;script&gt;
+  import { bot } from '@kucukkanat/bots/svelte';
+  export let busy = false;
+&lt;/script&gt;
+
+&lt;div use:bot={{ type: 'clover', state: busy ? 'thinking' : 'default', size: 64 }}&gt;&lt;/div&gt;</pre></div>
+        </div>
+        <a class="link" href="docs/frameworks.html">Framework guides <span aria-hidden="true">→</span></a>
+      </div>
+    </section>
+
+    <!-- Closing call to action -->
+    <section class="section">
+      <div class="wrap">
+        <div class="cta">
+          <div class="cta-bots" aria-hidden="true">
+            <div class="vis-bot" data-bot='{"type":"pebble","face":"mouth","hat":"beanie","accessoryColor":"#e85d4a","size":84}'></div>
+            <div class="vis-bot" data-bot='{"type":"clover","face":"mouth","size":108,"state":"working"}'></div>
+            <div class="vis-bot" data-bot='{"type":"alien","state":"sleeping","size":84}'></div>
+          </div>
+          <h2>Make one that's yours.</h2>
+          <p>Shape, colour, fur, face, things to wear. Share it as a link, export it as a GIF, or publish a crew page.</p>
+          <div class="actions"><a class="btn primary big" href="playground/">Open the studio <span aria-hidden="true">→</span></a><a class="btn big" href="docs/">Get started</a></div>
         </div>
       </div>
     </section>
   </main>
 
-  <footer>
+  <footer class="foot">
     <div class="wrap">
-      MIT licensed. A from-scratch homage to <a href="https://libraries.dev/bots">bot-avatars</a> by Jakub Antalik.
-      · <a href="playground/">Playground</a> · <a href="https://github.com/kucukkanat/bots">Source</a>
+      <div class="about">
+        <a class="brand" href="./"><img src="assets/favicon.svg" alt="" width="28" height="28" /> bots</a>
+        <p>MIT licensed. A from-scratch homage to <a href="https://libraries.dev/bots">bot-avatars</a> by Jakub Antalik.</p>
+      </div>
+      <div><h2>Product</h2><ul><li><a href="playground/">Studio</a></li><li><a href="docs/">Getting started</a></li><li><a href="docs/agents.html">Agent recipes</a></li></ul></div>
+      <div><h2>Reference</h2><ul><li><a href="docs/options.html">Options</a></li><li><a href="docs/api.html">API</a></li><li><a href="docs/performance.html">Performance</a></li></ul></div>
+      <div><h2>Project</h2><ul><li><a href="https://github.com/kucukkanat/bots">GitHub</a></li><li><a href="https://www.npmjs.com/package/@kucukkanat/bots">npm</a></li><li><a href="https://github.com/kucukkanat/bots/blob/main/LICENSE">License</a></li></ul></div>
     </div>
   </footer>
 
