@@ -660,7 +660,7 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
   const extras = shape.extras || {};
   const lightSide = (sign) => clamp(0.6 + 0.4 * sign * lx, 0.2, 1);
   // Everything a part needs to draw itself in this frame.
-  const partsEnv = () => ({ R, proj, c0, s, sp, cp, D, base, ink: look.ink, look, pose, time, lx, ly, shape });
+  const partsEnv = () => ({ R, dpr, proj, c0, s, sp, cp, D, base, ink: look.ink, look, pose, time, lx, ly, shape });
 
   // Parts behind the body are drawn after it with 'destination-over', which
   // stacks each new shape underneath: their own layers go in reverse.

@@ -36,20 +36,44 @@ function puffs(ctx, p0, p1, p2, { n = 9, r0, r1, color, tip, tipFrom = 0.7, dark
     ctx.lineWidth = 2 * (r0 + (r1 - r0) * (t0 + t1) / 2) * 0.92;
     ctx.beginPath(); ctx.moveTo(...a); ctx.quadraticCurveTo(2 * m[0] - (a[0] + b[0]) / 2, 2 * m[1] - (a[1] + b[1]) / 2, ...b); ctx.stroke();
   }
+  // Two flat fills per puff (a body and a highlight) instead of a gradient each: parts draw every frame.
+  const tones = toneCache(color, tip, dark);
   for (let i = 0; i < n; i++) {
     const t = i / (n - 1);
     const [x, y] = qp(p0, p1, p2, t);
     const r = r0 + (r1 - r0) * t;
-    const col = tip && t >= tipFrom ? tip : color;
-    const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
-    g.addColorStop(0, shade(col, 0.1));
-    g.addColorStop(1, shade(col, -dark - t * 0.08));
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
+    const tn = tones[tip && t >= tipFrom ? 1 : 0];
+    ctx.fillStyle = tn.base;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+    ctx.fillStyle = tn.hi;
+    ctx.beginPath(); ctx.arc(x - r * 0.28, y - r * 0.3, r * 0.5, 0, TAU); ctx.fill();
   }
 }
+const tones = new Map();
+function toneCache(color, tip, dark) {
+  const key = `${color}|${tip}|${dark}`;
+  let t = tones.get(key);
+  if (!t) tones.set(key, (t = [color, tip || color].map((c) => ({ base: shade(c, -dark * 0.5), hi: rgba(shade(c, 0.16), 0.55) }))));
+  return t;
+}
+
+/** A sprite drawn once per key at device scale, for things painted on the body that never change. */
+const sprites = new Map();
+const makeCanvas = (w, h) => (typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h) : Object.assign(document.createElement('canvas'), { width: w, height: h }));
+function sprite(key, px, drawUnits) {
+  let sp = sprites.get(key);
+  if (sp) return sp;
+  const S = Math.ceil(px * 2.4);
+  const c = makeCanvas(S, S);
+  const g = c.getContext('2d');
+  g.setTransform(px, 0, 0, px, S / 2, S / 2);
+  drawUnits(g);
+  sprites.set(key, (sp = { canvas: c, S, px }));
+  if (sprites.size > 200) sprites.delete(sprites.keys().next().value);
+  return sp;
+}
+/** Draw a sprite in body units (it was drawn in body units at `px` per unit). */
+const blit = (ctx, sp) => ctx.drawImage(sp.canvas, -sp.S / 2 / sp.px, -sp.S / 2 / sp.px, sp.S / sp.px, sp.S / sp.px);
 
 function tail(ctx, p, env, back) {
   const { R, proj, pose, time, base, D } = env;
@@ -247,13 +271,20 @@ function onBody(ctx, env, f) {
 }
 
 function plates(ctx, p, env) {
-  const { shape, base, pose } = env;
+  const { shape, base, pose, R, dpr } = env;
   const rows = p.rows ?? 5;
-  const top = shape.bounds.minY, bottom = shape.bounds.maxY;
   const color = p.color || base;
+  const px = R * (dpr || 2);
+  const sp = sprite(`plates|${shape.type}|${shape._id ?? ''}|${rows}|${color}|${Math.round(px)}`, px, (g) => drawPlates(g, shape, rows, color));
   onBody(ctx, env, () => {
-    ctx.lineWidth = 0.022;
     ctx.globalAlpha = 1 - pose.morph * 0.3;
+    blit(ctx, sp);
+  });
+}
+function drawPlates(ctx, shape, rows, color) {
+  const top = shape.bounds.minY, bottom = shape.bounds.maxY;
+  {
+    ctx.lineWidth = 0.022;
     for (let r = 0; r < rows; r++) {
       const y = top + ((r + 0.55) / rows) * (bottom - top) * 0.92;
       const w = shape.halfWidthAt(y, 0.1) * 1.05;
@@ -272,7 +303,7 @@ function plates(ctx, p, env) {
         ctx.fill(); ctx.stroke();
       }
     }
-  });
+  }
 }
 
 function slot(ctx, p, env) {
