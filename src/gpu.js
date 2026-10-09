@@ -77,8 +77,8 @@ uniform int uPasses;
 uniform vec4 uPC[4];      // pass colours (straight alpha)
 uniform vec2 uPO[4];      // pass offsets, device px
 uniform int uHighs;
-uniform vec4 uHC[2];      // highlight colours (straight alpha)
-uniform vec3 uHG[2];      // highlight centre and radius, body frame
+uniform vec4 uHC[3];      // highlight colours (straight alpha)
+uniform vec3 uHG[3];      // highlight centre and radius, body frame
 uniform int uHasFuzz;
 uniform vec4 uFC;
 uniform vec2 uFO;
@@ -108,7 +108,7 @@ void main() {
   if (uPasses > 1) col = over(col, uPC[1].rgb, uPC[1].a * inner(uB1, p, uPO[1]));
   if (uPasses > 2) col = over(col, uPC[2].rgb, uPC[2].a * inner(uB2, p, uPO[2]));
   if (uPasses > 3) col = over(col, uPC[3].rgb, uPC[3].a * inner(uB3, p, uPO[3]));
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < 3; i++) {
     if (i >= uHighs) break;
     float t = clamp(length(bp - uHG[i].xy) / uHG[i].z, 0.0, 1.0);
     col = over(col, uHC[i].rgb, uHC[i].a * (1.0 - t));
@@ -489,11 +489,11 @@ export class GpuBody {
       gl.uniform4fv(u.uPC, passes.flatMap((ps) => ps.rgba).concat(new Array((4 - passes.length) * 4).fill(0)));
       gl.uniform2fv(u.uPO, passes.flatMap((ps) => [ps.ox, ps.oy]).concat(new Array((4 - passes.length) * 2).fill(0)));
     }
-    const highs = b.highs.slice(0, 2);
+    const highs = b.highs.slice(0, 3);
     gl.uniform1i(u.uHighs, highs.length);
     if (highs.length) {
-      gl.uniform4fv(u.uHC, highs.flatMap((h) => h.rgba).concat(new Array((2 - highs.length) * 4).fill(0)));
-      gl.uniform3fv(u.uHG, highs.flatMap((h) => [h.x, h.y, h.r]).concat(new Array((2 - highs.length) * 3).fill(0)));
+      gl.uniform4fv(u.uHC, highs.flatMap((h) => h.rgba).concat(new Array((3 - highs.length) * 4).fill(0)));
+      gl.uniform3fv(u.uHG, highs.flatMap((h) => [h.x, h.y, h.r]).concat(new Array((3 - highs.length) * 3).fill(0)));
     }
     gl.uniform1i(u.uHasFuzz, fuzz ? 1 : 0);
     gl.uniform4fv(u.uFC, b.fuzz ? b.fuzz.rgba : [0, 0, 0, 0]);

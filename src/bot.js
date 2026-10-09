@@ -5,9 +5,11 @@
 
 import { adjust, autoInk } from './color.js';
 import { BotSim, restPose, STATES } from './engine.js';
-import { drawBot, OVERSCAN, BODY, RISE } from './render.js';
+import { drawBot, OVERSCAN, BODY, RISE, HAT_STYLES } from './render.js';
 import { presets, getShape, shapeFromSvgPath } from './shapes.js';
 import { workerPool, mainThreadGpu, stats } from './pool.js';
+import { normalizeOptions, encodeDNA, EXPRESSIONS } from './options.js';
+import { hatDef } from './plugins.js';
 
 export const DEFAULTS = Object.freeze({
   type: 'clover',
@@ -32,10 +34,10 @@ export const DEFAULTS = Object.freeze({
 });
 
 export const SHADINGS = ['fabric', 'plastic', 'smooth', 'crisp', 'flat'];
-export const HATS = ['none', 'beanie', 'party', 'crown', 'beret', 'tophat'];
+export const HATS = HAT_STYLES;
 export const GLASSES = ['none', 'round', 'square', 'shades'];
 
-const FACE_KEYS = ['lookX', 'lookY', 'eyeOpen', 'happy', 'smile', 'mouthOpen'];
+const FACE_KEYS = ['lookX', 'lookY', 'eyeOpen', 'happy', 'smile', 'mouthOpen', 'brow', 'browTilt', 'eyeWide', 'squint', 'dizzy', 'blushPulse'];
 
 /**
  * The look as the worker thread receives it: plain data, with the shape as its
@@ -43,13 +45,30 @@ const FACE_KEYS = ['lookX', 'lookY', 'eyeOpen', 'happy', 'smile', 'mouthOpen'];
  */
 function lookMessage(look) {
   const { shape, pose, ...rest } = look;
-  const spec = look.path
-    ? { key: `${look.type}:${look.path}`, points: shape.points, meta: { type: shape.type, faceY: shape.faceY, faceScale: shape.faceScale, extras: shape.extras } }
+  // Custom outlines and registered shapes travel as points; built-ins by name.
+  const spec = look.path || presets[shape.type]?.custom
+    ? { key: `${look.type}:${look.path || 'registered'}`, points: shape.points, meta: { type: shape.type, faceY: shape.faceY, faceScale: shape.faceScale, extras: shape.extras } }
     : { type: shape.type };
-  return { ...rest, shape: spec };
+  const msg = { ...rest, shape: spec };
+  const hd = look.hat && hatDef(look.hat);
+  if (hd) msg.hatDef = hd;
+  // Functions don't cross threads; images do.
+  for (const k of Object.keys(msg)) if (typeof msg[k] === 'function') delete msg[k];
+  if (msg.accessories) msg.accessories = msg.accessories.filter((a) => a.image).map(({ image, x, y, size, rotate, layer }) => ({ image, x, y, size, rotate, layer }));
+  return msg;
 }
 
-const STATE_WORDS = { default: 'idle', working: 'working', sleeping: 'sleeping' };
+const STATE_WORDS = { default: 'idle', working: 'working', sleeping: 'sleeping', listening: 'listening', thinking: 'thinking', speaking: 'speaking', error: 'having trouble', success: 'done' };
+
+/** What the simulation needs on top of the options: the expression's face. */
+function simOptions(o) {
+  const e = o.expression;
+  const face = !e || e === 'neutral' ? null : typeof e === 'object' ? e : EXPRESSIONS[e] || null;
+  return face ? { ...o, expressionFace: face } : o;
+}
+
+let audioCtx = null;
+const mediaSources = new WeakMap();
 
 function pageTheme() {
   if (typeof document === 'undefined') return 'light';
@@ -60,7 +79,7 @@ function pageTheme() {
 
 /** Resolve options into what the renderer needs. */
 export function resolveLook(opts) {
-  const o = { ...DEFAULTS, ...opts };
+  const o = { ...DEFAULTS, ...normalizeOptions(opts) };
   const preset = presets[o.type] || presets.circle;
   const shape = (o.path && shapeFromSvgPath(o.path, o.type)) || getShape(o.type);
   const color = adjust(o.color || preset.color, { brightness: o.brightness, saturation: o.saturation });
@@ -125,7 +144,9 @@ export class BotAvatar {
    * @param {object} options
    */
   constructor(target, options = {}) {
-    this.options = { ...DEFAULTS, ...options };
+    this._raw = { ...options };
+    this.options = { ...DEFAULTS, ...normalizeOptions(this._raw) };
+    this._listeners = new Map();
     this._ownCanvas = !(target instanceof HTMLCanvasElement);
     if (!this._ownCanvas) this.canvas = target;
     else {
@@ -133,13 +154,15 @@ export class BotAvatar {
       target.appendChild(this.canvas);
     }
     this.canvas.setAttribute('role', 'img');
-    this.sim = new BotSim(this.options.seed ?? Math.random(), this.options.state, this.options);
+    this.sim = new BotSim(this.options.seed ?? Math.random(), this.options.state, simOptions(this.options));
+    this.sim.onEvent = (name) => this._emit(name, name === 'state' ? { state: this.sim.state } : {});
     this.visible = true;
     this.look = resolveLook(this.options);
+    this._loadAccessories();
     this._onClick = () => {
       if (!this.options.interactive) return;
       this.sim.poke();
-      this.canvas.dispatchEvent(new CustomEvent('bot-poke', { bubbles: true }));
+      this._emit('poke');
     };
     this.canvas.addEventListener('click', this._onClick);
     if (typeof IntersectionObserver !== 'undefined') {
@@ -196,10 +219,17 @@ export class BotAvatar {
   /** Update options; anything not passed is kept. */
   set(options) {
     const prev = this.options;
-    this.options = { ...prev, ...options };
+    for (const [k, v] of Object.entries(options)) {
+      if (v === undefined) delete this._raw[k];
+      else this._raw[k] = v;
+    }
+    this.options = { ...DEFAULTS, ...normalizeOptions(this._raw) };
+    options = { ...options, ...normalizeOptions(options) };
     if (options.state && options.state !== this.sim.state) this.sim.setState(options.state);
-    this.sim.setOptions(this.options);
+    this.sim.setOptions(simOptions(this.options));
     this.look = resolveLook(this.options);
+    if ('accessories' in options) this._loadAccessories();
+    else if (this._accs) this.look.accessories = this._accs;
     if (this.handle) {
       this.pool.post(this.handle, { op: 'look', look: lookMessage(this.look) });
       this.pool.post(this.handle, { op: 'opts', ...this._renderOpts() });
@@ -213,6 +243,114 @@ export class BotAvatar {
   setState(state) { return this.set({ state }); }
   /** Hop and turn round, as a click does. */
   poke() { this.sim.poke(); }
+
+  /**
+   * Play an expression for a moment over whatever it's doing: 'happy', 'joy',
+   * 'surprised', 'worried', 'sad', 'angry', 'smug', 'sleepy', 'confused',
+   * 'dizzy', 'love', or an object of face channels.
+   */
+  react(expression, duration = 1.6) {
+    this.sim.react(expression, duration, EXPRESSIONS);
+    return this;
+  }
+
+  /**
+   * Speak: the mouth follows the sound of `source` (a MediaStream, an <audio>
+   * or <video> element, or a Web Audio node) and the avatar switches to the
+   * speaking state. `speak()` with nothing restores the state it was in.
+   * Without audio, `setVoice(level)` drives the mouth by hand, and the
+   * speaking state alone makes up its own chatter.
+   */
+  speak(source) {
+    this._analyser?.disconnect?.();
+    this._analyser = null;
+    if (!source) {
+      this.sim.setVoice(null);
+      if (this._speakPrev) { this.setState(this._speakPrev); this._speakPrev = null; }
+      return this;
+    }
+    audioCtx ??= new (globalThis.AudioContext || globalThis.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    let node = source;
+    if (typeof MediaStream !== 'undefined' && source instanceof MediaStream) node = audioCtx.createMediaStreamSource(source);
+    else if (typeof HTMLMediaElement !== 'undefined' && source instanceof HTMLMediaElement) {
+      node = mediaSources.get(source);
+      if (!node) { node = audioCtx.createMediaElementSource(source); node.connect(audioCtx.destination); mediaSources.set(source, node); }
+    }
+    const an = audioCtx.createAnalyser();
+    an.fftSize = 512;
+    node.connect(an);
+    this._analyser = an;
+    this._voiceBuf = new Float32Array(an.fftSize);
+    if (this.sim.state !== 'speaking') { this._speakPrev = this.sim.state; this.setState('speaking'); }
+    return this;
+  }
+
+  /** Drive the speaking mouth by hand: 0 (closed) … 1 (wide); null for made-up chatter. */
+  setVoice(level) { this.sim.setVoice(level); return this; }
+
+  /**
+   * Keep an eye on something: an element, a point in client coordinates
+   * ({ x, y }), or null to stop. The pointer still wins when it comes close.
+   */
+  lookAt(target) { this._lookAt = target || null; return this; }
+
+  /**
+   * Listen for 'poke', 'blink', 'jump', 'land' or 'state'. Returns a function
+   * that stops listening. The same events bubble from the canvas as
+   * 'bot-poke', 'bot-blink', … DOM events.
+   */
+  on(name, fn) {
+    if (!this._listeners.has(name)) this._listeners.set(name, new Set());
+    this._listeners.get(name).add(fn);
+    return () => this._listeners.get(name)?.delete(fn);
+  }
+
+  _emit(name, detail = {}) {
+    this._listeners.get(name)?.forEach((fn) => fn({ type: name, bot: this, ...detail }));
+    this.canvas.dispatchEvent(new CustomEvent(`bot-${name}`, { bubbles: true, detail }));
+  }
+
+  /**
+   * Export as an animated 'gif', 'apng', 'webm', a 'sprite' sheet, or a still
+   * 'png' / 'webp'. Resolves to a Blob. Options: duration, fps, scale,
+   * background. The exporter loads on first use.
+   */
+  export(options = {}) {
+    return import('./export.js').then((m) => m.exportBot(this, options));
+  }
+
+  /** A short code that holds this whole design; pass it back as `dna`. */
+  get dna() {
+    const { seed, pose, dna, identity, accessories, ...o } = this.options;
+    return encodeDNA(o, DEFAULTS);
+  }
+
+  /** Load images for `accessories` (by `src` or `image`) and redraw when they're in. */
+  _loadAccessories() {
+    const list = this.options.accessories;
+    this._accs = null;
+    if (!Array.isArray(list) || !list.length) return;
+    const token = (this._accToken = {});
+    Promise.all(list.map(async (a) => {
+      let img = a.image;
+      if (!img && a.src) {
+        const el = new Image();
+        el.crossOrigin = a.crossOrigin ?? 'anonymous';
+        el.src = a.src;
+        await el.decode();
+        img = el;
+      }
+      if (img && typeof createImageBitmap !== 'undefined' && !(img instanceof ImageBitmap)) img = await createImageBitmap(img);
+      return { ...a, image: img };
+    })).then((accs) => {
+      if (token !== this._accToken || this._destroyed) return;
+      this._accs = accs;
+      this.look = { ...this.look, accessories: accs };
+      if (this.handle) this.pool.post(this.handle, { op: 'look', look: lookMessage(this.look) });
+      this.draw();
+    }).catch(() => {});
+  }
 
   _layout(resize = true) {
     const size = this.options.size;
@@ -247,14 +385,30 @@ export class BotAvatar {
   }
 
   _tick(dt, drawTurn = true) {
-    if (this.options.interactive && pointer) {
+    let aim = null;
+    if ((this.options.interactive && pointer) || this._lookAt) {
       const r = this.canvas.getBoundingClientRect();
       const R = this.options.size * BODY;
-      const dx = (pointer.x - (r.left + r.width / 2)) / R;
-      const dy = (pointer.y - (r.top + r.height / 2 + RISE * this.options.size)) / R;
-      const d = Math.hypot(dx, dy);
-      this.sim.setPointer(d < 5 && d > 0.05 ? { x: Math.max(-1, Math.min(1, dx / 2.5)), y: Math.max(-1, Math.min(1, dy / 2.5)) } : null);
-    } else this.sim.setPointer(null);
+      const toward = (px, py, far) => {
+        const dx = (px - (r.left + r.width / 2)) / R;
+        const dy = (py - (r.top + r.height / 2 + RISE * this.options.size)) / R;
+        const d = Math.hypot(dx, dy);
+        return (far || d < 5) && d > 0.05 ? { x: Math.max(-1, Math.min(1, dx / 2.5)), y: Math.max(-1, Math.min(1, dy / 2.5)) } : null;
+      };
+      if (this.options.interactive && pointer) aim = toward(pointer.x, pointer.y, false);
+      if (!aim && this._lookAt) {
+        const t = this._lookAt;
+        if (t.getBoundingClientRect) { const b = t.getBoundingClientRect(); aim = toward(b.left + b.width / 2, b.top + b.height / 2, true); }
+        else aim = toward(t.x, t.y, true);
+      }
+    }
+    this.sim.setPointer(aim);
+    if (this._analyser) {
+      this._analyser.getFloatTimeDomainData(this._voiceBuf);
+      let sum = 0;
+      for (let i = 0; i < this._voiceBuf.length; i++) sum += this._voiceBuf[i] * this._voiceBuf[i];
+      this.sim.setVoice(Math.min(1, Math.max(0, Math.sqrt(sum / this._voiceBuf.length) * 7 - 0.03)));
+    }
     this.sim.update(dt);
     if (this.options.size <= 48 && this._economy() && (this._ticks = (this._ticks || 0) + 1) % 2) return;
     if (drawTurn && this._changed()) this.draw();
@@ -267,7 +421,7 @@ export class BotAvatar {
    */
   _changed() {
     const p = this.sim.pose, q = this._drawn;
-    if (!q || p.sleep > 0.05) return true;
+    if (!q || p.sleep > 0.05 || p.think > 0.05 || (p.whirl > 0.02 && this.options.whirl > 0)) return true;
     const px = this.options.size * BODY * this.dpr;
     const geo = (Math.abs(p.yaw - q.yaw) + Math.abs(p.pitch - q.pitch)) * 1.6 + Math.abs(p.roll - q.roll) * 2
       + Math.abs(p.x - q.x) + Math.abs(p.y - q.y) + Math.abs(p.sx - q.sx) + Math.abs(p.sy - q.sy) * 2;
@@ -313,6 +467,7 @@ export class BotAvatar {
 
   destroy() {
     this._destroyed = true;
+    this.speak(null);
     if (this.handle) this.pool.remove(this.handle);
     stopLoop(this);
     this._io?.disconnect();
@@ -328,4 +483,6 @@ export function createBot(target, options) {
 }
 
 export { STATES };
+export { registerShape, registerHat, registerState } from './plugins.js';
+export { STYLES, EXPRESSIONS, encodeDNA, decodeDNA, lookFromId, normalizeOptions } from './options.js';
 export { settings as renderSettings, stats as renderStats } from './pool.js';

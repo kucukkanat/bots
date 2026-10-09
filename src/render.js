@@ -3,9 +3,10 @@
 // rounding off toward front and back), turned by the pose's yaw and pitch.
 // Light, fur, the face and anything worn are laid over it.
 
-import { shade, rgba, clamp, luminance } from './color.js';
+import { shade, rgba, clamp, luminance, mix, parseColor } from './color.js';
 import { mulberry32, smoothstep } from './engine.js';
 import { cssRgba, fringeQuads, invert } from './gpu.js';
+import { hatDef } from './plugins.js';
 
 /** The canvas is this much larger than the avatar's box, so hops never clip. */
 export const OVERSCAN = 1.5;
@@ -27,6 +28,15 @@ function skinUv({ T, S, P, e }) {
 }
 
 const profile = (u) => 0.5 + 0.5 * Math.sqrt(Math.max(0, 1 - u * u));
+/**
+ * The cushion's profile through the depth: a round pillow at roundness 1, a
+ * slab with softened edges toward 0 (a superellipse).
+ */
+function profileFor(roundness) {
+  if (roundness == null || roundness >= 1) return profile;
+  const p = 2 + (1 - Math.max(0, roundness)) * 8;
+  return (u) => 0.5 + 0.5 * Math.max(0, 1 - Math.abs(u) ** p) ** (1 / p);
+}
 
 function shapePath(shape, step = 1) {
   const k = step === 1 ? '_path' : '_pathLo';
@@ -287,16 +297,24 @@ function furSkin(shape, look, la, px) {
 }
 
 const tints = new WeakMap();
-function tintedSkin(skin, base) {
+/**
+ * The skin blended with the body colour (and its pattern, if any) — baked
+ * once per look, so a pattern costs nothing per frame.
+ */
+function tintedSkin(skin, base, pattern = null) {
   const key = skin;
   let byColor = tints.get(key);
   if (!byColor) tints.set(key, (byColor = new Map()));
-  let c = byColor.get(base);
+  const id = pattern ? `${base}|${pattern.key}` : base;
+  let c = byColor.get(id);
   if (c) return c;
   c = makeCanvas(skin.S, skin.S);
   const g = c.getContext('2d');
-  g.fillStyle = base;
-  g.fillRect(0, 0, skin.S, skin.S);
+  if (pattern) g.drawImage(patternCanvas(pattern, base, skin), 0, 0);
+  else {
+    g.fillStyle = base;
+    g.fillRect(0, 0, skin.S, skin.S);
+  }
   g.globalCompositeOperation = 'overlay';
   g.drawImage(skin.canvas, 0, 0);
   const pale = clamp((luminance(base) - 0.5) * 0.8, 0, 0.3);
@@ -305,9 +323,135 @@ function tintedSkin(skin, base) {
     g.globalAlpha = pale;
     g.drawImage(skin.canvas, 0, 0);
   }
-  byColor.set(base, c);
+  if (pattern?.kind === 'tips') {
+    // Frosted tips: the pile's light strands take the second colour.
+    const t = makeCanvas(skin.S, skin.S), tg = t.getContext('2d');
+    tg.drawImage(skin.canvas, 0, 0);
+    tg.globalCompositeOperation = 'multiply';
+    tg.fillStyle = pattern.color;
+    tg.fillRect(0, 0, skin.S, skin.S);
+    g.globalCompositeOperation = 'screen';
+    g.globalAlpha = 0.55;
+    g.drawImage(t, 0, 0);
+  }
+  byColor.set(id, c);
   if (byColor.size > 24) byColor.delete(byColor.keys().next().value);
   return c;
+}
+
+// --- Fur patterns ----------------------------------------------------------------
+
+export const FUR_PATTERNS = ['none', 'two-tone', 'gradient', 'tips', 'spots', 'stripes', 'belly', 'patches'];
+
+function furPatternOf(look, shape) {
+  const kind = look.furPattern;
+  if (!kind || kind === 'none' || !FUR_PATTERNS.includes(kind)) return null;
+  const color = look.furColor2 || shade(look.color, luminance(look.color) > 0.6 ? -0.25 : 0.28);
+  const scale = clamp(look.furPatternScale ?? 1, 0.3, 3);
+  return { kind, color, scale, shape, key: `${kind}|${color}|${scale}|${shape._id ??= ++shapeIds}` };
+}
+
+/** The body colour with the pattern's second colour painted in, in skin pixels. */
+const patterns = new WeakMap();
+function patternCanvas(pattern, base, skin) {
+  let byKey = patterns.get(skin);
+  if (!byKey) patterns.set(skin, (byKey = new Map()));
+  const id = `${base}|${pattern.key}`;
+  if (byKey.has(id)) return byKey.get(id).canvas;
+  const { S, P } = skin;
+  const c = makeCanvas(S, S), g = c.getContext('2d', { willReadFrequently: true });
+  g.fillStyle = base;
+  g.fillRect(0, 0, S, S);
+  g.save();
+  g.translate(SKIN_EXT * P, SKIN_EXT * P);
+  g.scale(P, P);
+  const { kind, color, scale, shape } = pattern;
+  const { minX, maxX, minY, maxY } = shape.bounds;
+  const rand = mulberry32(0.271828);
+  // Soft edges: a blur in skin pixels, as the pile would blend two colours.
+  g.filter = `blur(${Math.max(1, P * 0.035)}px)`;
+  g.fillStyle = color;
+  g.strokeStyle = color;
+  if (kind === 'two-tone') {
+    g.fillRect(0, minY - 1, maxX + 1, maxY - minY + 2);
+  } else if (kind === 'gradient') {
+    g.filter = 'none';
+    const gr = g.createLinearGradient(0, minY, 0, maxY);
+    gr.addColorStop(0, rgba(color, 0));
+    gr.addColorStop(1, rgba(color, 1));
+    g.fillStyle = gr;
+    g.fillRect(minX - 1, minY - 1, maxX - minX + 2, maxY - minY + 2);
+  } else if (kind === 'tips') {
+    // Painted after the overlay, from the strands themselves (tintedSkin).
+  } else if (kind === 'spots') {
+    const n = Math.round(14 / scale);
+    for (let i = 0; i < n; i++) {
+      const x = minX + rand() * (maxX - minX), y = minY + rand() * (maxY - minY);
+      const r = (0.07 + rand() * 0.1) * scale;
+      g.beginPath();
+      g.ellipse(x, y, r * (0.8 + rand() * 0.5), r, rand() * Math.PI, 0, Math.PI * 2);
+      g.fill();
+    }
+  } else if (kind === 'stripes') {
+    const gap = 0.3 * scale;
+    g.lineWidth = gap * 0.42;
+    g.lineCap = 'round';
+    for (let y = minY - gap; y < maxY + gap; y += gap) {
+      g.beginPath();
+      const ph = rand() * 6;
+      for (let x = minX - 0.1; x <= maxX + 0.1; x += 0.05) {
+        const yy = y + Math.sin(x * 3.2 + ph) * 0.06 + (Math.abs(x) * 0.1);
+        x === minX - 0.1 ? g.moveTo(x, yy) : g.lineTo(x, yy);
+      }
+      g.stroke();
+    }
+  } else if (kind === 'belly') {
+    const cy = Math.min(maxY - 0.35, (shape.faceY ?? 0) + 0.45);
+    g.beginPath();
+    g.ellipse(0, cy, (maxX - minX) * 0.27 * scale, (maxY - cy) * 0.9 * scale, 0, 0, Math.PI * 2);
+    g.fill();
+  } else if (kind === 'patches') {
+    const n = Math.round(4 / scale) + 2;
+    for (let i = 0; i < n; i++) {
+      const x = minX + rand() * (maxX - minX), y = minY + rand() * (maxY - minY);
+      g.beginPath();
+      for (let a = 0; a <= Math.PI * 2 + 0.01; a += Math.PI / 8) {
+        const r = (0.22 + 0.12 * Math.sin(a * 3 + i)) * scale * (0.7 + rand() * 0.5);
+        const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
+        a === 0 ? g.moveTo(px, py) : g.lineTo(px, py);
+      }
+      g.fill();
+    }
+  }
+  g.restore();
+  // How much of the second colour sits where, for the outline hairs.
+  let px = null;
+  const [br, bg, bb] = parseColor(base), [cr, cg, cb] = parseColor(color);
+  const d2 = (cr - br) ** 2 + (cg - bg) ** 2 + (cb - bb) ** 2 || 1;
+  const amount = (x, y) => {
+    const X = Math.round((x + SKIN_EXT) * P), Y = Math.round((y + SKIN_EXT) * P);
+    if (X < 0 || Y < 0 || X >= S || Y >= S) return 0;
+    px ??= g.getImageData(0, 0, S, S).data;
+    const o = (Y * S + X) * 4;
+    return clamp(((px[o] - br) * (cr - br) + (px[o + 1] - bg) * (cg - bg) + (px[o + 2] - bb) * (cb - bb)) / d2);
+  };
+  byKey.set(id, { canvas: c, amount });
+  return c;
+}
+
+/** For each outline hair, whether it grows from the pattern's second colour. */
+const strandTone = new WeakMap();
+function strandColours(list, pattern, base, skin) {
+  let byKey = strandTone.get(list);
+  if (!byKey) strandTone.set(list, (byKey = new Map()));
+  const id = `${base}|${pattern.key}`;
+  if (byKey.has(id)) return byKey.get(id);
+  patternCanvas(pattern, base, skin);
+  const { amount } = patterns.get(skin).get(id);
+  const out = new Uint8Array(list.length);
+  if (pattern.kind !== 'tips') list.forEach((st, i) => { out[i] = amount(st.x, st.y) > 0.5 ? 1 : 0; });
+  byKey.set(id, out);
+  return out;
 }
 
 // Silhouette fringe: fine strands standing off the outline, some in pairs
@@ -503,9 +647,13 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
   sideParts.sort((a, b) => a.z - b.z);
 
   // Antennae (behind the body; the stalk grows out of the top).
+  const ants = look.antennae === 'none' ? null
+    : look.antennae === 'one' ? [{ x: 0, len: 0.42, ball: 0.12 }]
+      : look.antennae === 'two' ? [{ x: -0.4, len: 0.4, ball: 0.09 }, { x: 0.4, len: 0.4, ball: 0.09 }]
+        : extras.antennae;
   const antennae = () => {
-    if (!extras.antennae || look.hat) return;
-    for (const a of extras.antennae) {
+    if (!ants || (look.hat && look.hat !== 'none')) return;
+    for (const a of ants) {
       const top = shape.topAt(a.x, 0.1);
       const [X0, Y0] = proj(a.x, top + 0.12, 0);
       const [X1, Y1] = proj(a.x * 1.1, top - a.len, 0);
@@ -526,12 +674,13 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
   // front and back pull apart — about 3 device pixels apart.
   const order = c0 * cp >= 0 ? 1 : -1;
   const span = 2 * D * R * dpr * Math.hypot(s, c0 * sp);
+  const prof = profileFor(look.roundness);
   const sliceList = (px) => {
     const n = px < 0.75 ? 1 : clamp(2 * Math.ceil(px / 6) + 1, 3, 21);
     const out = [];
     for (let i = 0; i < n; i++) {
       const u = n === 1 ? 0 : order * (-1 + (2 * i) / (n - 1));
-      const k = profile(u);
+      const k = prof(u);
       const z = u * D;
       out.push([R * k * c, -R * k * s * sp, 0, R * k * cp, R * z * s, R * z * c0 * sp]);
     }
@@ -546,7 +695,8 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
   const slices = sliceList(span);
   let bodyPath = null;
   const body = () => (bodyPath ??= stack(shapePath(shape), slices));
-  const darkC = shade(base, -0.3, 6, 1.15);
+  // A coloured fill light tints the shade side; nothing changes without one.
+  const darkC = look.fillColor ? mix(shade(base, -0.3, 6, 1.15), look.fillColor, clamp((look.fillStrength ?? 0.5) * 0.7)) : shade(base, -0.3, 6, 1.15);
 
   // Everything laid on the body, described once and painted either on the GPU
   // or with the 2D canvas.
@@ -561,7 +711,7 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     const zf = D * 0.6, e = SKIN_EXT;
     const cx2 = Math.sign(c) * Math.max(Math.abs(c), 0.5);
     const T = [R * cx2, -R * s * sp, 0, R * cp, R * zf * s, R * zf * c0 * sp];
-    skin = { canvas: tintedSkin(sk, base), T, S: sk.S, P: sk.P, e };
+    skin = { canvas: tintedSkin(sk, base, furPatternOf(look, shape)), T, S: sk.S, P: sk.P, e, src: sk };
   }
 
   // Turn shading: the side that shows as the head turns.
@@ -600,7 +750,8 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     if (rimK > 0 && look.shading !== 'smooth') {
       lq = Math.min(1, q * 1.5);
       passes.push({
-        color: look.shading === 'plastic' ? 'rgba(255,255,255,0.75)' : rgba(shade(base, fabric ? 0.25 : 0.35, 0, 1), fabric ? 0.45 : 0.9),
+        color: look.rimColor ? rgba(look.rimColor, look.shading === 'plastic' ? 0.75 : fabric ? 0.5 : 0.9)
+          : look.shading === 'plastic' ? 'rgba(255,255,255,0.75)' : rgba(shade(base, fabric ? 0.25 : 0.35, 0, 1), fabric ? 0.45 : 0.9),
         blur: R * (look.shading === 'crisp' ? 0.02 : 0.08) * (0.6 + rimK),
         ox: -lx * R * 0.05 * (0.5 + rimK), oy: -ly * R * 0.05 * (0.5 + rimK),
         q: lq,
@@ -611,10 +762,14 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     const spread = look.spread ?? 1.4;
     const hiA = (fabric ? 0.2 : look.shading === 'plastic' ? 0.3 : 0.26) * highK;
     const hiF = fabric ? 1.3 * (1 - 0.9 * luminance(base)) : 1;
-    highs.push({ x: lx * R * 0.42 + R * D * s * 0.8, y: ly * R * 0.42, r: R * 0.95 * spread, color: fabric ? shade(base, 0.32, 0, 1.05) : '#ffffff', a: clamp(hiA * hiF) });
+    const keyC = (c) => (look.lightColor ? mix(c, look.lightColor, 0.55) : c);
+    highs.push({ x: lx * R * 0.42 + R * D * s * 0.8, y: ly * R * 0.42, r: R * 0.95 * spread, color: keyC(fabric ? shade(base, 0.32, 0, 1.05) : '#ffffff'), a: clamp(hiA * hiF) });
     // Plastic: a hot spot (and a window reflection, painted after).
     if (look.shading === 'plastic') {
-      highs.push({ x: lx * R * 0.48 + R * D * s * 0.9, y: ly * R * 0.5 + R * D * sp, r: R * 0.22 * spread, color: '#ffffff', a: clamp(0.85 * highK / 1.3) });
+      highs.push({ x: lx * R * 0.48 + R * D * s * 0.9, y: ly * R * 0.5 + R * D * sp, r: R * 0.22 * spread, color: keyC('#ffffff'), a: clamp(0.85 * highK / 1.3) });
+    } else if (look.gloss > 0) {
+      // Gloss: a tight specular spot, on any material.
+      highs.push({ x: lx * R * 0.46 + R * D * s * 0.9, y: ly * R * 0.48 + R * D * sp, r: R * 0.2 * spread, color: keyC('#ffffff'), a: clamp(0.45 * look.gloss), gloss: true });
     }
   }
 
@@ -635,11 +790,14 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     const curl = look.furCurl ?? 0.7;
     const list = strands(shape, Math.round(2400 * (look.furDensity ?? 1.6) / 1.6 * (0.4 + fz)));
     const TONES = 3;
-    const segs = Array.from({ length: TONES }, () => []);
+    const pat = skin && furPatternOf(look, shape);
+    const second = pat && pat.kind !== 'tips' && strandColours(list, pat, base, skin.src);
+    const segs = Array.from({ length: second ? TONES * 2 : TONES }, () => []);
     const swayT = time * 2.2;
-    for (const st of list) {
+    for (let si = 0; si < list.length; si++) {
+      const st = list[si];
       const w = Math.sqrt(1 - st.u * st.u);
-      const k = profile(st.u);
+      const k = prof(st.u);
       // Normal of the cushion at that point, then turned with the head.
       const Nx = st.nx * w, Ny = st.ny * w, Nz = st.u;
       const nx1 = Nx * c0 + Nz * s, nz1 = -Nx * s + Nz * c0;
@@ -654,12 +812,12 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
       const bx = -dy * st.bend * curl * len * 0.8, by = dx * st.bend * curl * len * 0.8;
       const lit = clamp(0.5 + 0.5 * (nx1 * lx + ny1 * ly) + (st.tone - 0.5) * 0.5, 0, 0.999);
       // Short enough that a straight stroke with a bent tip reads as a curl.
-      segs[Math.floor(lit * TONES)].push(X - dx * len * 0.7, Y - dy * len * 0.7, X + dx * len + bx, Y + dy * len + by);
+      segs[Math.floor(lit * TONES) + (second && second[si] ? TONES : 0)].push(X - dx * len * 0.7, Y - dy * len * 0.7, X + dx * len + bx, Y + dy * len + by);
     }
     fringe = {
       segs,
       width: Math.max(0.4, R * 0.006),
-      tones: [rgba(shade(base, -0.24, 3, 0.85), 0.45), rgba(shade(base, -0.1, 0, 0.9), 0.45), rgba(shade(base, 0.04, 0, 0.95), 0.45)],
+      tones: [base, ...(second ? [pat.color] : [])].flatMap((col) => [rgba(shade(col, -0.24, 3, 0.85), 0.45), rgba(shade(col, -0.1, 0, 0.9), 0.45), rgba(shade(col, 0.04, 0, 0.95), 0.45)]),
     };
   }
 
@@ -718,9 +876,17 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
       const bodyLo = stack(shapePath(shape, 3), sliceList(span * LIGHT_Q));
       lightLayer(lc, ctx, 'light', bodyLo, passes, dpr, lq, lightKey, poseSig, moves, relaxed ? 1.5 : 0.6);
     }
+    // Gloss shares the lit side's gradient (an extra stop at its centre)
+    // rather than costing a second fill over the body.
+    const gloss = highs.find((h) => h.gloss);
     for (const h of highs) {
+      if (h.gloss) continue;
       const g = lc.createRadialGradient(h.x, h.y, 0, h.x, h.y, h.r);
-      g.addColorStop(0, rgba(h.color, h.a));
+      if (gloss && h === highs[0]) {
+        const t = clamp(gloss.r / h.r, 0.05, 0.9);
+        g.addColorStop(0, rgba(mix(h.color, gloss.color, gloss.a / (gloss.a + h.a)), clamp(h.a + gloss.a)));
+        g.addColorStop(t, rgba(h.color, h.a * (1 - t)));
+      } else g.addColorStop(0, rgba(h.color, h.a));
       g.addColorStop(1, rgba(h.color, 0));
       lc.fillStyle = g;
       cover();
@@ -739,13 +905,14 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     lc.restore();
   }
 
+  const whirlOn = look.whirl > 0 && pose.whirl > 0.02;
   // Face and glasses ride on the front of the body.
   const faceA = smoothstep((facing - 0.18) / 0.3);
   const fs = shape.faceScale * (look.faceScale ?? 1);
   if (faceA > 0) {
     lc.save();
     lc.globalAlpha = faceA;
-    const fx = pose.lookX * 0.09, fy = shape.faceY + pose.lookY * 0.07;
+    const fx = pose.lookX * 0.09 + (look.faceX ?? 0), fy = shape.faceY + pose.lookY * 0.07 + (look.faceY ?? 0);
     const [X, Y] = proj(fx, fy, Math.min(1, D * 1.4));
     lc.transform(R * c0, -R * s * sp, 0, R * cp, X, Y);
     drawFace(lc, look, pose, fs, R);
@@ -774,7 +941,10 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     lc.stroke(body());
   }
   // Behind the body, nearest first.
+  if (whirlOn) drawWhirl(ctx, R, pose, look, time, base, -1);
+  if (look.accessories) drawAccessories(ctx, look.accessories, 'back', proj, R, c0, s, sp, cp, D, 1);
   antennae();
+  if (look.ears && look.ears !== 'none') drawEars(ctx, look.ears, shape, proj, R, c0, base, look, dpr);
   sideParts.filter((p) => p.z < 0).reverse().forEach((p) => p.draw(true));
   lc.save();
   lc.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -793,6 +963,25 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     });
   }
 
+  if (faceA > 0 && look.scarf) {
+    const by = Math.min(shape.faceY + 0.52 * fs, shape.bounds.maxY - 0.16);
+    const [bX, bY] = proj(0, by, Math.min(1, D * 1.2));
+    ctx.save();
+    ctx.globalAlpha = faceA;
+    ctx.transform(R * c0, -R * s * sp, 0, R * cp, bX, bY);
+    drawSprite(ctx, sprite(`scarf|${look.scarfColor || '#d94f4f'}`, 0.5, R * dpr, (g) => drawScarf(g, look.scarfColor || '#d94f4f')));
+    ctx.restore();
+  }
+  if (faceA > 0 && look.badge) {
+    const by = Math.min(shape.faceY + 0.42 * fs, shape.bounds.maxY - 0.25);
+    const bx = clamp(shape.halfWidthAt(by) * 0.62, 0.25, 0.6);
+    const [bX, bY] = proj(bx, by, Math.min(1, D * 1.1));
+    ctx.save();
+    ctx.globalAlpha = faceA;
+    ctx.transform(R * c0, -R * s * sp, 0, R * cp, bX, bY);
+    drawSprite(ctx, sprite(`badge|${look.badge}|${look.badgeColor}|${look.ink}`, 0.15, R * dpr, (g) => drawBadge(g, String(look.badge), look.badgeColor || '#ffffff', look.ink)));
+    ctx.restore();
+  }
   if (faceA > 0 && look.bowTie) {
     const by = Math.min(shape.faceY + 0.5 * fs, shape.bounds.maxY - 0.2);
     const [bX, bY] = proj(0, by, Math.min(1, D * 1.2));
@@ -804,6 +993,7 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
   }
 
   sideParts.filter((p) => p.z >= 0).forEach((p) => p.draw());
+  if (look.accessories) drawAccessories(ctx, look.accessories, 'front', proj, R, c0, s, sp, cp, D, faceA);
 
   // Headphone band over the top of the head.
   if (look.headphones) {
@@ -835,7 +1025,37 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     ctx.translate(X, Y);
     ctx.rotate(-pose.pitch * 0.1);
     ctx.scale(R, R * (0.75 + 0.25 * cp));
-    drawHat(ctx, look.hat, acc, hw, s, lx, time);
+    drawHat(ctx, look.hat, acc, hw, s, lx, time, look);
+    ctx.restore();
+  }
+
+  if (whirlOn) drawWhirl(ctx, R, pose, look, time, base, 1);
+
+  // Thinking: a little bubble of dots by the head.
+  if (pose.think > 0.05) {
+    const top = shape.bounds.minY;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, pose.think);
+    const bub = look.theme === 'dark' ? '#2a2733' : '#ffffff';
+    const dot = look.theme === 'dark' ? '#e9e6ff' : '#6b6880';
+    const pts = [[0.72, top + 0.05, 0.05], [0.9, top - 0.15, 0.08], [1.08, top - 0.45, 0.2]];
+    for (const [x, y, r] of pts) {
+      ctx.fillStyle = bub;
+      ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+      ctx.lineWidth = R * 0.015;
+      ctx.beginPath();
+      ctx.ellipse(x * R, y * R, r * R * 1.25, r * R, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    const [bx, by] = [pts[2][0] * R, pts[2][1] * R];
+    for (let i = 0; i < 3; i++) {
+      const k = 0.5 + 0.5 * Math.sin(time * 6 - i * 0.9);
+      ctx.fillStyle = rgba(dot, 0.4 + 0.6 * k);
+      ctx.beginPath();
+      ctx.arc(bx + (i - 1) * R * 0.08, by + R * 0.01 - k * R * 0.025, R * 0.026, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -856,20 +1076,53 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
 
 // --- Face --------------------------------------------------------------------
 
+export const EYE_STYLES = ['round', 'oval', 'wide', 'dot', 'sleepy', 'happy', 'line', 'star', 'heart'];
+export const MOUTH_STYLES = ['smile', 'cat', 'line', 'o', 'teeth', 'tongue'];
+export const BROWS = ['auto', 'none', 'soft', 'thick', 'line'];
+
+function star(ctx, x, y, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5, k = i % 2 ? r * 0.45 : r;
+    i ? ctx.lineTo(x + Math.cos(a) * k, y + Math.sin(a) * k) : ctx.moveTo(x + Math.cos(a) * k, y + Math.sin(a) * k);
+  }
+  ctx.closePath();
+}
+
+function heart(ctx, x, y, r) {
+  ctx.beginPath();
+  ctx.moveTo(x, y + r * 0.85);
+  ctx.bezierCurveTo(x - r * 1.3, y - r * 0.1, x - r * 0.7, y - r * 1.05, x, y - r * 0.35);
+  ctx.bezierCurveTo(x + r * 0.7, y - r * 1.05, x + r * 1.3, y - r * 0.1, x, y + r * 0.85);
+  ctx.closePath();
+}
+
 function drawFace(ctx, look, pose, fs, R) {
   const ink = look.ink;
   const gap = 0.25 * fs * (look.eyeGap ?? 1);
-  const rx = 0.085 * fs * (look.eyeSize ?? 1), ry = 0.118 * fs * (look.eyeSize ?? 1);
+  let rx = 0.085 * fs * (look.eyeSize ?? 1), ry = 0.118 * fs * (look.eyeSize ?? 1);
+  const style = look.eyeStyle || 'round';
+  if (style === 'oval') { rx *= 0.78; ry *= 1.12; }
+  else if (style === 'wide') { rx *= 1.25; ry *= 1.08; }
+  else if (style === 'dot') { rx *= 0.72; ry = rx; }
   const lw = Math.max(0.035 * fs, 1.2 / R);
   ctx.fillStyle = ink;
   ctx.strokeStyle = ink;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  const happy = pose.happy > 0.5;
+  const happy = pose.happy > 0.5 || style === 'happy';
   for (const side of [-1, 1]) {
     const ex = side * gap;
-    if (pose.sleep > 0.5 && pose.eyeOpen < 0.2) {
+    if (pose.dizzy > 0.5) {
+      // × eyes.
+      const k = rx * 0.9;
+      ctx.lineWidth = lw * 1.1;
+      ctx.beginPath();
+      ctx.moveTo(ex - k, -k); ctx.lineTo(ex + k, k);
+      ctx.moveTo(ex + k, -k); ctx.lineTo(ex - k, k);
+      ctx.stroke();
+    } else if (pose.sleep > 0.5 && pose.eyeOpen < 0.2) {
       ctx.lineWidth = lw;
       ctx.beginPath();
       ctx.arc(ex, -ry * 0.25, rx * 1.05, Math.PI * 0.15, Math.PI * 0.85);
@@ -885,25 +1138,94 @@ function drawFace(ctx, look, pose, fs, R) {
       ctx.moveTo(ex - rx, 0);
       ctx.quadraticCurveTo(ex, ry * 0.25, ex + rx, 0);
       ctx.stroke();
-    } else {
-      const h = ry * pose.eyeOpen;
+    } else if (style === 'line') {
+      ctx.lineWidth = lw * 1.2;
       ctx.beginPath();
-      ctx.ellipse(ex, 0, rx, h, 0, 0, Math.PI * 2);
+      ctx.moveTo(ex - rx, 0);
+      ctx.lineTo(ex + rx, 0);
+      ctx.stroke();
+    } else if (style === 'star' || style === 'heart') {
+      ctx.save();
+      ctx.translate(ex, 0);
+      ctx.scale(1, pose.eyeOpen * (1 + 0.2 * pose.eyeWide));
+      (style === 'star' ? star : heart)(ctx, 0, 0, ry * 1.1);
+      ctx.fillStyle = look.irisColor || ink;
       ctx.fill();
+      ctx.restore();
+    } else {
+      const wide = 1 + 0.22 * pose.eyeWide;
+      let h = ry * pose.eyeOpen * wide * (1 - 0.55 * pose.squint);
+      const w = rx * wide;
+      if (style === 'sleepy') h *= 0.55;
+      ctx.beginPath();
+      ctx.ellipse(ex, 0, w, h, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (look.irisColor && h > ry * 0.3) {
+        ctx.save();
+        ctx.fillStyle = look.irisColor;
+        const ix = ex + pose.lookX * w * 0.18, iy = pose.lookY * h * 0.15;
+        ctx.beginPath();
+        ctx.ellipse(ix, iy, w * 0.72, h * 0.72, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = ink;
+        ctx.beginPath();
+        ctx.ellipse(ix, iy, w * 0.36, h * 0.38, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
       if (look.eyeShine !== false && pose.eyeOpen > 0.5) {
         ctx.save();
         ctx.fillStyle = 'rgba(255,255,255,0.9)';
         ctx.beginPath();
-        ctx.arc(ex + rx * 0.32 + pose.lookX * rx * 0.15, -h * 0.38, rx * 0.3, 0, Math.PI * 2);
+        ctx.arc(ex + w * 0.32 + pose.lookX * w * 0.15, -h * 0.38, w * 0.3, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
+      }
+      if (style === 'sleepy') {
+        ctx.lineWidth = lw * 0.9;
+        ctx.beginPath();
+        ctx.moveTo(ex - w * 1.15, -h * 0.9);
+        ctx.lineTo(ex + w * 1.15, -h * 0.9);
+        ctx.stroke();
       }
     }
   }
 
-  if (look.blush) {
+  // Brows: always if asked for, otherwise only while an expression moves them.
+  const browOn = look.brows === 'none' ? false : (look.brows && look.brows !== 'auto') || Math.abs(pose.brow) + Math.abs(pose.browTilt) > 0.02;
+  if (browOn && !(pose.sleep > 0.5)) {
+    ctx.lineWidth = lw * (look.brows === 'thick' ? 1.9 : look.brows === 'line' ? 0.9 : 1.25);
+    ctx.beginPath();
+    for (const side of [-1, 1]) {
+      const by = -ry * 1.55 - pose.brow * ry * 0.5;
+      const xi = side * (gap - rx * 0.75), xo = side * (gap + rx * 1.05);
+      const yi = by + pose.browTilt * ry * 0.38, yo = by - pose.browTilt * ry * 0.2;
+      ctx.moveTo(xi, yi);
+      if (look.brows === 'line') ctx.lineTo(xo, yo);
+      else ctx.quadraticCurveTo((xi + xo) / 2, Math.min(yi, yo) - ry * 0.18, xo, yo);
+    }
+    ctx.stroke();
+  }
+
+  if (look.freckles) {
     ctx.save();
-    ctx.fillStyle = rgba(look.blushColor || '#ff6f91', 0.35);
+    ctx.fillStyle = rgba(ink, 0.32);
+    ctx.beginPath();
+    for (const side of [-1, 1]) {
+      for (const [dx, dy] of [[0.1, 1.2], [0.55, 1.05], [0.9, 1.3]]) {
+        const x = side * (gap + rx * (dx - 0.2)), y = ry * dy, r = 0.011 * fs;
+        ctx.moveTo(x + r, y);
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+      }
+    }
+    ctx.fill();
+    ctx.restore();
+  }
+
+  const blushA = Math.max(look.blush ? 0.35 : 0, pose.blushPulse * 0.45);
+  if (blushA > 0) {
+    ctx.save();
+    ctx.fillStyle = rgba(look.blushColor || '#ff6f91', blushA);
     for (const side of [-1, 1]) {
       ctx.beginPath();
       ctx.ellipse(side * (gap + rx * 0.9), ry * 1.35, rx * 0.95, rx * 0.5, 0, 0, Math.PI * 2);
@@ -912,21 +1234,46 @@ function drawFace(ctx, look, pose, fs, R) {
     ctx.restore();
   }
 
-  if (look.face === 'mouth') {
+  const mouthStyle = look.mouthStyle && look.mouthStyle !== 'smile' ? look.mouthStyle : null;
+  if (look.face === 'mouth' || mouthStyle) {
     const my = ry * 1.55;
     const w = 0.1 * fs;
     ctx.lineWidth = lw;
-    if (pose.smile < 0.15) {
+    if (pose.smile < -0.15) {
+      // A frown.
       ctx.beginPath();
-      ctx.ellipse(0, my + 0.01 * fs, 0.03 * fs, (0.022 + 0.03 * pose.mouthOpen) * fs, 0, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (pose.mouthOpen < 0.3) {
-      ctx.beginPath();
-      ctx.moveTo(-w * 0.75, my);
-      ctx.quadraticCurveTo(0, my + 0.08 * fs * pose.smile, w * 0.75, my);
+      ctx.moveTo(-w * 0.7, my + 0.035 * fs);
+      ctx.quadraticCurveTo(0, my + 0.035 * fs + 0.08 * fs * pose.smile, w * 0.7, my + 0.035 * fs);
       ctx.stroke();
-    } else {
-      const depth = (0.05 + 0.09 * pose.mouthOpen) * fs;
+    } else if (mouthStyle === 'cat') {
+      const open = pose.mouthOpen;
+      ctx.beginPath();
+      ctx.arc(-w * 0.3, my, w * 0.3, Math.PI * 0.1, Math.PI * 0.95);
+      ctx.moveTo(w * 0.6, my);
+      ctx.arc(w * 0.3, my, w * 0.3, Math.PI * 0.05, Math.PI * 0.9);
+      ctx.stroke();
+      if (open > 0.3) {
+        ctx.beginPath();
+        ctx.ellipse(0, my + w * 0.45, w * 0.22, w * 0.25 * open, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (mouthStyle === 'line') {
+      if (pose.mouthOpen > 0.3) {
+        ctx.beginPath();
+        ctx.ellipse(0, my + 0.01 * fs, w * 0.6, (0.012 + 0.05 * pose.mouthOpen) * fs, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.6, my + 0.01 * fs);
+        ctx.lineTo(w * 0.6, my + 0.01 * fs);
+        ctx.stroke();
+      }
+    } else if (mouthStyle === 'o') {
+      ctx.beginPath();
+      ctx.ellipse(0, my + 0.015 * fs, (0.03 + 0.02 * pose.mouthOpen) * fs, (0.035 + 0.04 * pose.mouthOpen) * fs, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (mouthStyle === 'teeth' || mouthStyle === 'tongue' || (pose.smile >= 0.15 && pose.mouthOpen >= 0.3)) {
+      const depth = (0.05 + 0.09 * Math.max(pose.mouthOpen, mouthStyle ? 0.45 : 0)) * fs;
       ctx.beginPath();
       ctx.moveTo(-w, my - 0.01 * fs);
       ctx.quadraticCurveTo(0, my + 0.02 * fs, w, my - 0.01 * fs);
@@ -936,13 +1283,180 @@ function drawFace(ctx, look, pose, fs, R) {
       ctx.fill();
       ctx.save();
       ctx.clip();
-      ctx.fillStyle = '#ff7a8a';
-      ctx.beginPath();
-      ctx.ellipse(0, my + depth * 1.3, w * 0.55, depth * 0.55, 0, 0, Math.PI * 2);
-      ctx.fill();
+      if (mouthStyle === 'teeth') {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-w, my - 0.02 * fs, w * 2, depth * 0.45);
+      } else {
+        ctx.fillStyle = '#ff7a8a';
+        ctx.beginPath();
+        ctx.ellipse(0, my + depth * 1.3, w * 0.55, depth * (mouthStyle === 'tongue' ? 0.8 : 0.55), 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.restore();
+    } else if (pose.smile < 0.15) {
+      ctx.beginPath();
+      ctx.ellipse(0, my + 0.01 * fs, 0.03 * fs, (0.022 + 0.03 * pose.mouthOpen) * fs, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.75, my);
+      ctx.quadraticCurveTo(0, my + 0.08 * fs * pose.smile, w * 0.75, my);
+      ctx.stroke();
     }
   }
+}
+
+// --- Things to wear and effects --------------------------------------------------
+
+// Small parts that only change with their options (badge, bandana, ears) are
+// painted once into a sprite at the device's pixel scale and then drawn as a
+// single image each frame: their gradients, curves and text cost nothing more.
+const sprites = new Map();
+function sprite(key, half, scale, paint) {
+  const q = Math.max(1, Math.round(scale * 2) / 2);
+  const id = `${key}|${q}`;
+  let sp = sprites.get(id);
+  if (sp) return sp;
+  const px = Math.ceil(half * 2 * q) + 4;
+  const canvas = makeCanvas(px, px), g = canvas.getContext('2d');
+  g.translate(px / 2, px / 2);
+  g.scale(q, q);
+  paint(g);
+  sp = { canvas, px, q };
+  sprites.set(id, sp);
+  if (sprites.size > 96) sprites.delete(sprites.keys().next().value);
+  return sp;
+}
+const drawSprite = (ctx, sp) => ctx.drawImage(sp.canvas, -sp.px / 2 / sp.q, -sp.px / 2 / sp.q, sp.px / sp.q, sp.px / sp.q);
+
+export const EAR_STYLES = ['none', 'cat', 'bunny', 'bear', 'round'];
+
+/** Ears on top of the head, behind the body (drawn under it, so steps reversed). */
+function drawEars(ctx, kind, shape, proj, R, c0, base, look, scale) {
+  const inner = look.blushColor || shade(base, 0.18, -15, 1.2);
+  const sp = sprite(`ear|${kind}|${base}|${inner}`, 0.75, R * scale, (g) => paintEar(g, kind, base, inner));
+  for (const side of [-1, 1]) {
+    const ex = side * Math.min(0.55, shape.halfWidthAt(shape.bounds.minY + 0.25) * 0.62);
+    const ey = shape.topAt(ex, 0.12) + 0.12;
+    const [X, Y] = proj(ex, ey, 0);
+    const wk = 0.35 + 0.65 * Math.abs(c0);
+    ctx.save();
+    ctx.translate(X, Y);
+    ctx.rotate(side * (kind === 'bunny' ? 0.18 : 0.32));
+    ctx.scale(wk * R, R);
+    drawSprite(ctx, sp);
+    ctx.restore();
+  }
+}
+
+/** One ear in body units, its base at (0, 0). */
+function paintEar(g, kind, base, inner) {
+  const gr = g.createLinearGradient(0, -0.6, 0, 0);
+  gr.addColorStop(0, shade(base, 0.08));
+  gr.addColorStop(1, shade(base, -0.18));
+  g.fillStyle = gr;
+  g.beginPath();
+  if (kind === 'cat') { g.moveTo(-0.22, 0); g.quadraticCurveTo(-0.05, -0.55, 0, -0.52); g.quadraticCurveTo(0.05, -0.55, 0.22, 0); }
+  else if (kind === 'bunny') g.ellipse(0, -0.42, 0.14, 0.5, 0, 0, Math.PI * 2);
+  else { const r = kind === 'bear' ? 0.2 : 0.17; g.arc(0, -r * 0.7, r, 0, Math.PI * 2); }
+  g.fill();
+  g.fillStyle = rgba(inner, 0.75);
+  g.beginPath();
+  if (kind === 'cat') { g.moveTo(-0.12, -0.04); g.quadraticCurveTo(0, -0.42, 0.12, -0.04); }
+  else if (kind === 'bunny') g.ellipse(0, -0.42, 0.07, 0.38, 0, 0, Math.PI * 2);
+  else { const r = kind === 'bear' ? 0.11 : 0.09; g.arc(0, -(kind === 'bear' ? 0.2 : 0.17) * 0.7, r, 0, Math.PI * 2); }
+  g.fill();
+}
+
+function drawScarf(ctx, color) {
+  const g = ctx.createLinearGradient(0, -0.1, 0, 0.3);
+  g.addColorStop(0, shade(color, 0.12));
+  g.addColorStop(1, shade(color, -0.15));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(-0.42, -0.06);
+  ctx.quadraticCurveTo(0, 0.06, 0.42, -0.06);
+  ctx.lineTo(0.05, 0.32);
+  ctx.quadraticCurveTo(0, 0.36, -0.05, 0.32);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  for (const [x, y] of [[-0.18, 0.04], [0.14, 0.05], [0, 0.18], [-0.04, 0.03], [0.24, -0.02]]) {
+    ctx.beginPath();
+    ctx.arc(x, y, 0.022, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = shade(color, -0.05);
+  ctx.beginPath();
+  ctx.ellipse(-0.3, -0.04, 0.08, 0.06, 0.4, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawBadge(ctx, text, color, ink) {
+  const r = 0.12;
+  const g = ctx.createRadialGradient(-r * 0.4, -r * 0.4, 0, 0, 0, r);
+  g.addColorStop(0, shade(color, 0.1));
+  g.addColorStop(1, shade(color, -0.12));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+  ctx.lineWidth = 0.012;
+  ctx.stroke();
+  ctx.fillStyle = luminance(color) > 0.5 ? ink === '#ffffff' ? '#1d1b26' : ink : '#ffffff';
+  const t = [...text].slice(0, 3).join('');
+  ctx.font = `700 ${t.length > 2 ? 0.08 : t.length > 1 ? 0.1 : 0.13}px ui-rounded, system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(t, 0, 0.005);
+}
+
+/**
+ * Your own images worn on the body: { image, x, y, size, rotate, layer }.
+ * x, y in body units (−1..1, y down), size as a fraction of the body.
+ */
+function drawAccessories(ctx, list, layer, proj, R, c0, s, sp, cp, D, alpha) {
+  for (const a of list) {
+    if ((a.layer || 'front') !== layer || !a.image || alpha <= 0) continue;
+    const [X, Y] = proj(a.x ?? 0, a.y ?? 0, layer === 'front' ? Math.min(1, D * 1.25) : -D);
+    const iw = a.image.width || 1, ih = a.image.height || 1;
+    const k = ((a.size ?? 0.4) * 2) / Math.max(iw, ih);
+    ctx.save();
+    ctx.globalAlpha *= alpha;
+    ctx.transform(R * c0, -R * s * sp, 0, R * cp, X, Y);
+    ctx.rotate(((a.rotate ?? 0) * Math.PI) / 180);
+    ctx.drawImage(a.image, (-iw * k) / 2, (-ih * k) / 2, iw * k, ih * k);
+    ctx.restore();
+  }
+}
+
+/** The whirl: a tapered trail on a tilted ring while the body spins. */
+function drawWhirl(ctx, R, pose, look, time, base, half) {
+  const k = clamp(look.whirl * pose.whirl, 0, 2);
+  const rx = R * 1.25, ry = rx * 0.3, cy = R * 0.1;
+  const len = Math.PI * 1.35, head = time * 14;
+  const col = look.whirlColor || shade(base, 0.3, 0, 0.9);
+  const N = 22;
+  ctx.save();
+  ctx.lineCap = 'round';
+  let px = null, py = null;
+  for (let i = 0; i <= N; i++) {
+    const f = i / N;
+    const a = head - len * (1 - f);
+    const x = Math.cos(a) * rx, y = cy + Math.sin(a) * ry;
+    // half -1: the far side of the ring (behind the body), 1: the near side.
+    if (px !== null && Math.sign(Math.sin(a)) === half) {
+      ctx.strokeStyle = rgba(col, 0.55 * f * Math.min(1, k));
+      ctx.lineWidth = R * 0.11 * f * Math.min(1.5, 0.5 + k * 0.5);
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    }
+    px = x; py = y;
+  }
+  ctx.restore();
 }
 
 function drawGlasses(ctx, kind, acc, fs) {
@@ -1027,14 +1541,96 @@ function drawBowTie(ctx, acc, fabric) {
 
 // --- Hats --------------------------------------------------------------------
 
-function drawHat(ctx, kind, acc, hw, s, lx, time) {
+export const HAT_STYLES = ['none', 'beanie', 'party', 'crown', 'beret', 'tophat', 'cap', 'witch', 'halo', 'bow'];
+const hatPaths = new Map();
+
+function drawHat(ctx, kind, acc, hw, s, lx, time, look) {
+  const def = hatDef(kind, look);
+  if (def) {
+    // A registered hat: SVG path layers in a 100×100 box, bottom centre on the head.
+    const k = (hw * 2.2 * (def.width ?? 1)) / 100;
+    ctx.save();
+    ctx.scale(k, k);
+    ctx.translate(-50, -100 - (def.lift ?? 0));
+    for (const L of def.layers || []) {
+      let p = hatPaths.get(L.d);
+      if (!p) hatPaths.set(L.d, (p = new Path2D(L.d)));
+      ctx.globalAlpha = L.opacity ?? 1;
+      if (L.fill) { ctx.fillStyle = L.fill === 'accessory' ? acc : L.fill; ctx.fill(p); }
+      if (L.stroke) { ctx.strokeStyle = L.stroke === 'accessory' ? acc : L.stroke; ctx.lineWidth = L.lineWidth ?? 2; ctx.stroke(p); }
+    }
+    ctx.restore();
+    return;
+  }
   const lit = (col, x0, x1) => {
     const g = ctx.createLinearGradient(x0, 0, x1, 0);
     g.addColorStop(0, lx < 0 ? shade(col, 0.16) : shade(col, -0.12));
     g.addColorStop(1, lx < 0 ? shade(col, -0.14) : shade(col, 0.14));
     return g;
   };
-  if (kind === 'beanie') {
+  if (kind === 'cap') {
+    // A baseball cap, the peak turned with the head.
+    const h = hw * 0.7;
+    ctx.fillStyle = lit(acc, -hw, hw);
+    ctx.beginPath();
+    ctx.ellipse(0, -0.02, hw * 1.02, h, 0, Math.PI, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = shade(acc, -0.12);
+    ctx.beginPath();
+    ctx.ellipse(s * hw * 0.5, 0, hw * (0.95 - Math.abs(s) * 0.4), 0.09, 0, 0, Math.PI);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 0.012;
+    for (const t of [-0.45, 0, 0.45]) {
+      ctx.beginPath();
+      ctx.moveTo(t * hw + s * 0.05, -0.02);
+      ctx.quadraticCurveTo(t * hw * 0.6, -h * 0.7, 0, -h);
+      ctx.stroke();
+    }
+    ctx.fillStyle = shade(acc, 0.2);
+    ctx.beginPath();
+    ctx.arc(0, -h, 0.035, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (kind === 'witch') {
+    const b = hw * 1.5, h = hw * 2;
+    ctx.fillStyle = lit(acc, -b, b);
+    ctx.beginPath();
+    ctx.ellipse(0, -0.02, b, 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-hw * 0.75, -0.04);
+    ctx.quadraticCurveTo(-hw * 0.3, -h * 0.6, hw * 0.35 + s * 0.05, -h);
+    ctx.quadraticCurveTo(hw * 0.2, -h * 0.5, hw * 0.75, -0.04);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#7b5cff';
+    ctx.fillRect(-hw * 0.74, -0.2, hw * 1.48, 0.1);
+    ctx.fillStyle = '#ffd34d';
+    ctx.fillRect(-0.05 + s * 0.08, -0.215, 0.1, 0.13);
+  } else if (kind === 'halo') {
+    const y = -0.22 + Math.sin(time * 2) * 0.03;
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,214,90,0.8)';
+    ctx.shadowBlur = 8;
+    ctx.strokeStyle = '#ffd65a';
+    ctx.lineWidth = 0.07;
+    ctx.beginPath();
+    ctx.ellipse(0, y, hw * 0.95, 0.11, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 0.02;
+    ctx.beginPath();
+    ctx.ellipse(0, y - 0.015, hw * 0.9, 0.09, 0, Math.PI * 1.1, Math.PI * 1.7);
+    ctx.stroke();
+  } else if (kind === 'bow') {
+    ctx.save();
+    ctx.translate(hw * 0.45, 0.02);
+    ctx.rotate(0.25);
+    ctx.scale(1.1, 1.1);
+    drawBowTie(ctx, acc === '#2b2833' ? '#ff5c8a' : acc, false);
+    ctx.restore();
+  } else if (kind === 'beanie') {
     const h = hw * 0.95;
     ctx.fillStyle = lit(acc, -hw, hw);
     ctx.beginPath();

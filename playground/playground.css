@@ -129,3 +129,13 @@ textarea.path {
   transition: opacity .2s, transform .2s; z-index: 100;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* Advanced controls: hidden until switched on. */
+.controls-col:not(.show-adv) .adv { display: none; }
+.adv { display: flex; flex-direction: column; gap: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.adv-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 4px 0; }
+.adv-bar .ctl { grid-template-columns: auto minmax(0, 160px); }
+.ctl select, .text-input { font: inherit; font-size: 14px; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; min-width: 0; width: 100%; }
+.text-input.wide { width: 100%; }
+.dna { display: flex; gap: 8px; align-items: center; }
+.dna .text-input { flex: 1; }

@@ -83,11 +83,99 @@ import { BotAvatar } from '@hackdonalds/bots/react';
 
 `prefers-reduced-motion` shows each state's still pose. All avatars share one animation loop and pause when off screen.
 
+## Advanced
+
+Everything below is optional: leave it out and the avatar looks, moves and costs exactly what it did. Most of it is resolved once, before drawing (presets, Bot DNA, ids, colours, fur patterns are baked into the fur texture), so turning it on costs nothing per frame; the rest (brows, trails, audio) costs only while it's showing.
+
+### Grouped options and styles
+
+Flat options and grouped objects are interchangeable; groups are easier to read and write:
+
+```js
+createBot('#agent', {
+  type: 'cat',
+  style: 'teddy',                       // plush, teddy, velvet, mohair, felt, vinyl, clay, sticker, paper
+  fur: { length: 1.6, clumps: 0.6, pattern: 'stripes', color: '#8b5a2b', scale: 1.2 },
+  light: { angle: 290, color: '#ffe7b3', fill: '#4c6fff', fillStrength: 0.4, rimColor: '#7ad7ff' },
+  material: { roundness: 0.8, gloss: 0.4 },
+  face: { eyes: { style: 'oval', iris: '#3b82f6' }, brows: 'soft', mouth: 'cat', freckles: true, expression: 'smug' },
+  motion: { blinkRate: 1.4, breathing: 1.5, jiggle: 1, whirl: 1, jump: { height: 0.5, spin: 2, squash: 1.3, lean: 1.5 } },
+  wear: { hat: 'witch', ears: 'bunny', scarf: true, badge: 'AI', antennae: 'two' },
+});
+```
+
+In HTML, groups take JSON: `<bot-avatar fur='{"pattern":"spots"}'>` (the face group is `face-options`, since `face` is the eyes/mouth switch), and every flat option has its kebab-case attribute.
+
+| Group | Options |
+| --- | --- |
+| `fur` | `length`, `density`, `fuzz`, `curl`, `gravity`, `clumps`, `pattern` (`none`, `two-tone`, `gradient`, `tips`, `spots`, `stripes`, `belly`, `patches`), `color` (second colour), `scale` |
+| `light` | `angle`, `color` (key light), `fill` (shade-side tint) and `fillStrength`, `rimColor`, `shadow`, `highlight`, `rim`, `spread` |
+| `material` | `shading`, `roundness` (1 a pillow, 0 a slab), `gloss`, `depth` |
+| `face` | `features` (`eyes`/`mouth`), `eyes: { style, size, gap, shine, iris }`, `brows` (`auto`, `none`, `soft`, `thick`, `line`), `mouth` (`smile`, `cat`, `line`, `o`, `teeth`, `tongue`), `freckles`, `x`, `y`, `scale`, `blush`, `blushColor`, `ink`, `expression` |
+| `motion` | `speed`, `turn`, `blinkRate`, `glanceRate`, `breathing`, `jiggle`, `whirl`, `whirlColor`, `jump: { every, height, time, spin, squash, stretch, lean }` |
+| `wear` | `hat` (`beanie`, `party`, `crown`, `beret`, `tophat`, `cap`, `witch`, `halo`, `bow`, or your own), `glasses`, `headphones`, `bowTie`, `color`, `scarf`, `scarfColor`, `badge` (up to 3 characters), `badgeColor`, `ears` (`cat`, `bunny`, `bear`, `round`), `antennae` (`auto`, `none`, `one`, `two`), `accessories` |
+
+Eye styles: `round`, `oval`, `wide`, `dot`, `sleepy`, `happy`, `line`, `star`, `heart`.
+
+### Agent states, expressions and voice
+
+States for agents: `default` (idle), `working`, `sleeping`, `listening`, `thinking` (with a thought bubble), `speaking`, `error`, `success`.
+
+```js
+bot.setState('thinking');
+bot.react('surprised');            // a moment's expression over any state:
+                                   // happy, joy, surprised, worried, sad, angry, smug, sleepy, confused, dizzy, love
+bot.speak(mediaStream);            // mouth follows a mic, an <audio>/<video> element or a Web Audio node
+bot.speak();                       // stop, back to the previous state
+bot.setVoice(0.6);                 // or drive the mouth yourself (e.g. from TTS visemes); null = made-up chatter
+bot.lookAt(document.querySelector('#chat-input'));   // keep an eye on an element (or { x, y })
+```
+
+`expression` holds a face (`expression: 'smug'`) and also takes an object of channels: `brow`, `browTilt`, `eyeWide`, `squint`, `smile` (−1 frown … 1), `mouthOpen`, `happy`, `dizzy`, `blushPulse`.
+
+### Events
+
+```js
+bot.on('land', () => playThud());      // 'poke', 'blink', 'jump', 'land', 'state'
+el.addEventListener('bot-blink', …);   // the same, as bubbling DOM events
+```
+
+### Bot DNA and looks from ids
+
+```js
+const code = bot.dna;                         // 'bot1.…' — the whole design in a short string
+createBot('#copy', { dna: code });            // the same bot again
+createBot('#user', { identity: user.email }); // a stable bot of its own for every id
+```
+
+### Your own shapes, hats, states and images
+
+```js
+import { registerShape, registerHat, registerState } from '…/src/index.js';
+registerShape('bean', { path: 'M50 8C80 8 92 40 86 62C80 86 60 94 46 92C22 88 8 66 12 40C16 18 30 8 50 8Z', color: '#c58b5a' });
+registerHat('fez', { layers: [{ d: 'M28 100L34 40H66L72 100Z', fill: '#c0392b' }, { d: 'M50 40C52 30 60 26 64 30', stroke: '#222', lineWidth: 3 }] });
+registerState('dance', { duration: 1.2, keyframes: [{ at: 0, pose: { roll: -0.2 } }, { at: 0.6, pose: { roll: 0.2, y: -0.15, happy: 1 } }, { at: 1.2, pose: { roll: -0.2 } }] });
+createBot('#x', { type: 'bean', hat: 'fez', state: 'dance',
+  accessories: [{ src: '/logo.png', x: 0.45, y: 0.4, size: 0.2 }] });   // images pinned to the body, turning with it
+```
+
+### Export
+
+```js
+const gif = await bot.export({ format: 'gif', duration: 2.4, fps: 20 });   // also 'apng', 'webm', 'sprite', 'png', 'webp'
+```
+
+Frames are rendered offline from a copy of the avatar's simulation; the exporter loads on first use.
+
+### Theming with CSS
+
+`<bot-avatar>` reads `--bot-color`, `--bot-ink`, `--bot-accessory-color`, `--bot-blush-color`, `--bot-fur-color`, `--bot-light-color`, `--bot-fill-color`, `--bot-rim-color` and `--bot-iris-color` where no attribute sets them; call `el.refresh()` after changing them.
+
 ## Playground
 
 <p align="center"><img src="docs/playground.png" alt="The playground: a cat bot wearing a party hat, round glasses and a bow tie" width="100%" /></p>
 
-`/playground/` lets you design a bot (shape, custom outline, colour, face, material, fur, things to wear, motion), turn it round by dragging, copy the code for HTML / JS / React, share a link, download a PNG, save a crew in your browser, and **publish to GitHub Pages**: it downloads a standalone `index.html` with your bot or crew, ready to upload to any repository with Pages turned on.
+`/playground/` lets you design a bot (shape, custom outline, colour, face, material, fur, things to wear, motion, and with **Advanced controls** on, every option above), try the agent states and reactions, load a look from an id or Bot DNA, export a GIF / APNG / WebM / sprite sheet, turn it round by dragging, copy the code for HTML / JS / React, share a link, download a PNG, save a crew in your browser, and **publish to GitHub Pages**: it downloads a standalone `index.html` with your bot or crew, ready to upload to any repository with Pages turned on.
 
 ## How it renders
 

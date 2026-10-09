@@ -1,4 +1,4 @@
-import { createBot, types, presets, palette, DEFAULTS, SHADINGS, HATS, GLASSES, shapeToSvgPath } from '../src/index.js';
+import { createBot, types, presets, palette, DEFAULTS, SHADINGS, HATS, GLASSES, shapeToSvgPath, STYLES, EXPRESSIONS, EYE_STYLES, MOUTH_STYLES, BROWS, EAR_STYLES, FUR_PATTERNS, lookFromId, decodeDNA } from '../src/index.js';
 import { initTheme } from '../assets/theme.js';
 import { libUrl } from '../assets/lib-url.js';
 
@@ -40,9 +40,33 @@ const NUMERIC = {
   speed: { min: 0.2, max: 3, step: 0.05, def: 1 },
   turn: { min: 0, max: 2, step: 0.01, def: 1 },
   jumpEvery: { min: 0, max: 20, step: 0.5, def: 8 },
+  // Advanced
+  roundness: { min: 0, max: 1, step: 0.01, def: 1 },
+  gloss: { min: 0, max: 2, step: 0.01, def: 0 },
+  fillStrength: { min: 0, max: 1, step: 0.01, def: 0.5 },
+  furClumps: { min: 0, max: 1, step: 0.01, def: 0 },
+  furPatternScale: { min: 0.3, max: 3, step: 0.01, def: 1 },
+  faceX: { min: -0.4, max: 0.4, step: 0.01, def: 0 },
+  faceY: { min: -0.4, max: 0.4, step: 0.01, def: 0 },
+  blinkRate: { min: 0.2, max: 3, step: 0.05, def: 1 },
+  glanceRate: { min: 0.2, max: 3, step: 0.05, def: 1 },
+  breathing: { min: 0, max: 3, step: 0.05, def: 1 },
+  jiggle: { min: 0, max: 2, step: 0.01, def: 0 },
+  whirl: { min: 0, max: 2, step: 0.01, def: 0 },
+  jumpHeight: { min: 0.1, max: 1, step: 0.01, def: 0.42 },
+  jumpTime: { min: 0.4, max: 2, step: 0.01, def: 0.95 },
+  jumpSpin: { min: 0, max: 3, step: 1, def: 1 },
+  jumpSquash: { min: 0, max: 2, step: 0.01, def: 1 },
+  jumpStretch: { min: 0, max: 2, step: 0.01, def: 1 },
+  jumpLean: { min: 0, max: 3, step: 0.01, def: 1 },
 };
-const BOOLS = { headphones: false, bowTie: false, blush: false, eyeShine: true, interactive: true, paused: false };
-const STRS = { type: 'clover', state: 'default', face: 'eyes', shading: 'fabric', hat: 'none', glasses: 'none', color: undefined, ink: undefined, accessoryColor: undefined, path: undefined, label: undefined };
+const BOOLS = { headphones: false, bowTie: false, blush: false, eyeShine: true, interactive: true, paused: false, freckles: false, scarf: false };
+const STRS = {
+  type: 'clover', state: 'default', face: 'eyes', shading: 'fabric', hat: 'none', glasses: 'none', color: undefined, ink: undefined, accessoryColor: undefined, path: undefined, label: undefined,
+  style: undefined, furPattern: 'none', furColor2: undefined, lightColor: undefined, fillColor: undefined, rimColor: undefined,
+  eyeStyle: 'round', irisColor: undefined, brows: 'auto', mouthStyle: 'smile', expression: 'neutral', whirlColor: undefined,
+  scarfColor: undefined, badge: undefined, badgeColor: undefined, ears: 'none', antennae: 'auto',
+};
 const KEYS = [...Object.keys(STRS), ...Object.keys(NUMERIC), ...Object.keys(BOOLS)];
 
 const defaultOf = (key, o) => {
@@ -169,6 +193,21 @@ function seg(key, label, values, labels = values) {
   syncs.push(() => set(opts[key] ?? defaultOf(key, opts)));
   return row(label, s);
 }
+function select(key, label, values, labels = values) {
+  const sel = h('select', { 'aria-label': label }, ...values.map((v, i) => h('option', { value: v }, labels[i])));
+  sel.addEventListener('change', () => update({ [key]: sel.value }));
+  syncs.push(() => { sel.value = opts[key] ?? defaultOf(key, opts); });
+  return row(label, sel);
+}
+function text(key, label, placeholder) {
+  const input = h('input', { type: 'text', placeholder, maxlength: 3, class: 'text-input' });
+  input.addEventListener('input', () => update({ [key]: input.value || undefined }));
+  syncs.push(() => { if (document.activeElement !== input) input.value = opts[key] || ''; });
+  return row(label, input);
+}
+/** Rows only shown with "Advanced controls" on. */
+const adv = (...rows) => h('div', { class: 'adv' }, ...rows);
+const title = (s) => s[0].toUpperCase() + s.slice(1).replace(/-/g, ' ');
 function toggle(key, label) {
   const input = h('input', { type: 'checkbox' });
   input.addEventListener('change', () => update({ [key]: input.checked }));
@@ -219,6 +258,14 @@ const chips = h('div', { class: 'chips' },
 
 const BODY_SWATCHES = [...new Set(Object.values(palette))].concat(['#FF5C8A', '#FF9F1C', '#7C3AED', '#111111', '#FFFFFF']);
 
+const advToggle = h('input', { type: 'checkbox' });
+advToggle.addEventListener('change', () => { controls.classList.toggle('show-adv', advToggle.checked); try { localStorage.setItem('bots.adv', advToggle.checked ? '1' : ''); } catch {} });
+try { advToggle.checked = !!localStorage.getItem('bots.adv'); } catch {}
+controls.classList.toggle('show-adv', advToggle.checked);
+controls.append(h('div', { class: 'adv-bar' },
+  h('label', { class: 'toggle' }, advToggle, 'Advanced controls'),
+  select('style', 'Style', ['', ...Object.keys(STYLES)], ['Custom', ...Object.keys(STYLES).map(title)])));
+
 group('Shape', true, shapeGrid, h('div', {}, h('span', { class: 'lbl muted', style: 'font-size:13px' }, 'Custom outline'), pathArea, chips));
 group('Colour', true,
   colors('color', 'Body', BODY_SWATCHES, { auto: "The type's own colour" }),
@@ -230,12 +277,28 @@ group('Face', true,
   h('div', { class: 'toggles' }, toggle('blush', 'Blush'), toggle('eyeShine', 'Eye shine')),
   range('eyeSize', 'Eye size'),
   range('eyeGap', 'Eye spacing'),
-  range('faceScale', 'Face size'));
+  range('faceScale', 'Face size'),
+  adv(
+    select('eyeStyle', 'Eye style', EYE_STYLES, EYE_STYLES.map(title)),
+    colors('irisColor', 'Iris', ['#3B82F6', '#22C55E', '#A16207', '#8B5CF6', '#EC4899'], { auto: 'None' }),
+    select('brows', 'Brows', BROWS, ['With expressions', 'Never', 'Soft', 'Thick', 'Line']),
+    select('mouthStyle', 'Mouth', MOUTH_STYLES, ['Smile', 'Cat  :3', 'Line', 'O', 'Teeth', 'Tongue']),
+    select('expression', 'Expression', Object.keys(EXPRESSIONS), Object.keys(EXPRESSIONS).map(title)),
+    h('div', { class: 'toggles' }, toggle('freckles', 'Freckles')),
+    range('faceX', 'Face across'),
+    range('faceY', 'Face height')));
 group('Wear', true,
-  seg('hat', 'Hat', HATS, ['None', 'Beanie', 'Party', 'Crown', 'Beret', 'Top hat']),
+  select('hat', 'Hat', HATS, HATS.map((h) => (h === 'tophat' ? 'Top hat' : title(h)))),
   seg('glasses', 'Glasses', GLASSES, ['None', 'Round', 'Square', 'Shades']),
   h('div', { class: 'toggles' }, toggle('headphones', 'Headphones'), toggle('bowTie', 'Bow tie')),
-  colors('accessoryColor', 'Colour', ['#F4EFE6', '#E85D4A', '#5B5BF7', '#2FCB7A', '#F2C14E', '#FF8FC8'], { auto: 'Soft black' }));
+  colors('accessoryColor', 'Colour', ['#F4EFE6', '#E85D4A', '#5B5BF7', '#2FCB7A', '#F2C14E', '#FF8FC8'], { auto: 'Soft black' }),
+  adv(
+    select('ears', 'Ears', EAR_STYLES, EAR_STYLES.map(title)),
+    select('antennae', 'Antennae', ['auto', 'none', 'one', 'two'], ["Shape's own", 'None', 'One', 'Two']),
+    h('div', { class: 'toggles' }, toggle('scarf', 'Bandana')),
+    colors('scarfColor', 'Bandana', ['#D94F4F', '#3B82F6', '#22C55E', '#F2C14E', '#111111'], { auto: 'Red' }),
+    text('badge', 'Badge', 'e.g. AI'),
+    colors('badgeColor', 'Badge colour', ['#FFFFFF', '#FFD34D', '#5B5BF7', '#E85D4A'], { auto: 'White' })));
 group('Material & light', false,
   seg('shading', 'Material', SHADINGS, ['Plush', 'Plastic', 'Smooth', 'Crisp', 'Flat']),
   range('light', 'Light angle'),
@@ -243,19 +306,64 @@ group('Material & light', false,
   range('highlight', 'Highlight'),
   range('rim', 'Rim light'),
   range('spread', 'Spread'),
-  range('depth', 'Depth'));
+  range('depth', 'Depth'),
+  adv(
+    range('roundness', 'Roundness'),
+    range('gloss', 'Gloss'),
+    colors('lightColor', 'Key light', ['#FFE7B3', '#B3D4FF', '#FFB3D9', '#C6FFB3'], { auto: 'White' }),
+    colors('fillColor', 'Fill light', ['#4C6FFF', '#7B2CBF', '#00A6A6', '#FF6B3D'], { auto: 'None' }),
+    range('fillStrength', 'Fill strength'),
+    colors('rimColor', 'Rim light', ['#FFFFFF', '#7AD7FF', '#FF8FC8', '#FFD34D'], { auto: 'Automatic' })));
 const furGroup = group('Fur', false,
   range('furLength', 'Length'),
   range('furDensity', 'Density'),
   range('furFuzz', 'Fuzz'),
   range('furCurl', 'Curl'),
-  range('furGravity', 'Gravity'));
+  range('furGravity', 'Gravity'),
+  adv(
+    range('furClumps', 'Clumps'),
+    select('furPattern', 'Pattern', FUR_PATTERNS, FUR_PATTERNS.map(title)),
+    colors('furColor2', 'Second colour', ['#FFFFFF', '#111111', '#F2C14E', '#EAA06F', '#8B5A2B'], { auto: 'Automatic' }),
+    range('furPatternScale', 'Pattern scale')));
 syncs.push(() => { furGroup.hidden = opts.shading !== 'fabric'; });
 group('Motion', false,
   range('speed', 'Speed'),
   range('turn', 'Look around'),
   range('jumpEvery', 'Jump every (s)'),
-  h('div', { class: 'toggles' }, toggle('interactive', 'Follow pointer'), toggle('paused', 'Paused')));
+  h('div', { class: 'toggles' }, toggle('interactive', 'Follow pointer'), toggle('paused', 'Paused')),
+  adv(
+    range('blinkRate', 'Blinks'),
+    range('glanceRate', 'Glances'),
+    range('breathing', 'Breathing'),
+    range('jiggle', 'Jiggle'),
+    range('jumpHeight', 'Jump height'),
+    range('jumpTime', 'Jump time'),
+    range('jumpSpin', 'Spins per jump'),
+    range('jumpSquash', 'Squash'),
+    range('jumpStretch', 'Stretch'),
+    range('jumpLean', 'Lean'),
+    range('whirl', 'Spin trail'),
+    colors('whirlColor', 'Trail colour', ['#FFFFFF', '#7AD7FF', '#FFD34D', '#FF8FC8'], { auto: 'Body tint' })));
+
+// Agent tools: reactions, identity, Bot DNA, exports.
+const reactRow = h('div', { class: 'chips' }, ...['happy', 'joy', 'surprised', 'love', 'confused', 'worried', 'sad', 'angry', 'dizzy'].map((e) =>
+  h('button', { type: 'button', class: 'chip', onclick: () => bot.react(e) }, title(e))));
+const idInput = h('input', { type: 'text', class: 'text-input wide', placeholder: 'A user or agent id, e.g. ada@example.com' });
+idInput.addEventListener('change', () => { if (idInput.value.trim()) { update({ ...blank(), ...lookFromId(idInput.value.trim()), seed: undefined }); bot.poke(); } });
+const dnaInput = h('input', { type: 'text', class: 'text-input wide', placeholder: 'Paste a Bot DNA code (bot1.…)' });
+dnaInput.addEventListener('change', () => { const o = decodeDNA(dnaInput.value); if (Object.keys(o).length) { update({ ...blank(), ...o }); toast('Bot loaded from DNA'); } });
+const exportBtn = (fmt, label) => h('button', { type: 'button', class: 'chip', onclick: async () => {
+  toast(`Rendering ${label}…`);
+  try {
+    const blob = await bot.export({ format: fmt, duration: 2.4, fps: fmt === 'gif' ? 20 : 25, scale: 2 });
+    download(`${(name || presets[opts.type].label).toLowerCase().replace(/\W+/g, '-')}.${fmt === 'sprite' ? 'sprite.png' : fmt === 'apng' ? 'png' : fmt}`, URL.createObjectURL(blob));
+  } catch (e) { toast(String(e.message || e)); }
+} }, label);
+group('Agent tools', false,
+  row('React', reactRow),
+  row('Look from id', idInput),
+  row('Bot DNA', h('div', { class: 'dna' }, dnaInput, h('button', { type: 'button', class: 'btn small', onclick: () => copy(bot.dna, 'DNA copied') }, 'Copy DNA'))),
+  row('Export', h('div', { class: 'chips' }, exportBtn('gif', 'GIF'), exportBtn('apng', 'APNG'), exportBtn('webm', 'WebM'), exportBtn('sprite', 'Sprite sheet'))));
 
 // ---------------------------------------------------------------------------
 // Updating

@@ -1,20 +1,78 @@
 export type BotType =
   | 'clover' | 'flower' | 'triangle' | 'square' | 'blob' | 'ghost' | 'circle' | 'drop' | 'star'
   | 'droid' | 'mech' | 'alien' | 'hexagon' | 'cat' | 'cloud' | 'pill' | 'pebble' | 'puddle';
-export type BotState = 'default' | 'working' | 'sleeping';
+export type BotState = 'default' | 'working' | 'sleeping' | 'listening' | 'thinking' | 'speaking' | 'error' | 'success' | (string & {});
 export type BotShading = 'fabric' | 'plastic' | 'smooth' | 'crisp' | 'flat';
-export type BotHat = 'none' | 'beanie' | 'party' | 'crown' | 'beret' | 'tophat';
+export type BotHat = 'none' | 'beanie' | 'party' | 'crown' | 'beret' | 'tophat' | 'cap' | 'witch' | 'halo' | 'bow' | (string & {});
+export type BotEyeStyle = 'round' | 'oval' | 'wide' | 'dot' | 'sleepy' | 'happy' | 'line' | 'star' | 'heart';
+export type BotMouthStyle = 'smile' | 'cat' | 'line' | 'o' | 'teeth' | 'tongue';
+export type BotFurPattern = 'none' | 'two-tone' | 'gradient' | 'tips' | 'spots' | 'stripes' | 'belly' | 'patches';
+export type BotStyle = 'plush' | 'teddy' | 'velvet' | 'mohair' | 'felt' | 'vinyl' | 'clay' | 'sticker' | 'paper';
+export type BotExpression = 'neutral' | 'happy' | 'joy' | 'surprised' | 'worried' | 'sad' | 'angry' | 'smug' | 'sleepy' | 'confused' | 'dizzy' | 'love';
+/** Face channels for expressions and custom states. */
+export interface BotFace { brow?: number; browTilt?: number; eyeWide?: number; squint?: number; smile?: number; mouthOpen?: number; happy?: number; dizzy?: number; blushPulse?: number }
+export interface BotAccessory { src?: string; image?: CanvasImageSource; x?: number; y?: number; size?: number; rotate?: number; layer?: 'front' | 'back'; crossOrigin?: string }
 export type BotGlasses = 'none' | 'round' | 'square' | 'shades';
 
 export interface BotPose {
   yaw: number; pitch: number; roll: number; x: number; y: number; sx: number; sy: number;
   lookX: number; lookY: number; eyeOpen: number; happy: number; smile: number; mouthOpen: number; sleep: number;
+  brow: number; browTilt: number; eyeWide: number; squint: number; dizzy: number; think: number; blushPulse: number; whirl: number;
 }
 
 export interface BotOptions {
-  type?: BotType;
+  type?: BotType | (string & {});
+  /** A named look that sets many options at once. */
+  style?: BotStyle;
+  /** A Bot DNA code (from `bot.dna`). */
+  dna?: string;
+  /** Any string: the same id always gets the same look. */
+  identity?: string;
+  // Grouped forms of the flat options below (see the README).
+  fur?: { length?: number; density?: number; fuzz?: number; curl?: number; gravity?: number; clumps?: number; pattern?: BotFurPattern; color?: string; scale?: number };
+  light?: number | { angle?: number; color?: string; fill?: string; fillStrength?: number; rimColor?: string; shadow?: number; highlight?: number; rim?: number; spread?: number };
+  material?: { shading?: BotShading; roundness?: number; gloss?: number; depth?: number };
+  motion?: { speed?: number; turn?: number; blinkRate?: number; glanceRate?: number; breathing?: number; jiggle?: number; whirl?: number; whirlColor?: string; jump?: { every?: number; height?: number; time?: number; spin?: number; squash?: number; stretch?: number; lean?: number } };
+  wear?: { hat?: BotHat; glasses?: BotGlasses; headphones?: boolean; bowTie?: boolean; color?: string; scarf?: boolean; scarfColor?: string; badge?: string; badgeColor?: string; ears?: string; antennae?: string; accessories?: BotAccessory[] };
+  furClumps?: number;
+  furPattern?: BotFurPattern;
+  furColor2?: string;
+  furPatternScale?: number;
+  lightColor?: string;
+  fillColor?: string;
+  fillStrength?: number;
+  rimColor?: string;
+  roundness?: number;
+  gloss?: number;
+  eyeStyle?: BotEyeStyle;
+  irisColor?: string;
+  brows?: 'auto' | 'none' | 'soft' | 'thick' | 'line';
+  mouthStyle?: BotMouthStyle;
+  freckles?: boolean;
+  faceX?: number;
+  faceY?: number;
+  expression?: BotExpression | BotFace;
+  blinkRate?: number;
+  glanceRate?: number;
+  breathing?: number;
+  jiggle?: number;
+  whirl?: number;
+  whirlColor?: string;
+  jumpHeight?: number;
+  jumpTime?: number;
+  jumpSpin?: number;
+  jumpSquash?: number;
+  jumpStretch?: number;
+  jumpLean?: number;
+  scarf?: boolean;
+  scarfColor?: string;
+  badge?: string;
+  badgeColor?: string;
+  ears?: 'none' | 'cat' | 'bunny' | 'bear' | 'round';
+  antennae?: 'auto' | 'none' | 'one' | 'two';
+  accessories?: BotAccessory[];
   state?: BotState;
-  face?: 'eyes' | 'mouth';
+  face?: 'eyes' | 'mouth' | { features?: 'eyes' | 'mouth'; eyes?: { style?: BotEyeStyle; size?: number; gap?: number; shine?: boolean; iris?: string }; brows?: string; mouth?: BotMouthStyle; freckles?: boolean; x?: number; y?: number; scale?: number; blush?: boolean; blushColor?: string; ink?: string; expression?: BotExpression | BotFace };
   /** Box size in px (default 64). */
   size?: number;
   /** SVG path data in a 100×100 box centred on (50, 50), used in place of the type's outline. */
@@ -24,7 +82,6 @@ export interface BotOptions {
   brightness?: number;
   saturation?: number;
   shading?: BotShading;
-  light?: number;
   shadow?: number;
   highlight?: number;
   rim?: number;
@@ -79,7 +136,36 @@ export declare class BotAvatar {
   destroy(): void;
   /** Whether this avatar's frames are painted with WebGL. */
   readonly webgl: boolean;
+  /** A moment's expression over any state. */
+  react(expression: BotExpression | BotFace, duration?: number): this;
+  /** Mouth follows audio (MediaStream, media element or AudioNode); no argument stops. */
+  speak(source?: MediaStream | HTMLMediaElement | AudioNode | null): this;
+  /** Drive the speaking mouth by hand, 0–1; null for made-up chatter. */
+  setVoice(level: number | null): this;
+  /** Keep an eye on an element or a client-space point; null to stop. */
+  lookAt(target: Element | { x: number; y: number } | null): this;
+  on(event: 'poke' | 'blink' | 'jump' | 'land' | 'state', fn: (e: { type: string; bot: BotAvatar; state?: string }) => void): () => void;
+  /** The whole design as a short code. */
+  readonly dna: string;
+  export(options?: { format?: 'gif' | 'apng' | 'webm' | 'sprite' | 'png' | 'webp'; duration?: number; fps?: number; scale?: number; background?: string }): Promise<Blob>;
 }
+
+export declare function registerShape(name: string, def: { path?: string; points?: [number, number][]; color?: string; label?: string; faceY?: number; faceScale?: number }): void;
+export declare function registerHat(name: string, def: { layers: { d: string; fill?: string; stroke?: string; lineWidth?: number; opacity?: number }[]; width?: number; lift?: number }): void;
+export declare function registerState(name: string, def: { pose?: Partial<BotPose>; keyframes?: { at: number; pose: Partial<BotPose> }[]; duration?: number; loop?: boolean; blink?: boolean }): void;
+export declare const STYLES: Record<BotStyle, Partial<BotOptions>>;
+export declare const EXPRESSIONS: Record<BotExpression, BotFace>;
+export declare function encodeDNA(options: BotOptions, defaults?: BotOptions): string;
+export declare function decodeDNA(code: string): BotOptions;
+export declare function lookFromId(id: string): BotOptions;
+export declare function normalizeOptions(options: BotOptions): BotOptions;
+export declare function exportBot(bot: BotAvatar, options?: Parameters<BotAvatar['export']>[0]): Promise<Blob>;
+export declare const EYE_STYLES: BotEyeStyle[];
+export declare const MOUTH_STYLES: BotMouthStyle[];
+export declare const BROWS: string[];
+export declare const EAR_STYLES: string[];
+export declare const FUR_PATTERNS: BotFurPattern[];
+export declare const HAT_STYLES: string[];
 
 /** Global rendering switches; set them before the first avatar is created. */
 export declare const renderSettings: { workers: boolean; maxWorkers: number; softwareWebGL: boolean };
