@@ -1,6 +1,8 @@
 // Regenerates the README images in docs/. Needs Playwright and the site served
 // locally: `npm start` in one terminal, then `node docs/screenshots.mjs`.
 import { chromium } from 'playwright';
+import { types, presets } from '../src/shapes.js';
+import { encodeDNA } from '../src/options.js';
 
 const base = process.env.BASE_URL || 'http://localhost:8000';
 const out = new URL('./', import.meta.url).pathname;
@@ -20,10 +22,12 @@ async function shoot(path, file, { width = 1280, height = 800, theme = 'light', 
 
 await shoot('/docs/poster.html', 'hero.png', { width: 1280, height: 640, theme: 'dark', settle: 3500 });
 await shoot('/', 'landing.png', { height: 860 });
-await shoot('/', 'gallery.png', { theme: 'dark', element: '#grid', height: 1400 });
-await shoot('/', 'gallery-working.png', {
-  element: '#grid', height: 1400,
-  before: async (p) => { await p.click('#state-seg [data-v="working"]'); await p.click('#face-seg [data-v="mouth"]'); },
+// The gallery: every type on a crew page (c/), built from Bot DNA codes.
+const crew = (o) => '/c/#t=' + encodeURIComponent('Eighteen shapes') + ',' + types.map((type) => `${encodeDNA({ type, ...o })}~${encodeURIComponent(presets[type].label)}`).join(',');
+await shoot(crew({}), 'gallery.png', { theme: 'dark', element: '#members', height: 1400 });
+await shoot(crew({ face: 'mouth' }), 'gallery-working.png', {
+  element: '#members', height: 1400,
+  before: async (p) => { await p.waitForTimeout(800); await p.click('#state-seg [data-v="working"]'); },
 });
 await shoot('/playground/#type=cat&hat=party&glasses=round&bowTie=true&face=mouth', 'playground.png', { width: 1440, height: 900 });
 

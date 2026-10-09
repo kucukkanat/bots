@@ -1,0 +1,61 @@
+<!-- Export & stickers | Export a bot as a GIF, APNG, WebM, sprite sheet, PNG or WebP, and make sticker sets for chat apps. -->
+<h1>Export &amp; stickers</h1>
+<p class="sub">Any avatar can be rendered to a file: animated, still, or a whole set of stickers. Frames are drawn offline from a copy of the avatar's simulation, so exporting never stutters the live one, and the exporter's code loads only when you first use it.</p>
+
+<div class="demo-row">
+  <figure><bot-avatar id="exp-bot" type="flower" face="mouth" hat="party" size="96" style="width:96px;height:96px"></bot-avatar><figcaption>try it</figcaption></figure>
+  <figure data-live><div class="exp-btns"><button class="btn small" type="button" data-format="gif">GIF</button><button class="btn small" type="button" data-format="apng">APNG</button><button class="btn small" type="button" data-format="webm">WebM</button><button class="btn small" type="button" data-format="png">PNG</button></div><figcaption id="exp-out">downloads a file</figcaption></figure>
+</div>
+
+<h2>bot.export()</h2>
+```js
+const gif = await bot.export({ format: 'gif', duration: 2.4, fps: 20 });
+const url = URL.createObjectURL(gif);
+```
+::table Option | Values | Default
+`format` | `gif`, `apng`, `webm`, `sprite` (a sheet of frames), `png`, `webp` | `gif`
+`duration` | seconds of animation | `2` (WebM `3`)
+`fps` | frames per second | `20` GIF, `25` APNG and sprites, `30` WebM
+`scale` | pixels per CSS pixel | `2`
+`background` | a colour, or leave out for transparency | transparent
+::end
+<p>It resolves to a <code>Blob</code>; a sprite sheet's blob also carries <code>blob.sprite</code> (<code>columns</code>, <code>rows</code>, <code>frames</code>, <code>frameSize</code>, <code>fps</code>). WebM needs <code>MediaRecorder</code>; the others work everywhere the avatar does.</p>
+
+<h2>A still frame</h2>
+```js
+const png = bot.toDataURL({ scale: 4 });   // the current frame, synchronously
+```
+
+<h2>Stickers</h2>
+<p>A single die-cut sticker (512px, white outline, transparent background), or a whole crew as a ZIP of stickers with a <code>crew.json</code> of names and DNA codes:</p>
+```js
+const sticker = await bot.export({ format: 'sticker' });          // PNG; frames: true for an animated APNG
+
+import { exportStickers } from '@kucukkanat/bots/export';
+const zip = await exportStickers([bot, { type: 'cat', hat: 'party', label: 'Mia' }, 'bot1.…'], {
+  size: 512, outline: true,
+});
+```
+<p>The list takes live avatars, option objects or DNA codes (any other string is used as an <code>identity</code>). Use them as reactions in Slack or Discord, or as a WhatsApp or Telegram sticker pack.</p>
+
+<h2>In the studio</h2>
+<p>The <a href="../playground/">studio</a> exports the bot you're designing as GIF, APNG, WebM or a sprite sheet with one click, no code.</p>
+
+<script type="module">
+  document.addEventListener('bots-loaded', () => {
+    const el = document.getElementById('exp-bot');
+    const out = document.getElementById('exp-out');
+    for (const b of document.querySelectorAll('[data-format]')) b.addEventListener('click', async () => {
+      b.disabled = true;
+      out.textContent = 'rendering…';
+      try {
+        const blob = await el.bot.export({ format: b.dataset.format, duration: 2, fps: 20 });
+        const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'bot.' + (b.dataset.format === 'apng' ? 'png' : b.dataset.format) });
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+        out.textContent = Math.round(blob.size / 1024) + ' kB ' + b.dataset.format;
+      } catch (e) { out.textContent = 'not supported here'; }
+      b.disabled = false;
+    });
+  });
+</script>

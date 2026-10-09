@@ -1,0 +1,70 @@
+<!-- Frameworks | Use bots from plain HTML, vanilla JavaScript, React, Vue or Svelte, and with server rendering. -->
+<h1>Frameworks</h1>
+<p class="sub">The custom element works in every framework that renders HTML. The wrappers are thin: they create a controller on mount, pass changed props to <code>set()</code>, and destroy it on unmount.</p>
+
+<h2>Plain HTML</h2>
+```html
+<script type="module" src="https://kucukkanat.github.io/bots/dist/bots.js"></script>
+
+<bot-avatar type="clover" state="working" size="96"></bot-avatar>
+```
+
+<h2>Vanilla JavaScript</h2>
+```js
+import { createBot } from '@kucukkanat/bots';
+
+const bot = createBot(document.querySelector('#agent'), { type: 'droid', size: 96 });
+bot.on('state', (e) => console.log('now', e.state));
+```
+
+<h2>React</h2>
+```jsx
+import { BotAvatar } from '@kucukkanat/bots/react';
+
+export function Agent({ busy, onBot }) {
+  return (
+    <BotAvatar
+      type="clover"
+      size={64}
+      state={busy ? 'thinking' : 'default'}
+      onReady={onBot}                      // the controller, for say(), react(), lookAt()…
+      onState={(e) => console.log(e.state)}
+    />
+  );
+}
+```
+<p>Every option is a prop. Event props: <code>onPoke</code>, <code>onBlink</code>, <code>onJump</code>, <code>onLand</code>, <code>onState</code>. Props are compared by value, so re-rendering with the same props costs nothing. <code>className</code> and <code>style</code> go on the host element.</p>
+
+<h2>Vue</h2>
+```vue
+<script setup>
+import { ref } from 'vue';
+import { BotAvatar } from '@kucukkanat/bots/vue';
+
+const busy = ref(false);
+const onReady = (bot) => bot.say('Hi from Vue!');
+</script>
+
+<template>
+  <BotAvatar type="cat" :size="64" :state="busy ? 'thinking' : 'default'" @ready="onReady" />
+</template>
+```
+<p>Options are props; the controller arrives with the <code>ready</code> event. You can also use <code>&lt;bot-avatar&gt;</code> directly; tell Vue it's a custom element with <code>compilerOptions.isCustomElement = (tag) =&gt; tag === 'bot-avatar'</code>.</p>
+
+<h2>Svelte</h2>
+```svelte
+<script>
+  import { bot } from '@kucukkanat/bots/svelte';
+  export let busy = false;
+</script>
+
+<div use:bot={{ type: 'clover', size: 64, state: busy ? 'thinking' : 'default' }}></div>
+```
+<p>The action creates the avatar inside the node, calls <code>set()</code> when its parameters change and cleans up on destroy.</p>
+
+<h2>Server rendering</h2>
+<p>Avatars draw on a canvas, so they only exist in the browser. Importing the module on the server is safe (nothing touches the DOM until an avatar is created), but create avatars in client-only code: <code>useEffect</code>, <code>onMounted</code>, <code>onMount</code>, or a client component in Next.js. Give the host a fixed width and height so nothing shifts when the avatar appears.</p>
+```jsx
+'use client';
+import { BotAvatar } from '@kucukkanat/bots/react';
+```

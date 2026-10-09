@@ -1,0 +1,86 @@
+<!-- Plugins & packs | Seasonal packs of hats and props, and your own shapes, hats, states and images for bots. -->
+<h1>Plugins &amp; packs</h1>
+<p class="sub">Shapes, hats and states are registries: add your own once and use them by name, exactly like the built-in ones. Packs are ready-made sets you import with one line.</p>
+
+<div class="demo-row">
+  <figure><bot-avatar type="ghost" hat="witch" blush size="80" style="width:80px;height:80px"></bot-avatar><figcaption>hat="witch"</figcaption></figure>
+  <figure><bot-avatar type="cat" hat="halo" face="mouth" size="80" style="width:80px;height:80px"></bot-avatar><figcaption>hat="halo"</figcaption></figure>
+  <figure><bot-avatar type="cloud" hat="bow" ears="bear" size="80" style="width:80px;height:80px"></bot-avatar><figcaption>hat="bow"</figcaption></figure>
+  <figure><bot-avatar type="blob" hat="cap" scarf scarf-color="#ffcf4a" size="80" style="width:80px;height:80px"></bot-avatar><figcaption>hat="cap" scarf</figcaption></figure>
+</div>
+
+<h2>Packs</h2>
+<p>A pack is a module that registers a themed set of hats and props when imported. Import it once, anywhere before you use its names:</p>
+```js
+import '@kucukkanat/bots/src/packs/halloween.js';   // or winter.js, party.js
+```
+```html
+<script type="module" src="https://kucukkanat.github.io/bots/dist/packs/halloween.js"></script>
+```
+::table Pack | Adds
+`halloween` | spooky hats and props
+`winter` | woolly hats and festive props
+`party` | party hats and celebration props
+::end
+<p>The <a href="../playground/">studio</a> lists every hat a pack adds once it's loaded.</p>
+
+<h2>Your own hat</h2>
+<p>Hats are SVG path layers in a 100×100 box whose bottom centre (50, 100) sits on top of the head. They're plain data, so they travel to the drawing threads for free.</p>
+```js
+import { registerHat } from '@kucukkanat/bots';
+
+registerHat('fez', {
+  layers: [
+    { d: 'M28 100L34 40H66L72 100Z', fill: '#c0392b' },
+    { d: 'M50 40C52 30 60 26 64 30', stroke: '#222', lineWidth: 3 },
+  ],
+  width: 1,   // 1 = as wide as the top of the head
+  lift: 0,    // raise it, in box units
+});
+```
+<p><code>fill: 'accessory'</code> uses the avatar's <code>accessoryColor</code>, so one hat works in any colour.</p>
+
+<h2>Your own shape</h2>
+<p>SVG path data in a 100×100 box centred on (50, 50). It is inflated, lit, furred and animated like any stock shape.</p>
+```js
+import { registerShape } from '@kucukkanat/bots';
+
+registerShape('bean', {
+  path: 'M50 8C80 8 92 40 86 62C80 86 60 94 46 92C22 88 8 66 12 40C16 18 30 8 50 8Z',
+  color: '#c58b5a',
+  label: 'Bean',
+  faceY: 0.05,
+});
+```
+<p>For a one-off, skip the registry and pass <code>path</code> to a single avatar.</p>
+
+<h2>Your own state</h2>
+<p>A state is a held pose, or keyframes that loop:</p>
+```js
+import { registerState } from '@kucukkanat/bots';
+
+registerState('dance', {
+  duration: 1.2,
+  keyframes: [
+    { at: 0, pose: { roll: -0.2 } },
+    { at: 0.6, pose: { roll: 0.2, y: -0.15, happy: 1 } },
+    { at: 1.2, pose: { roll: -0.2 } },
+  ],
+});
+bot.setState('dance');
+```
+<p>Pose channels include `yaw`, `pitch`, `roll`, `x`, `y`, `sx`, `sy`, `lookX`, `lookY`, `eyeOpen`, `happy`, `smile`, `mouthOpen`, `brow`, `browTilt`, `eyeWide`, `squint`.</p>
+
+<h2>Images</h2>
+<p>Pin a logo or sticker to the body; it turns with it.</p>
+```js
+createBot('#x', {
+  accessories: [{ src: '/logo.png', x: 0.45, y: 0.4, size: 0.2, layer: 'front' }],
+});
+```
+
+<h2>Features load on demand</h2>
+<p>Optional behaviours (lip-sync, toss, petting, sounds, moods, status badges) live in their own modules. Turning one on with its option, or calling its method, fetches it the first time; until then it costs no bytes and no time. To warm one up ahead of time:</p>
+```js
+await bot.feature('say');
+```
