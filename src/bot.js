@@ -269,15 +269,16 @@ export class BotAvatar {
       if (this._speakPrev) { this.setState(this._speakPrev); this._speakPrev = null; }
       return this;
     }
-    audioCtx ??= new (globalThis.AudioContext || globalThis.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    // An AudioNode brings its own context (nodes can't connect across contexts).
+    const ctx = source.context || (audioCtx ??= new (globalThis.AudioContext || globalThis.webkitAudioContext)());
+    if (ctx.state === 'suspended') ctx.resume();
     let node = source;
-    if (typeof MediaStream !== 'undefined' && source instanceof MediaStream) node = audioCtx.createMediaStreamSource(source);
+    if (typeof MediaStream !== 'undefined' && source instanceof MediaStream) node = ctx.createMediaStreamSource(source);
     else if (typeof HTMLMediaElement !== 'undefined' && source instanceof HTMLMediaElement) {
       node = mediaSources.get(source);
-      if (!node) { node = audioCtx.createMediaElementSource(source); node.connect(audioCtx.destination); mediaSources.set(source, node); }
+      if (!node) { node = ctx.createMediaElementSource(source); node.connect(ctx.destination); mediaSources.set(source, node); }
     }
-    const an = audioCtx.createAnalyser();
+    const an = ctx.createAnalyser();
     an.fftSize = 512;
     node.connect(an);
     this._analyser = an;

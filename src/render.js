@@ -947,7 +947,7 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
   if (whirlOn) drawWhirl(ctx, R, pose, look, time, base, -1);
   if (look.accessories) drawAccessories(ctx, look.accessories, 'back', proj, R, c0, s, sp, cp, D, 1);
   antennae();
-  if (look.ears && look.ears !== 'none') drawEars(ctx, look.ears, shape, proj, R, c0, base, look, dpr);
+  if (look.ears && look.ears !== 'none') drawEars(ctx, look.ears, shape, proj, R, c0, base, look);
   sideParts.filter((p) => p.z < 0).reverse().forEach((p) => p.draw(true));
   lc.save();
   lc.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -972,7 +972,7 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     ctx.save();
     ctx.globalAlpha = faceA;
     ctx.transform(R * c0, -R * s * sp, 0, R * cp, bX, bY);
-    drawSprite(ctx, sprite(`scarf|${look.scarfColor || '#d94f4f'}`, 0.5, R * dpr, (g) => drawScarf(g, look.scarfColor || '#d94f4f')));
+    drawSprite(ctx, sprite(`scarf|${look.scarfColor || '#d94f4f'}`, [-0.45, -0.12, 0.45, 0.38], R * dpr, (g) => drawScarf(g, look.scarfColor || '#d94f4f')));
     ctx.restore();
   }
   if (faceA > 0 && look.badge) {
@@ -1315,62 +1315,73 @@ function drawFace(ctx, look, pose, fs, R) {
 // painted once into a sprite at the device's pixel scale and then drawn as a
 // single image each frame: their gradients, curves and text cost nothing more.
 const sprites = new Map();
-function sprite(key, half, scale, paint) {
+function sprite(key, box, scale, paint) {
   const q = Math.max(1, Math.round(scale * 2) / 2);
   const id = `${key}|${q}`;
   let sp = sprites.get(id);
   if (sp) return sp;
-  const px = Math.ceil(half * 2 * q) + 4;
-  const canvas = makeCanvas(px, px), g = canvas.getContext('2d');
-  g.translate(px / 2, px / 2);
+  // `box` is the painted area in body units: a half-size around the origin,
+  // or [x0, y0, x1, y1]. Kept tight: every pixel in it is sampled per draw.
+  const [x0, y0, x1, y1] = typeof box === 'number' ? [-box, -box, box, box] : box;
+  const w = Math.ceil((x1 - x0) * q) + 4, h = Math.ceil((y1 - y0) * q) + 4;
+  const canvas = makeCanvas(w, h), g = canvas.getContext('2d');
+  g.translate(2 - x0 * q, 2 - y0 * q);
   g.scale(q, q);
   paint(g);
   // A bitmap is a fixed image the browser can keep ready; a canvas gets
   // snapshotted on every draw.
-  sp = { canvas: canvas.transferToImageBitmap ? canvas.transferToImageBitmap() : canvas, px, q };
+  sp = { canvas: canvas.transferToImageBitmap ? canvas.transferToImageBitmap() : canvas, x: x0 - 2 / q, y: y0 - 2 / q, w: w / q, h: h / q };
   sprites.set(id, sp);
   if (sprites.size > 96) sprites.delete(sprites.keys().next().value);
   return sp;
 }
-const drawSprite = (ctx, sp) => ctx.drawImage(sp.canvas, -sp.px / 2 / sp.q, -sp.px / 2 / sp.q, sp.px / sp.q, sp.px / sp.q);
+const drawSprite = (ctx, sp) => ctx.drawImage(sp.canvas, sp.x, sp.y, sp.w, sp.h);
 
 export const EAR_STYLES = ['none', 'cat', 'bunny', 'bear', 'round'];
 
 /** Ears on top of the head, behind the body (drawn under it, so steps reversed). */
-function drawEars(ctx, kind, shape, proj, R, c0, base, look, scale) {
+function drawEars(ctx, kind, shape, proj, R, c0, base, look) {
   const inner = look.blushColor || shade(base, 0.18, -15, 1.2);
-  const sp = sprite(`ear|${kind}|${base}|${inner}`, 0.75, R * scale, (g) => paintEar(g, kind, base, inner));
+  const paths = earPaths(kind);
+  // Both ears in one path per tone: two fills, whatever the ear count.
+  const outer = new Path2D(), lining = new Path2D();
+  let Yb = 0;
   for (const side of [-1, 1]) {
     const ex = side * Math.min(0.55, shape.halfWidthAt(shape.bounds.minY + 0.25) * 0.62);
     const ey = shape.topAt(ex, 0.12) + 0.12;
     const [X, Y] = proj(ex, ey, 0);
     const wk = 0.35 + 0.65 * Math.abs(c0);
-    ctx.save();
-    ctx.translate(X, Y);
-    ctx.rotate(side * (kind === 'bunny' ? 0.18 : 0.32));
-    ctx.scale(wk * R, R);
-    drawSprite(ctx, sp);
-    ctx.restore();
+    const m = new DOMMatrix().translateSelf(X, Y).rotateSelf(side * (kind === 'bunny' ? 0.18 : 0.32) * 180 / Math.PI).scaleSelf(wk * R, R);
+    outer.addPath(paths[0], m);
+    lining.addPath(paths[1], m);
+    Yb += Y / 2;
   }
-}
-
-/** One ear in body units, its base at (0, 0). */
-function paintEar(g, kind, base, inner) {
-  const gr = g.createLinearGradient(0, -0.6, 0, 0);
+  const gr = ctx.createLinearGradient(0, Yb - 0.6 * R, 0, Yb);
   gr.addColorStop(0, shade(base, 0.08));
   gr.addColorStop(1, shade(base, -0.18));
-  g.fillStyle = gr;
-  g.beginPath();
-  if (kind === 'cat') { g.moveTo(-0.22, 0); g.quadraticCurveTo(-0.05, -0.55, 0, -0.52); g.quadraticCurveTo(0.05, -0.55, 0.22, 0); }
-  else if (kind === 'bunny') g.ellipse(0, -0.42, 0.14, 0.5, 0, 0, Math.PI * 2);
-  else { const r = kind === 'bear' ? 0.2 : 0.17; g.arc(0, -r * 0.7, r, 0, Math.PI * 2); }
-  g.fill();
-  g.fillStyle = rgba(inner, 0.75);
-  g.beginPath();
-  if (kind === 'cat') { g.moveTo(-0.12, -0.04); g.quadraticCurveTo(0, -0.42, 0.12, -0.04); }
-  else if (kind === 'bunny') g.ellipse(0, -0.42, 0.07, 0.38, 0, 0, Math.PI * 2);
-  else { const r = kind === 'bear' ? 0.11 : 0.09; g.arc(0, -(kind === 'bear' ? 0.2 : 0.17) * 0.7, r, 0, Math.PI * 2); }
-  g.fill();
+  ctx.fillStyle = gr;
+  ctx.fill(outer);
+  ctx.fillStyle = rgba(inner, 0.75);
+  ctx.fill(lining);
+}
+
+const earCache = {};
+/** An ear's outline and lining in body units, its base at (0, 0). */
+function earPaths(kind) {
+  if (earCache[kind]) return earCache[kind];
+  const o = new Path2D(), i = new Path2D();
+  if (kind === 'cat') {
+    o.moveTo(-0.22, 0); o.quadraticCurveTo(-0.05, -0.55, 0, -0.52); o.quadraticCurveTo(0.05, -0.55, 0.22, 0); o.closePath();
+    i.moveTo(-0.12, -0.04); i.quadraticCurveTo(0, -0.42, 0.12, -0.04); i.closePath();
+  } else if (kind === 'bunny') {
+    o.ellipse(0, -0.42, 0.14, 0.5, 0, 0, Math.PI * 2);
+    i.ellipse(0, -0.42, 0.07, 0.38, 0, 0, Math.PI * 2);
+  } else {
+    const r = kind === 'bear' ? 0.2 : 0.17;
+    o.arc(0, -r * 0.7, r, 0, Math.PI * 2);
+    i.arc(0, -r * 0.7, kind === 'bear' ? 0.11 : 0.09, 0, Math.PI * 2);
+  }
+  return (earCache[kind] = [o, i]);
 }
 
 function drawScarf(ctx, color) {
