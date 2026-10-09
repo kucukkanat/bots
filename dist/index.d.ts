@@ -10,7 +10,7 @@ export type BotQuirk = 'patch' | 'cowlick' | 'scuff' | 'stitches';
 export type BotTemperament = 'eager' | 'sunny' | 'sharp' | 'stoic' | 'wobbly' | 'shy' | 'calm' | 'nervous' | 'showOff' | 'precise' | 'steady' | 'curious' | 'serious' | 'aloof' | 'dreamy' | 'chipper' | 'sleepy'
   | 'sly' | 'scholar' | 'drawn' | 'busy' | 'perky' | 'patient' | 'hive' | 'serene' | (string & {});
 /** A part a creature has beyond its body, drawn with motion of its own (see the Creatures guide). */
-export interface BotPart { kind: 'tail' | 'tendrils' | 'wings' | 'frills' | 'arms' | 'shell' | 'plates' | 'slot' | 'popup' | 'sprig' | 'knob' | 'spiral' | 'streak'; layer?: 'skin' | 'back' | 'front'; [param: string]: unknown }
+export interface BotPart { kind: 'tail' | 'tendrils' | 'wings' | 'frills' | 'arms' | 'shell' | 'plates' | 'slot' | 'popup' | 'sprig' | 'knob' | 'spiral' | 'streak' | 'beak'; layer?: 'skin' | 'back' | 'front'; [param: string]: unknown }
 /** A creature module: a preset plus parts, a temperament, defaults, a morph outline and a lifecycle. */
 export interface BotCreature {
   type: string; label: string; color: string; faceY?: number; faceScale?: number;

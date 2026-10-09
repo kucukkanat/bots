@@ -734,16 +734,32 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     for (const a of ants) {
       const top = shape.topAt(a.x, 0.1);
       const [X0, Y0] = proj(a.x, top + 0.12, 0);
-      const [X1, Y1] = proj(a.x * 1.1, top - a.len, 0);
+      // `curve` bends the stalk outward (body units at the tip); `feather` adds short hairs along it.
+      const curve = a.curve || 0;
+      const [X1, Y1] = proj(a.x * 1.1 + curve * Math.sign(a.x || 1), top - a.len, 0);
+      const [Xc, Yc] = proj(a.x * 1.05, top - a.len * 0.55, 0);
+      const sw = curve ? Math.sin(time * 1.8 + a.x) * R * 0.02 : 0;
       layers(true, () => {
         ctx.strokeStyle = shade(base, -0.28);
-        ctx.lineWidth = R * 0.06;
+        ctx.lineWidth = R * (a.width ?? 0.06);
         ctx.lineCap = 'round';
         ctx.beginPath();
         ctx.moveTo(X0, Y0);
-        ctx.lineTo(X1, Y1);
+        if (curve) ctx.quadraticCurveTo(Xc, Yc, X1 + sw, Y1); else ctx.lineTo(X1, Y1);
         ctx.stroke();
-      }, () => sphere(ctx, X1, Y1, a.ball * R, look.antennaColor || shade(base, 0.05, -20, 1.4), lx, ly));
+        if (a.feather) {
+          ctx.lineWidth = R * 0.02;
+          ctx.beginPath();
+          for (let k = 1; k <= 6; k++) {
+            const t = k / 7, u = 1 - t;
+            const x = u * u * X0 + 2 * u * t * Xc + t * t * (X1 + sw), y = u * u * Y0 + 2 * u * t * Yc + t * t * Y1;
+            const side = Math.sign(a.x || 1), hl = R * a.len * 0.12 * (1 - t * 0.5);
+            ctx.moveTo(x, y); ctx.lineTo(x + side * hl, y - hl * 0.6);
+            ctx.moveTo(x, y); ctx.lineTo(x - side * hl * 0.7, y - hl * 0.7);
+          }
+          ctx.stroke();
+        }
+      }, () => { if (a.ball > 0) sphere(ctx, X1 + sw, Y1, a.ball * R, look.antennaColor || shade(base, 0.05, -20, 1.4), lx, ly); });
     }
   };
 

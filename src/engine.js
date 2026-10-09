@@ -621,7 +621,9 @@ export class BotSim {
       pose.lagX = clamp(sc.px, -0.6, 0.6); pose.lagY = clamp(sc.py, -0.6, 0.6);
       // Wings and frills beat fast while it's busy or airborne, slowly at rest.
       const busy = pose.think > 0.5 || pose.y < -0.03 || pose.happy > 0.5 || pose.eyeWide > 0.4;
-      sc.amp += ((busy ? 1 : 0.2) - sc.amp) * Math.min(1, dt * 6);
+      // Still while listening (brows up, eyes on you) or asleep; a slow idle beat otherwise.
+      const still = !busy && (pose.brow > 0.3 || pose.sleep > 0.5);
+      sc.amp += ((busy ? 1 : still ? 0.03 : 0.2) - sc.amp) * Math.min(1, dt * 6);
       sc.flapT += dt * (busy ? 14 : 1.7);
       pose.flap = (0.5 + 0.5 * Math.sin(sc.flapT)) * sc.amp;
     }
