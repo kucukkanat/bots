@@ -4,7 +4,7 @@
 
 Animated bot avatars for AI agents. Eighteen plush 3D shapes with living faces that look around, hop while they work and doze off between tasks — plus hats, glasses, headphones and bow ties. Drawn with WebGL in worker threads, with a plain 2D canvas fallback wherever either is missing: no build step, no dependencies.
 
-**[Live site](https://hackdonalds.github.io/bots/) · [Playground](https://hackdonalds.github.io/bots/playground/)**
+**[Live site](https://kucukkanat.github.io/bots/) · [Playground](https://kucukkanat.github.io/bots/playground/)**
 
 <p align="center"><img src="docs/landing.png" alt="The bots landing page" width="100%" /></p>
 
@@ -24,7 +24,7 @@ All eighteen types, idle with eyes (left) and working with a mouth (right):
 ### Custom element
 
 ```html
-<script type="module" src="https://hackdonalds.github.io/bots/src/index.js"></script>
+<script type="module" src="https://kucukkanat.github.io/bots/src/index.js"></script>
 
 <bot-avatar type="clover" state="working" size="96"></bot-avatar>
 <bot-avatar type="cat" face="mouth" hat="party" bow-tie></bot-avatar>
@@ -35,7 +35,7 @@ Every option is an attribute in kebab-case. Change an attribute and the avatar e
 ### JavaScript
 
 ```js
-import { createBot } from 'https://hackdonalds.github.io/bots/src/index.js';
+import { createBot } from 'https://kucukkanat.github.io/bots/src/index.js';
 
 const bot = createBot('#agent', { type: 'droid', size: 96, glasses: 'round' });
 bot.setState('working');   // 'default' (idle) | 'working' | 'sleeping'
@@ -48,7 +48,7 @@ bot.destroy();
 ### React
 
 ```jsx
-import { BotAvatar } from '@hackdonalds/bots/react';
+import { BotAvatar } from '@kucukkanat/bots/react';
 
 <BotAvatar type="clover" state={busy ? 'working' : 'default'} size={64} />
 ```

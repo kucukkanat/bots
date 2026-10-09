@@ -432,7 +432,7 @@ function codeText(kind) {
     return `import { createBot } from '${LIB}';\n\nconst bot = createBot('#my-bot', {\n${body}\n});\n\n// bot.setState('working') · bot.setState('sleeping') · bot.poke()`;
   }
   const props = Object.entries({ ...ch, size: 96 }).map(([k, v]) => (v === true ? k : typeof v === 'string' ? `${k}=${JSON.stringify(v)}` : `${k}={${JSON.stringify(v)}}`));
-  return `import { BotAvatar } from '@hackdonalds/bots/react';\n\n<BotAvatar\n  ${props.join('\n  ')}\n/>`;
+  return `import { BotAvatar } from '@kucukkanat/bots/react';\n\n<BotAvatar\n  ${props.join('\n  ')}\n/>`;
 }
 function renderCode() { $('code').textContent = codeText(codeKind); }
 

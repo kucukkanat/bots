@@ -1,5 +1,5 @@
 {
-  "name": "@hackdonalds/bots",
+  "name": "@kucukkanat/bots",
   "version": "1.0.0",
   "description": "Animated bot avatars: eighteen plush 3D shapes with living faces, three states, hats and glasses. WebGL with a 2D canvas fallback, in worker threads, no dependencies. Web component, JS API and React wrapper.",
   "type": "module",
@@ -21,6 +21,6 @@
   "peerDependenciesMeta": { "react": { "optional": true } },
   "keywords": ["avatar", "bot", "agent", "ai", "animation", "canvas", "web-component", "react", "mascot"],
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/hackdonalds/bots.git" },
-  "homepage": "https://hackdonalds.github.io/bots/"
+  "repository": { "type": "git", "url": "git+https://github.com/kucukkanat/bots.git" },
+  "homepage": "https://kucukkanat.github.io/bots/"
 }

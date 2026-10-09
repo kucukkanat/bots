@@ -479,6 +479,8 @@ export class BotSim {
     this.io = { voice: null };
     this.reaction = null;
     this.jiggleT = Infinity;
+    /** Pose modifiers from lazily loaded features: (pose, dt, sim) => void, run last. */
+    this.mods = [];
     this.state = known(state) ? state : 'default';
     this.current = behaviour(this.state, this.rand, opts, this.emit, this.io);
     this.previous = null;
@@ -544,6 +546,7 @@ export class BotSim {
       const k = (this.opts.jiggle ?? 0) * 0.07 * Math.exp(-this.jiggleT * 4.5) * Math.sin(this.jiggleT * 26);
       pose.sy *= 1 - k; pose.sx *= 1 + k * 0.7;
     }
+    for (let i = 0; i < this.mods.length; i++) this.mods[i](pose, dt, this);
     return pose;
   }
 }

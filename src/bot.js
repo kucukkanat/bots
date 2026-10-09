@@ -37,6 +37,20 @@ export const SHADINGS = ['fabric', 'plastic', 'smooth', 'crisp', 'flat'];
 export const HATS = HAT_STYLES;
 export const GLASSES = ['none', 'round', 'square', 'shades'];
 
+/**
+ * Features that load on first use. Each module in ./features/ exports
+ * `install(bot)` returning a controller { tick?(dt), set?(options), destroy?() }.
+ * An option key switches its feature on when truthy; methods load theirs too.
+ * Nothing here costs a byte or a cycle until it's asked for.
+ */
+export const FEATURE_OPTIONS = {};
+const featureLoaders = {};
+/** Register a lazily loaded feature: `option` (if any) turns it on. */
+export function defineFeature(name, load, option) {
+  featureLoaders[name] = load;
+  if (option) FEATURE_OPTIONS[option] = name;
+}
+
 const FACE_KEYS = ['lookX', 'lookY', 'eyeOpen', 'happy', 'smile', 'mouthOpen', 'brow', 'browTilt', 'eyeWide', 'squint', 'dizzy', 'blushPulse'];
 
 /**
@@ -147,6 +161,8 @@ export class BotAvatar {
     this._raw = { ...options };
     this.options = { ...DEFAULTS, ...normalizeOptions(this._raw) };
     this._listeners = new Map();
+    this._features = new Map();
+    this._ticking = [];
     this._ownCanvas = !(target instanceof HTMLCanvasElement);
     if (!this._ownCanvas) this.canvas = target;
     else {
@@ -179,6 +195,39 @@ export class BotAvatar {
     } else this._attachMain();
     this._layout();
     this._sync();
+    this._syncFeatures();
+    /** Resolves once the avatar has a renderer (worker or main thread). */
+    this.ready = pool ? pool.ready.then(() => this) : Promise.resolve(this);
+  }
+
+  /**
+   * Load a feature (once) and resolve to its controller. Features are
+   * modules in ./features/, fetched the first time any avatar uses them.
+   */
+  feature(name) {
+    let f = this._features.get(name);
+    if (f) return f.promise;
+    const load = featureLoaders[name];
+    if (!load) return Promise.reject(new Error(`bots: unknown feature '${name}'`));
+    f = { ctl: null };
+    f.promise = load().then((m) => {
+      if (this._destroyed) return null;
+      f.ctl = m.install(this) || {};
+      if (f.ctl.tick) this._ticking.push(f.ctl);
+      this._sync();
+      return f.ctl;
+    });
+    this._features.set(name, f);
+    return f.promise;
+  }
+
+  _syncFeatures(changed = this.options) {
+    for (const [opt, name] of Object.entries(FEATURE_OPTIONS)) {
+      if (!(opt in changed)) continue;
+      const f = this._features.get(name);
+      if (f?.ctl) f.ctl.set?.(this.options);
+      else if (this.options[opt] && this.options[opt] !== 'none') this.feature(name);
+    }
   }
 
   _attachMain() {
@@ -234,6 +283,7 @@ export class BotAvatar {
       this.pool.post(this.handle, { op: 'look', look: lookMessage(this.look) });
       this.pool.post(this.handle, { op: 'opts', ...this._renderOpts() });
     } else if (this.ctx && options.renderer !== undefined) this.gpu = this.options.renderer === 'canvas' ? null : mainThreadGpu();
+    this._syncFeatures(options);
     if ((options.size !== undefined && options.size !== prev.size) || options.renderer !== undefined || options.quality !== undefined) this._layout();
     this._sync();
     this.draw();
@@ -410,6 +460,7 @@ export class BotAvatar {
       for (let i = 0; i < this._voiceBuf.length; i++) sum += this._voiceBuf[i] * this._voiceBuf[i];
       this.sim.setVoice(Math.min(1, Math.max(0, Math.sqrt(sum / this._voiceBuf.length) * 7 - 0.03)));
     }
+    for (let i = 0; i < this._ticking.length; i++) this._ticking[i].tick(dt);
     this.sim.update(dt);
     if (this.options.size <= 48 && this._economy() && (this._ticks = (this._ticks || 0) + 1) % 2) return;
     if (drawTurn && this._changed()) this.draw();
@@ -468,6 +519,7 @@ export class BotAvatar {
 
   destroy() {
     this._destroyed = true;
+    for (const f of this._features.values()) f.ctl?.destroy?.();
     this.speak(null);
     if (this.handle) this.pool.remove(this.handle);
     stopLoop(this);
@@ -487,3 +539,6 @@ export { STATES };
 export { registerShape, registerHat, registerState } from './plugins.js';
 export { STYLES, EXPRESSIONS, encodeDNA, decodeDNA, lookFromId, normalizeOptions } from './options.js';
 export { settings as renderSettings, stats as renderStats } from './pool.js';
+
+// Lazily loaded features: one line each, nothing fetched until used.
+// defineFeature(name, () => import('./features/<name>.js'), optionKey?)
