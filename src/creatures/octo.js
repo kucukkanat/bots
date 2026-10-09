@@ -8,33 +8,33 @@
 import { param, chaikin } from '../geometry.js';
 
 /**
- * The mantle: a dome on top (a superellipse near an ellipse) that widens
- * going down into a broad, flat-ish base with rounded corners, like a bell
- * jar sat on its rim. The lower half is a squarer superellipse so the base
- * is flat enough for the arms to hang from in a row, and its width grows
- * with depth so the head is wider at the bottom than the top.
- * Width ±0.80 at the equator, about ±0.86 low down; from -0.88 to +0.74.
+ * The head: a round dome on top (the upper half is an ellipse) that swells a
+ * little going down (the lower half is a slightly squarer superellipse whose
+ * width grows with depth) and closes in a gently rounded base, so it is a
+ * ball that is a touch wider below the equator than above it, with enough
+ * underside for the arms to hang from in a row.
+ * Width ±0.85 at the equator, ±0.86 a little below it; from -0.92 to +0.72.
  */
 function mantle() {
   return chaikin(param((t) => {
     const c = Math.cos(t), s = Math.sin(t);
     const lower = s > 0;
-    const n = lower ? 2.6 : 2.1;
-    const b = lower ? 0.74 : 0.9;
+    const n = lower ? 2.3 : 2.0;
+    const b = lower ? 0.72 : 0.92;
     const k = 2 / n;
-    const flare = 1 + (lower ? 0.22 * s : 0);
-    return [0.82 * flare * Math.sign(c) * Math.abs(c) ** k, b * Math.sign(s) * Math.abs(s) ** k];
+    const flare = 1 + (lower ? 0.2 * s : 0);
+    return [0.84 * flare * Math.sign(c) * Math.abs(c) ** k, b * Math.sign(s) * Math.abs(s) ** k];
   }), 1);
 }
 
 export default {
-  type: 'octo', label: 'Octo', color: '#8F6BD9', faceY: -0.02, faceScale: 1,
+  type: 'octo', label: 'Octo', color: '#8F6BD9', faceY: 0.04, faceScale: 1,
   outline: mantle,
   extras: {
     parts: [
       // Eight arms along the base: even ones hang behind the bottom edge, odd ones in
       // front of it (parts.js alternates them). Their tips glow gold, one per running tool.
-      { kind: 'arms', count: 8, len: 0.62, y: 0.55, color: '#A186E6', glow: '#FFD86A' },
+      { kind: 'arms', count: 8, len: 0.65, y: 0.55, color: '#AC92EE', glow: '#FFD86A' },
     ],
   },
   temperament: 'busy',

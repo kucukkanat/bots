@@ -28,17 +28,20 @@ function bean({ w, top, bottom, cy = 0, nTop = 2.2, nBottom = 2.7, taper = 0.15,
   }), 1);
 }
 
-// The three stages. Their bottoms all sit at about y = 0.87 (the ground).
-const seed = () => bean({ w: 0.55, top: 0.48, bottom: 0.44, cy: 0.42, nTop: 2.1, nBottom: 2.4, taper: 0.06, tilt: 0.14 });
-const hatchling = () => bean({ w: 0.72, top: 0.7, bottom: 0.6, cy: 0.27, nTop: 2.1, nBottom: 2.6, taper: 0.16, tilt: 0.05 });
+// The three stages. Their bottoms all sit at about y = 0.87 (the ground), so
+// growing reads as rising. Stage heights step evenly (1.12, 1.47, 1.78): a blend
+// keeps the younger stage's fur skin, which only reaches 0.12 above that stage's
+// crown, so a big jump in height would leave a bald cap on the blends between.
+const seed = () => bean({ w: 0.6, top: 0.69, bottom: 0.43, cy: 0.44, nTop: 2.1, nBottom: 2.4, taper: 0.06, tilt: 0.12 });
+const hatchling = () => bean({ w: 0.78, top: 0.78, bottom: 0.65, cy: 0.22, nTop: 2.0, nBottom: 2.5, taper: 0.1, tilt: 0.04 });
 const adult = () => bean({ w: 0.93, top: 0.9, bottom: 0.88, cy: 0, nTop: 2.1, nBottom: 2.8, taper: 0.26 });
 
 export default {
   type: 'sprout', label: 'Sprout', color: '#7CC46B', faceY: 0.08, faceScale: 1,
   outline: adult,
   stages: [
-    { outline: seed, meta: { faceY: 0.42, faceScale: 0.7 } },
-    { outline: hatchling, meta: { faceY: 0.3, faceScale: 0.85 } },
+    { outline: seed, meta: { faceY: 0.36, faceScale: 0.7 } },
+    { outline: hatchling, meta: { faceY: 0.2, faceScale: 0.85 } },
     { outline: adult, meta: { faceY: 0.08, faceScale: 1 } },
   ],
   extras: {
