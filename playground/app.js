@@ -7,7 +7,7 @@
 import {
   createBot, BotAvatar, types, presets, DEFAULTS, SHADINGS, HATS, GLASSES, STATES, STYLES, EXPRESSIONS,
   EYE_STYLES, MOUTH_STYLES, BROWS, EAR_STYLES, FUR_PATTERNS, lookFromId, decodeDNA, shapeToSvgPath,
-  drawBot, resolveLook, restPose, OVERSCAN,
+  loadRenderer, resolveLook, restPose, OVERSCAN,
 } from '../src/index.js';
 import { FEATURE_OPTIONS } from '../src/bot.js';
 import { initTheme } from '../assets/theme.js';
@@ -867,7 +867,7 @@ function renderThumb(o, size = 48) {
   const total = size * OVERSCAN, box = size * 1.25;
   const tmp = document.createElement('canvas');
   tmp.width = tmp.height = Math.round(total * scale);
-  drawBot(tmp.getContext('2d'), { size, dpr: scale, pose: { ...restPose('default'), yaw: 0.28, lookX: 0.15 }, look, time: 0 });
+  renderMod.drawBot(tmp.getContext('2d'), { size, dpr: scale, pose: { ...restPose('default'), yaw: 0.28, lookX: 0.15 }, look, time: 0 });
   const c = document.createElement('canvas');
   c.width = c.height = Math.round(box * scale);
   c.getContext('2d').drawImage(tmp, -((total - box) / 2) * scale, -((total - box) / 2) * scale);
@@ -878,7 +878,15 @@ function renderThumb(o, size = 48) {
 const idle = window.requestIdleCallback || ((f) => setTimeout(() => f({ timeRemaining: () => 8 }), 16));
 const jobs = [];
 let idleQueued = false;
-function enqueue(job) { jobs.push(job); if (!idleQueued) { idleQueued = true; idle(runJobs, { timeout: 1500 }); } }
+// Thumbnails need the renderer, which the library loads lazily: queue until it's here.
+let renderMod = null;
+const rendererReady = loadRenderer().then((m) => { renderMod = m; });
+function enqueue(job) {
+  jobs.push(job);
+  if (idleQueued) return;
+  idleQueued = true;
+  rendererReady.then(() => idle(runJobs, { timeout: 1500 }));
+}
 function runJobs(deadline) {
   idleQueued = false;
   do { jobs.shift()?.(); } while (jobs.length && deadline.timeRemaining() > 8);
