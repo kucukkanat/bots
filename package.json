@@ -1,6 +1,6 @@
 {
   "name": "@hackdonalds/bots",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Animated bot avatars: eighteen plush 3D shapes with living faces, three states, hats and glasses. WebGL with a 2D canvas fallback, in worker threads, no dependencies. Web component, JS API and React wrapper.",
   "type": "module",
   "main": "src/index.js",
