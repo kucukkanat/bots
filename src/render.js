@@ -334,6 +334,9 @@ function tintedSkin(skin, base, pattern = null) {
     g.globalAlpha = 0.55;
     g.drawImage(t, 0, 0);
   }
+  // Drawn every frame: as a bitmap it stays ready instead of being
+  // snapshotted from a canvas each time.
+  if (c.transferToImageBitmap) c = c.transferToImageBitmap();
   byColor.set(id, c);
   if (byColor.size > 24) byColor.delete(byColor.keys().next().value);
   return c;
@@ -1322,7 +1325,9 @@ function sprite(key, half, scale, paint) {
   g.translate(px / 2, px / 2);
   g.scale(q, q);
   paint(g);
-  sp = { canvas, px, q };
+  // A bitmap is a fixed image the browser can keep ready; a canvas gets
+  // snapshotted on every draw.
+  sp = { canvas: canvas.transferToImageBitmap ? canvas.transferToImageBitmap() : canvas, px, q };
   sprites.set(id, sp);
   if (sprites.size > 96) sprites.delete(sprites.keys().next().value);
   return sp;
@@ -1437,9 +1442,9 @@ function drawWhirl(ctx, R, pose, look, time, base, half) {
   const rx = R * 1.25, ry = rx * 0.3, cy = R * 0.1;
   const len = Math.PI * 1.35, head = time * 14;
   const col = look.whirlColor || shade(base, 0.3, 0, 0.9);
-  const N = 22;
-  ctx.save();
-  ctx.lineCap = 'round';
+  // Tapered in four steps: one stroke each, from the faint tail to the head.
+  const N = 24, STEPS = 4;
+  const paths = Array.from({ length: STEPS }, () => new Path2D());
   let px = null, py = null;
   for (let i = 0; i <= N; i++) {
     const f = i / N;
@@ -1447,15 +1452,20 @@ function drawWhirl(ctx, R, pose, look, time, base, half) {
     const x = Math.cos(a) * rx, y = cy + Math.sin(a) * ry;
     // half -1: the far side of the ring (behind the body), 1: the near side.
     if (px !== null && Math.sign(Math.sin(a)) === half) {
-      ctx.strokeStyle = rgba(col, 0.55 * f * Math.min(1, k));
-      ctx.lineWidth = R * 0.11 * f * Math.min(1.5, 0.5 + k * 0.5);
-      ctx.beginPath();
-      ctx.moveTo(px, py);
-      ctx.lineTo(x, y);
-      ctx.stroke();
+      const p = paths[Math.min(STEPS - 1, Math.floor(f * STEPS))];
+      p.moveTo(px, py);
+      p.lineTo(x, y);
     }
     px = x; py = y;
   }
+  ctx.save();
+  ctx.lineCap = 'round';
+  paths.forEach((p, i) => {
+    const f = (i + 1) / STEPS;
+    ctx.strokeStyle = rgba(col, Math.round(0.55 * f * Math.min(1, k) * 50) / 50);
+    ctx.lineWidth = R * 0.11 * f * Math.min(1.5, 0.5 + k * 0.5);
+    ctx.stroke(p);
+  });
   ctx.restore();
 }
 

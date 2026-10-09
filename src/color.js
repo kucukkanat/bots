@@ -56,8 +56,23 @@ export function adjust(hex, { brightness = 1, saturation = 1 } = {}) {
   return toHex(hslToRgb([h, clamp(s * saturation), clamp(nl)]));
 }
 
+// The renderer asks for the same few derived colours every frame: remember
+// them rather than re-parse and convert each time.
+const memo = new Map();
+function remember(key, make) {
+  let v = memo.get(key);
+  if (v === undefined) {
+    if (memo.size > 4096) memo.clear();
+    memo.set(key, (v = make()));
+  }
+  return v;
+}
+
 /** Shift lightness by `amount` (-1..1) and hue by `hue` degrees. */
 export function shade(hex, amount, hue = 0, sat = 1) {
+  return remember(`s${hex}|${amount}|${hue}|${sat}`, () => shadeNow(hex, amount, hue, sat));
+}
+function shadeNow(hex, amount, hue, sat) {
   const rgb = parseColor(hex);
   if (!rgb) return hex;
   const [h, s, l] = rgbToHsl(rgb);
@@ -67,14 +82,19 @@ export function shade(hex, amount, hue = 0, sat = 1) {
 }
 
 export function mix(a, b, t) {
+  return remember(`m${a}|${b}|${t}`, () => mixNow(a, b, t));
+}
+function mixNow(a, b, t) {
   const A = parseColor(a), B = parseColor(b);
   if (!A || !B) return a;
   return toHex([A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, A[2] + (B[2] - A[2]) * t]);
 }
 
 export function rgba(hex, alpha) {
-  const c = parseColor(hex) || [0, 0, 0];
-  return `rgba(${c[0]},${c[1]},${c[2]},${clamp(alpha)})`;
+  return remember(`r${hex}|${alpha}`, () => {
+    const c = parseColor(hex) || [0, 0, 0];
+    return `rgba(${c[0]},${c[1]},${c[2]},${clamp(alpha)})`;
+  });
 }
 
 /** Relative luminance (WCAG). */
