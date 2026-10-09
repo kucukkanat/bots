@@ -1071,6 +1071,10 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
       ctx.fillText('z', full / 2 + R * (0.6 + p * 0.45) + Math.sin(p * 6 + i) * R * 0.08, full / 2 - R * (0.55 + p * 0.85));
     }
   }
+
+  // Status badge: from the pose when the status feature runs, else the look (still frames).
+  const status = pose.status !== undefined ? pose.status : look.status && look.status !== 'none' ? (look.status === 'auto' ? STATUS_AUTO[look.state] : look.status) : null;
+  if (status) drawStatus(ctx, status, pose.statusK ?? 1, time, look, cx, cy + shape.bounds.minY * R, R, dpr, pose.think > 0.05 ? -1 : 1);
 }
 
 // --- Face --------------------------------------------------------------------
@@ -1416,6 +1420,116 @@ function drawBadge(ctx, text, color, ink) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(t, 0, 0.005);
+}
+
+// A status badge's plush shading and drop shadow, baked into its sprite.
+function puff(g, path, c0, c1, rim) {
+  const q = g.getTransform().a;
+  const gr = g.createLinearGradient(0, -0.2, 0, 0.2);
+  gr.addColorStop(0, c0);
+  gr.addColorStop(1, c1);
+  g.save();
+  g.shadowColor = 'rgba(30,20,60,0.24)';
+  g.shadowBlur = 0.05 * q;
+  g.shadowOffsetY = 0.02 * q;
+  g.fillStyle = gr;
+  g.fill(path);
+  g.restore();
+  // Rim, then the fill again over its inner half (and any seams between parts).
+  g.lineWidth = 0.044;
+  g.strokeStyle = rim;
+  g.stroke(path);
+  g.fillStyle = gr;
+  g.fill(path);
+  const hi = g.createLinearGradient(0, -0.2, 0, 0.02);
+  hi.addColorStop(0, 'rgba(255,255,255,0.45)');
+  hi.addColorStop(1, 'rgba(255,255,255,0)');
+  g.save();
+  g.clip(path);
+  g.fillStyle = hi;
+  g.fillRect(-0.4, -0.3, 0.8, 0.28);
+  g.restore();
+}
+
+const statusDisc = () => { const p = new Path2D(); p.arc(0, 0, 0.19, 0, Math.PI * 2); return p; };
+const STATUS_AUTO = { working: 'loading', thinking: 'typing', success: 'done', error: 'error' };
+
+/**
+ * A status badge by the top of the head (`side` 1 right, −1 left): typing
+ * dots in a bubble, a spinner, a check or a "!". `k` pops it in (0…1). The
+ * bubble and discs are sprites; only the dots and the spinner's arc move.
+ */
+function drawStatus(ctx, kind, k, time, look, x, top, R, dpr, side) {
+  const dark = look.theme === 'dark';
+  const paper = dark ? '#2e2a3a' : '#ffffff';
+  const ink = dark ? '#e9e6ff' : '#6b6880';
+  const j = k - 1;
+  const pop = k >= 1 ? 1 : Math.max(0, 1 + 2.7 * j * j * j + 1.7 * j * j);
+  if (pop <= 0) return;
+  const u = R * 1.2; // badge units
+  ctx.save();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.globalAlpha = Math.min(1, k * 2.5);
+  if (kind === 'typing') {
+    ctx.translate(x + side * R * 0.9, top - R * 0.04);
+    ctx.scale(u * pop, u * pop);
+    drawSprite(ctx, sprite(`status|typing|${paper}|${side}`, [-0.42, -0.24, 0.42, 0.34], u * dpr, (g) => {
+      g.scale(side, 1);
+      const p = new Path2D();
+      p.roundRect ? p.roundRect(-0.3, -0.17, 0.6, 0.34, 0.17) : p.ellipse(0, 0, 0.3, 0.17, 0, 0, Math.PI * 2);
+      p.moveTo(-0.17, 0.2);
+      p.arc(-0.24, 0.17, 0.075, 0, Math.PI * 2);
+      p.moveTo(-0.315, 0.265);
+      p.arc(-0.34, 0.265, 0.035, 0, Math.PI * 2);
+      puff(g, p, paper, shade(paper, dark ? -0.08 : -0.07), dark ? 'rgba(255,255,255,0.1)' : 'rgba(40,30,70,0.1)');
+    }));
+    for (let i = 0; i < 3; i++) {
+      const b = Math.max(0, Math.sin(time * 7 - i * 0.75));
+      ctx.fillStyle = rgba(ink, 0.45 + 0.55 * b);
+      ctx.beginPath();
+      ctx.arc((i - 1) * 0.135, 0.01 - b * 0.055, 0.045, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    ctx.translate(x + side * R * 0.8, top + R * 0.14);
+    ctx.scale(u * pop, u * pop);
+    if (kind === 'loading') {
+      drawSprite(ctx, sprite(`status|loading|${paper}`, [-0.24, -0.24, 0.24, 0.27], u * dpr, (g) => {
+        puff(g, statusDisc(), paper, shade(paper, dark ? -0.08 : -0.07), dark ? 'rgba(255,255,255,0.1)' : 'rgba(40,30,70,0.1)');
+        g.lineWidth = 0.045;
+        g.strokeStyle = rgba(ink, 0.16);
+        g.beginPath();
+        g.arc(0, 0, 0.105, 0, Math.PI * 2);
+        g.stroke();
+      }));
+      const base = look.color || '#7c6cf0';
+      const l = luminance(base);
+      const a0 = time * 5.5, len = 1.5 + 0.9 * Math.sin(time * 2.6);
+      ctx.strokeStyle = shade(base, l > 0.65 ? -0.4 : l < 0.12 ? 0.35 : -0.08);
+      ctx.lineWidth = 0.05;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(0, 0, 0.105, a0, a0 + len);
+      ctx.stroke();
+    } else {
+      const done = kind === 'done';
+      drawSprite(ctx, sprite(`status|${done ? 'done' : 'error'}`, [-0.24, -0.24, 0.24, 0.27], u * dpr, (g) => {
+        puff(g, statusDisc(), done ? '#5ad893' : '#ff8577', done ? '#23a35d' : '#e0414d', 'rgba(255,255,255,0.95)');
+        g.strokeStyle = '#ffffff';
+        g.fillStyle = '#ffffff';
+        g.lineCap = 'round';
+        g.lineJoin = 'round';
+        g.lineWidth = 0.052;
+        g.beginPath();
+        if (done) { g.moveTo(-0.082, 0.004); g.lineTo(-0.024, 0.062); g.lineTo(0.088, -0.056); g.stroke(); }
+        else {
+          g.moveTo(0, -0.095); g.lineTo(0, 0.022); g.stroke();
+          g.beginPath(); g.arc(0, 0.083, 0.031, 0, Math.PI * 2); g.fill();
+        }
+      }));
+    }
+  }
+  ctx.restore();
 }
 
 /**

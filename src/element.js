@@ -13,11 +13,11 @@ const NUMBERS = ['size', 'brightness', 'saturation', 'depth', 'light', 'shadow',
   'face-scale', 'eye-size', 'eye-gap', 'face-x', 'face-y', 'roundness', 'gloss', 'fill-strength',
   'blink-rate', 'glance-rate', 'breathing', 'jiggle', 'whirl'];
 const BOOLEANS = ['headphones', 'bow-tie', 'blush', 'eye-shine', 'paused', 'interactive', 'freckles', 'scarf',
-  'toss', 'petting'];
+  'toss', 'petting', 'social'];
 const STRINGS = ['type', 'state', 'face', 'color', 'ink', 'shading', 'hat', 'glasses', 'accessory-color', 'path', 'label', 'theme',
   'blush-color', 'renderer', 'quality', 'preset', 'dna', 'identity', 'fur-pattern', 'fur-color2', 'light-color', 'fill-color',
   'rim-color', 'eye-style', 'iris-color', 'brows', 'mouth-style', 'expression', 'whirl-color', 'scarf-color', 'badge',
-  'badge-color', 'ears', 'antennae'];
+  'badge-color', 'ears', 'antennae', 'status', 'mood'];
 const JSONS = ['fur', 'material', 'face-options', 'motion', 'wear', 'accessories'];
 // On/off or a level: present (or "true") is on, "false" off, a number sets it.
 const LEVELS = ['sounds'];
@@ -100,6 +100,7 @@ export class BotAvatarElement extends Base {
   react(expression, duration) { this.bot?.react(expression, duration); }
   speak(source) { this.bot?.speak(source); }
   setVoice(level) { this.bot?.setVoice(level); }
+  say(text, options) { return this.bot ? this.bot.say(text, options) : Promise.resolve(); }
   lookAt(target) { this.bot?.lookAt(target); }
   get dna() { return this.bot?.dna; }
 }

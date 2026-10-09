@@ -100,7 +100,7 @@ const DNA_KEYS = [
   'eyeShine', 'irisColor', 'brows', 'mouthStyle', 'freckles', 'faceX', 'faceY', 'faceScale', 'expression', 'speed',
   'turn', 'blinkRate', 'glanceRate', 'breathing', 'jiggle', 'whirl', 'whirlColor', 'jumpEvery', 'jumpHeight', 'jumpTime',
   'jumpSpin', 'jumpSquash', 'jumpStretch', 'jumpLean', 'scarf', 'scarfColor', 'badge', 'badgeColor', 'ears', 'antennae',
-  'path', 'preset', 'label', 'toss', 'petting', 'sounds',
+  'path', 'preset', 'label', 'toss', 'petting', 'sounds', 'status', 'mood', 'social',
 ];
 const b64 = {
   enc: (s) => {

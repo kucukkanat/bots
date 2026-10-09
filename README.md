@@ -167,7 +167,7 @@ bot.lookAt(document.querySelector('#chat-input'));   // keep an eye on an elemen
 ### Events
 
 ```js
-bot.on('land', () => playThud());      // 'poke', 'blink', 'jump', 'land', 'state'
+bot.on('land', () => playThud());      // 'poke', 'blink', 'jump', 'land', 'state', 'say-start', 'say-end', 'mood'
 el.addEventListener('bot-blink', …);   // the same, as bubbling DOM events
 ```
 
@@ -212,6 +212,41 @@ A pack is a ZIP of transparent PNGs (`01-cat.png`, … named from `label` or `ty
 ### Theming with CSS
 
 `<bot-avatar>` reads `--bot-color`, `--bot-ink`, `--bot-accessory-color`, `--bot-blush-color`, `--bot-fur-color`, `--bot-light-color`, `--bot-fill-color`, `--bot-rim-color` and `--bot-iris-color` where no attribute sets them; call `el.refresh()` after changing them.
+
+## Agent features
+
+Each loads on first use (a small module of its own); left off, they cost nothing.
+
+```js
+// Lip-sync from text, no audio: vowels open, m/b/p close, punctuation pauses.
+await bot.say('Hello! How can I help?', { wpm: 165 });  // speaking state, then back
+bot.say('Something else');                              // replaces what's being said
+bot.say('');                                            // stop
+
+// Streaming (LLM tokens): queue chunks onto the same utterance.
+for await (const token of stream) bot.say(token, { append: true });
+// When speech catches up with the stream it waits 0.8s for more before it ends.
+bot.on('say-end', (e) => e.interrupted);                // also 'say-start'
+
+createBot('#a', { status: 'typing' });  // 'none' | 'typing' | 'loading' | 'done' | 'error' | 'auto'
+createBot('#b', { status: 'auto' });    // working → spinner, thinking → typing dots, success → check (2s), error → !
+
+createBot('#c', { mood: 'auto' });      // or 'neutral' | 'happy' | 'excited' | 'calm' | 'sleepy' | 'grumpy'
+bot.mood;                               // { name: 'happy', energy: 0.7 }
+bot.on('mood', (e) => console.log(e.mood, e.energy));
+
+createBot('#d', { social: true });      // social bots glance at each other and react when one is poked
+```
+
+```html
+<bot-avatar status="auto" mood="auto" social></bot-avatar>
+<script>document.querySelector('bot-avatar').say('Hi there');</script>
+```
+
+- **status** badges sit by the top of the head (top-left while a thought bubble shows) and pop in and out; they're drawn the same way on WebGL and 2D.
+- **mood** scales speed, blinking, breathing and how often the bot hops, and leans its smile, brows and squint. With `'auto'` an energy level (0–1) rises with pokes, speech and state changes and drains toward sleepy over a few idle minutes; a quick flurry of pokes makes it grumpy for a while.
+- **social** never overrides your own `lookAt()` and the pointer always wins.
+- React: `onSayStart`, `onSayEnd` and `onMood` props.
 
 ## Play
 
