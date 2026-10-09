@@ -5,7 +5,7 @@
 // applies a change, so dragging a slider costs one bot.set() per frame.
 
 import {
-  createBot, BotAvatar, types, presets, palette, DEFAULTS, SHADINGS, HATS, GLASSES, STATES, STYLES, EXPRESSIONS,
+  createBot, BotAvatar, types, presets, DEFAULTS, SHADINGS, HATS, GLASSES, STATES, STYLES, EXPRESSIONS,
   EYE_STYLES, MOUTH_STYLES, BROWS, EAR_STYLES, FUR_PATTERNS, lookFromId, decodeDNA, shapeToSvgPath,
   drawBot, resolveLook, restPose, OVERSCAN,
 } from '../src/index.js';
@@ -13,6 +13,7 @@ import { FEATURE_OPTIONS } from '../src/bot.js';
 import { initTheme } from '../assets/theme.js';
 import { libUrl } from '../assets/lib-url.js';
 
+performance.mark('studio:start');
 const LIB = libUrl();
 const $ = (id) => document.getElementById(id);
 const h = (tag, attrs = {}, ...kids) => {
@@ -177,6 +178,7 @@ const liveOptions = (o) => {
 };
 const bot = createBot($('stage-bot'), { ...liveOptions(opts), size: 220 });
 applied = liveOptions(opts);
+performance.mark('studio:bot');
 bot.ready.then(() => requestAnimationFrame(() => {
   performance.mark('studio:first-bot');
   window.__studioFirstBot = performance.now();
@@ -445,6 +447,7 @@ const when = (ok, el) => { if (!ok) el.hidden = true; return el; };
 
 // --- Tabs ------------------------------------------------------------------------
 
+performance.mark('studio:controls');
 const TABS = [
   { id: 'library', label: 'Start', heading: 'Start', narrow: true },
   { id: 'look', label: 'Look' },
@@ -471,7 +474,8 @@ for (const t of TABS) {
 }
 tabsEl.addEventListener('keydown', (e) => {
   const visible = TABS.filter((t) => getComputedStyle(tabBtns[t.id]).display !== 'none').map((t) => t.id);
-  const i = visible.indexOf(activeTab);
+  const focused = document.activeElement?.id?.replace(/^tab-/, '');
+  const i = visible.indexOf(visible.includes(focused) ? focused : activeTab);
   let j = -1;
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') j = (i + 1) % visible.length;
   else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') j = (i - 1 + visible.length) % visible.length;
@@ -489,13 +493,23 @@ function showTab(id, user) {
   activeTab = id;
   tabBtns[id].setAttribute('aria-selected', 'true');
   tabBtns[id].tabIndex = 0;
+  buildPanel(id);
   panels[id].hidden = false;
   if (user) { tabBtns[id].scrollIntoView?.({ block: 'nearest', inline: 'nearest' }); store.set('bots.studio.tab', id); }
   if (id === 'agent') schedule();
   if (id === 'code') renderCode();
   if (id === 'library') queueThumbs();
 }
-const tabPanel = (id, ...kids) => panels[id].append(...kids);
+/** Panels are built the first time they're shown. */
+const builders = {};
+const tabPanel = (id, build) => { builders[id] = build; };
+function buildPanel(id) {
+  const build = builders[id];
+  if (!build) return;
+  delete builders[id];
+  panels[id].append(...build());
+  schedule();
+}
 
 // --- Look --------------------------------------------------------------------------
 
@@ -508,7 +522,7 @@ pathArea.addEventListener('input', () => update({ path: pathArea.value.trim() ||
 syncs.push(() => { if (document.activeElement !== pathArea) pathArea.value = opts.path || ''; });
 const chip = (label, onclick, attrs = {}) => h('button', { type: 'button', class: 'chip', onclick, ...attrs }, label);
 
-tabPanel('look',
+tabPanel('look', () => [
   grp('Colour',
     colors('color', 'Body', BODY_SWATCHES, { auto: "The type's own colour" }),
     range('brightness', 'Brightness'),
@@ -524,11 +538,11 @@ tabPanel('look',
       chip('⛨ Shield', () => update({ path: SHIELD })),
       chip('Edit current outline', () => update({ path: shapeToSvgPath(opts.type) })),
       chip('Clear', () => update({ path: undefined })))),
-  h('div', { class: 'panel-foot' }, h('button', { type: 'button', class: 'sbtn', onclick: () => update({ ...blank(), state: opts.state }) }, 'Reset everything')));
+  h('div', { class: 'panel-foot' }, h('button', { type: 'button', class: 'sbtn', onclick: () => update({ ...blank(), state: opts.state }) }, 'Reset everything'))]);
 
 // --- Face ----------------------------------------------------------------------------
 
-tabPanel('face',
+tabPanel('face', () => [
   grp('Features',
     seg('face', 'Show', ['eyes', 'mouth'], ['Eyes', 'Eyes + mouth']),
     select('eyeStyle', 'Eye style', EYE_STYLES, EYE_STYLES.map(title)),
@@ -545,7 +559,7 @@ tabPanel('face',
     range('eyeGap', 'Eye spacing'),
     range('faceScale', 'Face size'),
     range('faceX', 'Face across'),
-    range('faceY', 'Face height')));
+    range('faceY', 'Face height'))]);
 
 // --- Wear ----------------------------------------------------------------------------
 
@@ -608,7 +622,7 @@ const setPackTab = segmented(packTabs, async (id) => {
 });
 renderHats(HATS.map((name) => ({ name })));
 
-tabPanel('wear',
+tabPanel('wear', () => [
   grp('Hat', h('div', { class: 'hat-picker' }, packTabs, hatGrid)),
   grp('Things to wear',
     seg('glasses', 'Glasses', GLASSES, ['None', 'Round', 'Square', 'Shades']),
@@ -619,11 +633,11 @@ tabPanel('wear',
     select('ears', 'Ears', EAR_STYLES, EAR_STYLES.map(title)),
     select('antennae', 'Antennae', ['auto', 'none', 'one', 'two'], ["Shape's own", 'None', 'One', 'Two']),
     text('badge', 'Badge', 'e.g. AI'),
-    colors('badgeColor', 'Badge colour', ['#FFFFFF', '#FFD34D', '#5B5BF7', '#E85D4A'], { auto: 'White' })));
+    colors('badgeColor', 'Badge colour', ['#FFFFFF', '#FFD34D', '#5B5BF7', '#E85D4A'], { auto: 'White' }))]);
 
 // --- Material & light ----------------------------------------------------------------
 
-tabPanel('light',
+tabPanel('light', () => [
   grp('Material',
     seg('shading', 'Material', SHADINGS, ['Plush', 'Plastic', 'Smooth', 'Crisp', 'Flat']),
     range('roundness', 'Roundness'),
@@ -638,31 +652,33 @@ tabPanel('light',
     colors('lightColor', 'Key light', ['#FFE7B3', '#B3D4FF', '#FFB3D9', '#C6FFB3'], { auto: 'White' }),
     colors('fillColor', 'Fill light', ['#4C6FFF', '#7B2CBF', '#00A6A6', '#FF6B3D'], { auto: 'None' }),
     range('fillStrength', 'Fill strength'),
-    colors('rimColor', 'Rim colour', ['#FFFFFF', '#7AD7FF', '#FF8FC8', '#FFD34D'], { auto: 'Automatic' })));
+    colors('rimColor', 'Rim colour', ['#FFFFFF', '#7AD7FF', '#FF8FC8', '#FFD34D'], { auto: 'Automatic' }))]);
 
 // --- Fur ---------------------------------------------------------------------------------
 
-const furNote = h('div', { class: 'callout' }, h('span', {}, 'Fur shows on the Plush material.'),
-  h('button', { type: 'button', class: 'sbtn', onclick: () => update({ shading: 'fabric' }) }, 'Make it plush'));
-const furBody = h('div', {},
-  grp('Pile',
-    range('furLength', 'Length'),
-    range('furDensity', 'Density'),
-    range('furFuzz', 'Fuzz'),
-    range('furCurl', 'Curl'),
-    range('furGravity', 'Gravity'),
-    range('furClumps', 'Clumps')),
-  grp('Pattern',
-    select('furPattern', 'Pattern', FUR_PATTERNS, FUR_PATTERNS.map(title)),
-    colors('furColor2', 'Second colour', ['#FFFFFF', '#111111', '#F2C14E', '#EAA06F', '#8B5A2B'], { auto: 'Automatic' }),
-    range('furPatternScale', 'Pattern scale')));
-syncs.push(() => {
-  const fabric = shadingOf(opts) === 'fabric';
-  furNote.hidden = fabric;
-  furBody.classList.toggle('dim', !fabric);
-  furBody.inert = !fabric;
+tabPanel('fur', () => {
+  const furNote = h('div', { class: 'callout' }, h('span', {}, 'Fur shows on the Plush material.'),
+    h('button', { type: 'button', class: 'sbtn', onclick: () => update({ shading: 'fabric' }) }, 'Make it plush'));
+  const furBody = h('div', {},
+    grp('Pile',
+      range('furLength', 'Length'),
+      range('furDensity', 'Density'),
+      range('furFuzz', 'Fuzz'),
+      range('furCurl', 'Curl'),
+      range('furGravity', 'Gravity'),
+      range('furClumps', 'Clumps')),
+    grp('Pattern',
+      select('furPattern', 'Pattern', FUR_PATTERNS, FUR_PATTERNS.map(title)),
+      colors('furColor2', 'Second colour', ['#FFFFFF', '#111111', '#F2C14E', '#EAA06F', '#8B5A2B'], { auto: 'Automatic' }),
+      range('furPatternScale', 'Pattern scale')));
+  syncs.push(() => {
+    const fabric = shadingOf(opts) === 'fabric';
+    furNote.hidden = fabric;
+    furBody.classList.toggle('dim', !fabric);
+    furBody.inert = !fabric;
+  });
+  return [furNote, furBody];
 });
-tabPanel('fur', furNote, furBody);
 
 // --- Motion & play -------------------------------------------------------------------------
 
@@ -685,7 +701,7 @@ const playGroup = grp('Play',
   when(supports('sounds'), volumeRow));
 if (!['toss', 'petting', 'sounds'].some(supports)) playGroup.hidden = true;
 
-tabPanel('motion',
+tabPanel('motion', () => [
   playGroup,
   grp('Motion',
     range('speed', 'Speed', { fmt: (v) => `${(+v).toFixed(2)}×` }),
@@ -705,7 +721,7 @@ tabPanel('motion',
     range('jumpStretch', 'Stretch'),
     range('jumpLean', 'Lean'),
     range('whirl', 'Spin trail'),
-    colors('whirlColor', 'Trail colour', ['#FFFFFF', '#7AD7FF', '#FFD34D', '#FF8FC8'], { auto: 'Body tint' })));
+    colors('whirlColor', 'Trail colour', ['#FFFFFF', '#7AD7FF', '#FFD34D', '#FF8FC8'], { auto: 'Body tint' }))]);
 
 // --- Agent -----------------------------------------------------------------------------------
 
@@ -782,7 +798,7 @@ dnaInput.addEventListener('paste', () => setTimeout(dnaGo));
 const dnaOut = h('code', { class: 'dna-out' });
 syncs.push(() => { if (activeTab === 'agent') dnaOut.textContent = bot.dna; });
 
-tabPanel('agent',
+tabPanel('agent', () => [
   when(canSay(), grp('Talk',
     h('label', { class: 'lbl block', for: 'say-text' }, 'Lip-sync from text, as an agent replies'),
     sayText,
@@ -804,7 +820,7 @@ tabPanel('agent',
     row('Look from id', h('div', { class: 'inline' }, idInput, h('button', { type: 'button', class: 'sbtn', onclick: idGo }, 'Load')), 'look-id'),
     row('Bot DNA', h('div', { class: 'dna-box' }, dnaOut,
       h('button', { type: 'button', class: 'ibtn', 'aria-label': 'Copy DNA', title: 'Copy DNA', onclick: () => copy(bot.dna, 'DNA copied') }, icon('copy'))), null),
-    row('Paste DNA', dnaInput, 'dna-in')));
+    row('Paste DNA', dnaInput, 'dna-in'))]);
 
 // --- Code (the snippet module loads when the tab is first opened) ------------------------------
 
@@ -827,13 +843,14 @@ async function renderCode() {
   const t = await codeText();
   if (seq === codeSeq) codePre.textContent = t;
 }
-tabPanel('code',
+tabPanel('code', () => [
   h('div', { class: 'code-head' }, codeSeg,
     h('button', { type: 'button', class: 'sbtn', id: 'copy', onclick: async () => copy(await codeText(), 'Code copied') }, 'Copy')),
   codePre,
-  note('Only the options you changed are listed; everything else is the default.'));
+  note('Only the options you changed are listed; everything else is the default.')]);
 
 // ---------------------------------------------------------------------------
+performance.mark('studio:library');
 // Library: starters, shapes, finishes. Thumbnails are drawn once, off the
 // critical path (in idle time), and kept in this browser.
 
@@ -1175,7 +1192,9 @@ placeLibrary();
   const first = saved && panels[saved] && !(saved === 'library' && !narrow.matches) ? saved : narrow.matches ? 'library' : 'look';
   showTab(first);
 }
+performance.mark('studio:crew');
 renderCrew();
 if (opts.hat) ensureHat(opts.hat);
 apply();
 fitStage();
+performance.measure('studio:init', 'studio:start');
