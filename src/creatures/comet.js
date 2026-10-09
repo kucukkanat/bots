@@ -1,41 +1,59 @@
 // Comet: the fast-mode mascot. A plump five-point star in hot yellow, its tips
 // softly rounded, leaning into its run so the leading point aims up-right. It
-// is lit from inside like a lantern, and a glowing tail streams off its lower
-// left, stretching the faster it moves. A show-off by temperament: it hops
-// often, spins in the air and glances about for an audience.
+// is lit from inside like a lantern, and a glowing tail streams out from
+// behind its lower left, between the two trailing points, stretching the
+// faster it moves. A show-off by temperament: it hops often, spins in the air
+// and glances about for an audience.
 
 import { TAU, roundPoly } from '../geometry.js';
 
 /** How far the star leans (radians, clockwise): the leading point swings up-right. */
-const TILT = 0.4;
-const OUTER = 1.0, INNER = 0.52;
+const TILT = 0.38;
+const OUTER = 1.0, INNER = 0.54;
+
+/** The ten corners of the star, tips at even indices, before recentring. */
+const corners = () => Array.from({ length: 10 }, (_, i) => {
+  const a = -Math.PI / 2 + TILT + (i / 10) * TAU;
+  const r = i % 2 ? INNER : OUTER;
+  return [Math.cos(a) * r, Math.sin(a) * r];
+});
+/** The nudge that centres the leaning star in its box. */
+const centre = () => {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const [x, y] of corners()) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+  return [(minX + maxX) / 2, (minY + maxY) / 2];
+};
 
 /**
  * The body: a five-point star, tips rounded, tilted by TILT and nudged so it
- * sits centred in its box. Outer radius 1, inner 0.52 (plumper than the
+ * sits centred in its box. Outer radius 1, inner 0.54 (plumper than the
  * built-in star, so the face has room).
  */
 function body() {
-  const verts = [];
-  for (let i = 0; i < 10; i++) {
-    const a = -Math.PI / 2 + TILT + (i / 10) * TAU;
-    const r = i % 2 ? INNER : OUTER;
-    verts.push([Math.cos(a) * r, Math.sin(a) * r]);
-  }
-  // Recentre on the bounding box, so the lean does not push it off to one side.
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const [x, y] of verts) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
-  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
-  return roundPoly(verts.map(([x, y]) => [x - cx, y - cy]), 0.17);
+  const [cx, cy] = centre();
+  return roundPoly(corners().map(([x, y]) => [x - cx, y - cy]), 0.17);
 }
 
+// The tail's root: inside the body, behind the notch between the two trailing
+// points (corner 7, the lower-left inner corner), so the tail streams out from
+// behind the star and the points on either side frame it.
+const ROOT = (() => {
+  const [cx, cy] = centre();
+  const [nx, ny] = corners()[7];
+  return [nx * 0.7 - cx, ny * 0.7 - cy];
+})();
+
 export default {
-  type: 'comet', label: 'Comet', color: '#FFD166', faceY: 0.08, faceScale: 0.8,
+  type: 'comet', label: 'Comet', color: '#FFD166', faceY: 0.07, faceScale: 0.86,
   outline: body,
   extras: {
     parts: [
-      // The tail: a glowing streak off the lower left, trailing the body's motion and longer the faster it goes.
-      { kind: 'streak', anchor: [-0.55, 0.3], len: 1.1, layer: 'back' },
+      // The tail: three streaks from one root, trailing the body's motion and longer the faster it
+      // goes. Behind the body the first listed lands on top: a short pale core over a golden streak
+      // over a long amber one, so it fades from hot to ember along its length.
+      { kind: 'streak', anchor: ROOT, len: 0.7, color: '#FFF0A8', layer: 'back' },
+      { kind: 'streak', anchor: ROOT, len: 1.05, color: '#FFC84A', layer: 'back' },
+      { kind: 'streak', anchor: ROOT, len: 1.35, color: '#FF9E3D', layer: 'back' },
     ],
   },
   temperament: 'showOff',

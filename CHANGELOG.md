@@ -6,18 +6,19 @@ All notable changes to `@kucukkanat/bots` are recorded here. The format follows
 
 ## [1.3.0] - 2026-10-09
 
-The cast release: fourteen creatures beyond the first eighteen shapes, and the
+The cast release: twelve creatures beyond the first shapes, and the
 three pieces of anatomy they needed.
 
 ### Removed
 - Square, Pill, Pebble and Puddle: outlines, not characters. The names still
   resolve (square → hexagon; pill, pebble, puddle → blob; `RETIRED`,
   `liveType()`), so old DNA codes, crew pages and identities keep working.
+  Pangolin and axolotl were cut from the cast before release (they resolve
+  to hexagon and blob).
 
 ### Added
-- **Creatures** (`src/creatures/`, one module each): fox, pangolin, owl,
-  axolotl, jelly, moth, sprout, octo, toaster, snail, comet, swarm, orb and
-  glyph. Each is a preset plus parts, a temperament, option defaults, and for
+- **Creatures** (`src/creatures/`, one module each): fox, owl, jelly, moth,
+  sprout, octo, toaster, snail, comet, swarm, orb and glyph. Each is a preset plus parts, a temperament, option defaults, and for
   some a second outline or a lifecycle. `creatures` and `BASE_TYPES` are
   exported; `identity` keeps picking from the first eighteen.
 - **Parts** (`src/parts.js`): tails, tendrils, wings, frills, arms, shells,

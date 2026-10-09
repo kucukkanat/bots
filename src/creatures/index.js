@@ -6,9 +6,7 @@
 // lifecycle of outlines blended by age. See fox.js for the format.
 
 import fox from './fox.js';
-import pangolin from './pangolin.js';
 import owl from './owl.js';
-import axolotl from './axolotl.js';
 import jelly from './jelly.js';
 import moth from './moth.js';
 import sprout from './sprout.js';
@@ -20,4 +18,4 @@ import swarm from './swarm.js';
 import orb from './orb.js';
 import glyph from './glyph.js';
 
-export const creatures = [fox, pangolin, owl, axolotl, jelly, moth, sprout, octo, toaster, snail, comet, swarm, orb, glyph];
+export const creatures = [fox, owl, jelly, moth, sprout, octo, toaster, snail, comet, swarm, orb, glyph];
