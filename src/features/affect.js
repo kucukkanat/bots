@@ -205,11 +205,14 @@ export function install(bot) {
   const a = new Affect(io, opt());
   a.last = clock();
   const off = bot.on('say-end', () => a.spoken(clock()));
+  // How many tools are running rides on the pose, for creatures whose arms light up per tool.
+  const mod = (pose) => { if (a.tools) pose.tools = a.tools; };
+  bot.sim.mods.push(mod);
   return {
     engine: a,
     observe(event, data) { return a.observe(event, data, clock()); },
     set() { const o = opt(); if (o.sleepAfter !== undefined) a.sleepAfter = o.sleepAfter; if (o.tone !== undefined) a.tone = o.tone; },
     tick() { a.tick(clock()); },
-    destroy() { off(); },
+    destroy() { off(); const i = bot.sim.mods.indexOf(mod); if (i >= 0) bot.sim.mods.splice(i, 1); },
   };
 }

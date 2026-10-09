@@ -59,7 +59,7 @@ export const pack = {
   /** Suggested looks: options to spread into an avatar. */
   looks: [
     { type: 'cloud', color: '#dfe9f5', hat: 'santa', blush: true },
-    { type: 'pebble', color: '#9fc6e8', hat: 'earmuffs', scarf: true, scarfColor: '#ff8fb1' },
+    { type: 'blob', color: '#9fc6e8', hat: 'earmuffs', scarf: true, scarfColor: '#ff8fb1' },
     { type: 'drop', color: '#b07a4f', hat: 'antlers', blush: true, blushColor: '#e8395b' },
   ],
 };

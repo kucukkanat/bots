@@ -16,7 +16,13 @@ function withShape(look) {
   let shape;
   if (spec.points) {
     shape = custom.get(spec.key);
-    if (!shape) custom.set(spec.key, (shape = buildShape(spec.points, spec.meta)));
+    if (!shape) {
+      const { alt, stages, ...meta } = spec.meta;
+      shape = buildShape(spec.points, meta);
+      if (alt) shape.alt = buildShape(alt.points, { ...meta, faceY: alt.faceY, faceScale: alt.faceScale });
+      if (stages) shape.stages = stages.map((st) => buildShape(st.points, { ...meta, faceY: st.faceY, faceScale: st.faceScale }));
+      custom.set(spec.key, shape);
+    }
   } else shape = getShape(spec.type);
   return { ...look, shape };
 }

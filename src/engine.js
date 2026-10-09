@@ -12,6 +12,9 @@ export const REST = Object.freeze({
   yaw: 0, pitch: 0, roll: 0, x: 0, y: 0, sx: 1, sy: 1,
   lookX: 0, lookY: 0, eyeOpen: 1, happy: 0, smile: 0.25, mouthOpen: 0, sleep: 0,
   brow: 0, browTilt: 0, eyeWide: 0, squint: 0, dizzy: 0, think: 0, blushPulse: 0, whirl: 0, talk: 0,
+  // Secondary motion and body changes: trailing parts' lag, wing flap, a pop (success), the morph
+  // toward the alternative outline, and how many tools are running (lit arms).
+  lagX: 0, lagY: 0, flap: 0, pop: 0, morph: 0, tools: 0,
 });
 const KEYS = Object.keys(REST);
 
@@ -312,17 +315,23 @@ class Thinking {
     this.side = rand() < 0.5 ? -1 : 1;
     this.switch = 2 + rand() * 2;
     this.look = { x: 0, y: 0 };
+    // Swivel (the owl): the whole head turns right round to the back and back again.
+    this.sw = 0; this.swI = 0; this.swT = 1.5;
   }
   poke() { this.switch = 0; }
   update(dt, t, pointer) {
     if ((this.switch -= dt) <= 0) { this.side = -this.side; this.switch = (2.5 + this.rand() * 2) / (this.opts.glanceRate ?? 1); }
+    if (this.opts.swivel) {
+      if ((this.swT -= dt) <= 0) { this.swI++; this.swT = 2.6 + this.rand() * 1.5; }
+      this.sw = approach(this.sw, [0, 2.75, 0, -2.75][this.swI % 4], 1.4, dt);
+    }
     const tx = pointer ? pointer.x : this.side * 0.55, ty = pointer ? pointer.y : -0.55;
     this.look.x = approach(this.look.x, tx, 3, dt);
     this.look.y = approach(this.look.y, ty, 3, dt);
     const breath = Math.sin(t * 1.7) * (this.opts.breathing ?? 1);
     return {
       ...REST,
-      yaw: this.look.x * 0.45 + Math.sin(t * 0.9) * 0.05, pitch: this.look.y * 0.25, roll: this.side * 0.05 + Math.sin(t * 0.9) * 0.03,
+      yaw: this.look.x * 0.45 + Math.sin(t * 0.9) * 0.05 + this.sw, pitch: this.look.y * 0.25, roll: this.side * 0.05 + Math.sin(t * 0.9) * 0.03,
       sx: 0.965 - 0.006 * breath, sy: 1.055 + 0.01 * breath,
       lookX: this.look.x, lookY: this.look.y, eyeOpen: this.blink.update(dt),
       smile: 0.05, mouthOpen: 0.08, brow: 0.45, browTilt: 0.35, squint: 0.2, think: 1,
@@ -424,6 +433,7 @@ class Success {
       lookX: lx, lookY: ly, eyeOpen: air ? 1 : this.blink.update(dt),
       happy: air ? 1 : 0.6, smile: 1, mouthOpen: 0.35 + 0.35 * air, brow: 0.4,
       whirl: j.y ? Math.sin(j.spin * Math.PI) : 0,
+      pop: this.jumpP >= 0 ? Math.sin(Math.min(1, this.jumpP) * Math.PI) : 0,
     };
   }
 }
@@ -522,6 +532,8 @@ export class BotSim {
     this.io = { voice: null };
     this.reaction = null;
     this.jiggleT = Infinity;
+    // Secondary motion state: the trailing parts' spring, the wing beat, the morph.
+    this.sec = { px: 0, py: 0, vx: 0, vy: 0, lastX: 0, lastY: 0, lastYaw: 0, flapT: 0, amp: 0, morph: 0 };
     /** Pose modifiers from lazily loaded features: (pose, dt, sim) => void, run last. */
     this.mods = [];
     this.state = known(state) ? state : 'default';
@@ -594,6 +606,28 @@ export class BotSim {
       this.jiggleT += dt;
       const k = (this.opts.jiggle ?? 0) * 0.07 * Math.exp(-this.jiggleT * 4.5) * Math.sin(this.jiggleT * 26);
       pose.sy *= 1 - k; pose.sx *= 1 + k * 0.7;
+    }
+    const o = this.opts, sc = this.sec;
+    if (o.parts) {
+      // Trailing parts (tails, tendrils) stay put as the body moves, then spring back; the
+      // spring lives here so every renderer and every thread sees the same tail.
+      const dx = pose.x - sc.lastX, dy = pose.y - sc.lastY;
+      let dyaw = pose.yaw - sc.lastYaw;
+      dyaw -= Math.round(dyaw / (Math.PI * 2)) * Math.PI * 2;
+      sc.lastX = pose.x; sc.lastY = pose.y; sc.lastYaw = pose.yaw;
+      sc.px -= dx + dyaw * 0.22; sc.py -= dy;
+      sc.vx += (-sc.px * 60 - sc.vx * 9) * dt; sc.vy += (-sc.py * 60 - sc.vy * 9) * dt;
+      sc.px += sc.vx * dt; sc.py += sc.vy * dt;
+      pose.lagX = clamp(sc.px, -0.6, 0.6); pose.lagY = clamp(sc.py, -0.6, 0.6);
+      // Wings and frills beat fast while it's busy or airborne, slowly at rest.
+      const busy = pose.think > 0.5 || pose.y < -0.03 || pose.happy > 0.5 || pose.eyeWide > 0.4;
+      sc.amp += ((busy ? 1 : 0.2) - sc.amp) * Math.min(1, dt * 6);
+      sc.flapT += dt * (busy ? 14 : 1.7);
+      pose.flap = (0.5 + 0.5 * Math.sin(sc.flapT)) * sc.amp;
+    }
+    if (o.morphStates) {
+      sc.morph = approach(sc.morph, o.morphStates.includes(this.state) ? 1 : 0, 4, dt);
+      pose.morph = sc.morph < 0.002 ? 0 : sc.morph;
     }
     for (let i = 0; i < this.mods.length; i++) this.mods[i](pose, dt, this);
     return pose;

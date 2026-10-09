@@ -1,160 +1,12 @@
 // Body outlines. Every shape is generated procedurally as a closed outline of
 // evenly spaced points in a normalised box: the body spans roughly -1..1 on
 // both axes, y pointing down. The renderer inflates, lights and turns it.
+// The geometry helpers live in geometry.js; the cast beyond the first
+// eighteen lives in creatures/, one module each.
 
-const TAU = Math.PI * 2;
-export const OUTLINE_POINTS = 200;
-
-// ---------------------------------------------------------------------------
-// Geometry helpers
-
-const cross = (ax, ay, bx, by) => ax * by - ay * bx;
-
-/** A circle primitive for polar unions. */
-const circle = (cx, cy, r) => ({
-  far(dx, dy) {
-    const b = dx * cx + dy * cy;
-    const disc = b * b - (cx * cx + cy * cy - r * r);
-    return disc < 0 ? -1 : b + Math.sqrt(disc);
-  },
-});
-
-/** A convex polygon primitive for polar unions. */
-const poly = (pts) => ({
-  far(dx, dy) {
-    let best = -1;
-    for (let i = 0; i < pts.length; i++) {
-      const [ax, ay] = pts[i];
-      const [bx, by] = pts[(i + 1) % pts.length];
-      const ex = bx - ax, ey = by - ay;
-      const den = cross(dx, dy, ex, ey);
-      if (Math.abs(den) < 1e-9) continue;
-      const t = cross(ax, ay, ex, ey) / den;
-      const u = cross(ax, ay, dx, dy) / den;
-      if (u >= 0 && u <= 1 && t > best) best = t;
-    }
-    return best;
-  },
-});
-
-/** Outline of a union of primitives that is star-shaped around the origin. */
-function polarUnion(prims, n = 720) {
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    const a = -Math.PI / 2 + (i / n) * TAU;
-    const dx = Math.cos(a), dy = Math.sin(a);
-    let r = 0;
-    for (const p of prims) r = Math.max(r, p.far(dx, dy));
-    out.push([dx * r, dy * r]);
-  }
-  return out;
-}
-
-function polar(fn, n = 720) {
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    const a = -Math.PI / 2 + (i / n) * TAU;
-    const r = fn(a);
-    out.push([Math.cos(a) * r, Math.sin(a) * r]);
-  }
-  return out;
-}
-
-function param(fn, n = 720) {
-  const out = [];
-  for (let i = 0; i < n; i++) out.push(fn((i / n) * TAU));
-  return out;
-}
-
-function superellipse(a, b, n, cy = 0) {
-  return param((t) => {
-    const c = Math.cos(t), s = Math.sin(t);
-    return [a * Math.sign(c) * Math.abs(c) ** (2 / n), cy + b * Math.sign(s) * Math.abs(s) ** (2 / n)];
-  });
-}
-
-/** Chaikin corner cutting on a closed polyline. */
-export function chaikin(pts, iterations = 1) {
-  let p = pts;
-  for (let k = 0; k < iterations; k++) {
-    const q = [];
-    for (let i = 0; i < p.length; i++) {
-      const [ax, ay] = p[i];
-      const [bx, by] = p[(i + 1) % p.length];
-      q.push([ax * 0.75 + bx * 0.25, ay * 0.75 + by * 0.25], [ax * 0.25 + bx * 0.75, ay * 0.25 + by * 0.75]);
-    }
-    p = q;
-  }
-  return p;
-}
-
-/** A polygon with corners rounded off over `radius` along each edge. */
-function roundPoly(verts, radius) {
-  const pts = [];
-  const n = verts.length;
-  for (let i = 0; i < n; i++) {
-    const [px, py] = verts[(i - 1 + n) % n];
-    const [vx, vy] = verts[i];
-    const [nx, ny] = verts[(i + 1) % n];
-    const l1 = Math.hypot(px - vx, py - vy), l2 = Math.hypot(nx - vx, ny - vy);
-    const r1 = Math.min(radius, l1 / 2) / l1, r2 = Math.min(radius, l2 / 2) / l2;
-    pts.push([vx + (px - vx) * r1, vy + (py - vy) * r1], [vx, vy], [vx + (nx - vx) * r2, vy + (ny - vy) * r2]);
-  }
-  // Keep the straight runs straight: subdivide before smoothing.
-  return chaikin(subdivide(pts, 0.08), 5);
-}
-
-function subdivide(pts, step) {
-  const out = [];
-  for (let i = 0; i < pts.length; i++) {
-    const [ax, ay] = pts[i];
-    const [bx, by] = pts[(i + 1) % pts.length];
-    const k = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / step));
-    for (let j = 0; j < k; j++) out.push([ax + ((bx - ax) * j) / k, ay + ((by - ay) * j) / k]);
-  }
-  return out;
-}
-
-/** Resample a closed outline to `n` points evenly spaced by arc length. */
-export function resample(pts, n = OUTLINE_POINTS) {
-  const lens = [0];
-  for (let i = 0; i < pts.length; i++) {
-    const [ax, ay] = pts[i];
-    const [bx, by] = pts[(i + 1) % pts.length];
-    lens.push(lens[i] + Math.hypot(bx - ax, by - ay));
-  }
-  const total = lens[pts.length];
-  const out = [];
-  let j = 0;
-  for (let i = 0; i < n; i++) {
-    const d = (i / n) * total;
-    while (lens[j + 1] < d) j++;
-    const seg = lens[j + 1] - lens[j] || 1;
-    const t = (d - lens[j]) / seg;
-    const [ax, ay] = pts[j];
-    const [bx, by] = pts[(j + 1) % pts.length];
-    out.push([ax + (bx - ax) * t, ay + (by - ay) * t]);
-  }
-  // Start at the top centre and run clockwise, so outlines line up for morphing.
-  if (signedArea(out) < 0) out.reverse();
-  let start = 0, best = Infinity;
-  for (let i = 0; i < out.length; i++) {
-    const [x, y] = out[i];
-    const score = Math.abs(Math.atan2(x, -y));
-    if (score < best) { best = score; start = i; }
-  }
-  return out.slice(start).concat(out.slice(0, start));
-}
-
-function signedArea(pts) {
-  let a = 0;
-  for (let i = 0; i < pts.length; i++) {
-    const [ax, ay] = pts[i];
-    const [bx, by] = pts[(i + 1) % pts.length];
-    a += ax * by - bx * ay;
-  }
-  return a / 2;
-}
+import { TAU, OUTLINE_POINTS, circle, poly, polarUnion, polar, param, superellipse, chaikin, roundPoly, resample } from './geometry.js';
+import { creatures } from './creatures/index.js';
+export { TAU, OUTLINE_POINTS, chaikin, resample, circle, poly, polarUnion, polar, param, superellipse, roundPoly } from './geometry.js';
 
 // ---------------------------------------------------------------------------
 // The eighteen bodies
@@ -243,8 +95,6 @@ export const presets = {
     }).concat(circle(0, 0, 0.66))), 2) },
   triangle: { label: 'Triangle', color: '#DC48FF', faceY: 0.32, faceScale: 0.88,
     outline: () => roundPoly(triVerts, 0.34) },
-  square: { label: 'Square', color: '#35B8FF', faceY: 0.02, faceScale: 1,
-    outline: () => roundPoly([[-0.86, -0.86], [0.86, -0.86], [0.86, 0.86], [-0.86, 0.86]], 0.36) },
   blob: { label: 'Blob', color: '#2FCB7A', faceY: 0, faceScale: 1,
     outline: () => polar((a) => 0.86 + 0.07 * Math.sin(3 * a + 0.8) + 0.04 * Math.sin(5 * a + 2)) },
   ghost: { label: 'Ghost', color: '#F4F2FA', faceY: -0.08, faceScale: 0.95, outline: ghost },
@@ -279,14 +129,20 @@ export const presets = {
       circle(-0.58, 0.2, 0.4), circle(0.58, 0.2, 0.4), circle(-0.24, -0.18, 0.46),
       circle(0.28, -0.3, 0.5), circle(0, 0.28, 0.5),
     ]), 2) },
-  pill: { label: 'Pill', color: '#ACAAF3', faceY: 0, faceScale: 0.9,
-    outline: () => roundPoly([[-0.98, -0.56], [0.98, -0.56], [0.98, 0.56], [-0.98, 0.56]], 0.56) },
-  pebble: { label: 'Pebble', color: '#ABC793', faceY: 0.02, faceScale: 0.95,
-    outline: () => superellipse(0.96, 0.64, 2.4).map(([x, y]) => [x, y + 0.07 * Math.sin(x * 2.2) + 0.08]) },
-  puddle: { label: 'Puddle', color: '#EE8BDB', faceY: 0, faceScale: 0.95,
-    outline: () => polar((a) => 0.82 + 0.08 * Math.sin(2 * a) + 0.06 * Math.sin(4 * a + 1) + 0.04 * Math.sin(6 * a + 2))
-      .map(([x, y]) => [x * 0.86, y * 1.04]) },
 };
+
+/** The first fourteen shapes (the cast comes after them). */
+export const BASE_TYPES = Object.keys(presets);
+/**
+ * Retired shapes (1.3: square, pill, pebble and puddle were outlines, not
+ * characters) still resolve, to the nearest living body, so old DNA codes,
+ * crew pages and identities keep working.
+ */
+export const RETIRED = { square: 'hexagon', pill: 'blob', pebble: 'blob', puddle: 'blob' };
+/** A living type for any name: itself, a retired name's successor, or circle. */
+export const liveType = (type) => (presets[type] ? type : presets[RETIRED[type]] ? RETIRED[type] : 'circle');
+// The cast: creatures bring an outline plus parts, a temperament, defaults and morphs.
+for (const c of creatures) presets[c.type] = c;
 
 export const types = Object.keys(presets);
 export const palette = Object.fromEntries(types.map((t) => [t, presets[t].color]));
@@ -295,10 +151,16 @@ const cache = new Map();
 
 /** Shape data for a type (cached). */
 export function getShape(type) {
-  const key = presets[type] ? type : 'circle';
+  const key = liveType(type);
   if (!cache.has(key)) {
     const p = presets[key];
-    cache.set(key, buildShape(p.outline(), { type: key, faceY: p.faceY, faceScale: p.faceScale, extras: p.extras || null }));
+    const meta = { type: key, faceY: p.faceY, faceScale: p.faceScale, extras: p.extras || null, faceOn: p.faceOn || null };
+    const shape = buildShape(p.outline(), meta);
+    // Another outline the body can become (rolled up, retreated): blended in by pose.morph.
+    if (p.morph) shape.alt = buildShape(p.morph.outline(), { ...meta, ...(p.morph.meta || {}) });
+    // A lifecycle: outlines for ages 0..1, blended by look.age.
+    if (p.stages) shape.stages = p.stages.map((st) => buildShape(st.outline(), { ...meta, ...(st.meta || {}) }));
+    cache.set(key, shape);
   }
   return cache.get(key);
 }

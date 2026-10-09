@@ -3,7 +3,28 @@
 // they travel to the drawing threads as plain data.
 
 import { presets, types, palette, shapeFromSvgPath } from './shapes.js';
+import { TEMPERAMENTS, TEMPERAMENT_NAMES, BY_TYPE } from './temperament.js';
 export { registerState } from './engine.js';
+
+/**
+ * Add a creature of your own: the same module format as src/creatures/
+ * (see fox.js): an outline, parts with motion of their own, a temperament
+ * (new ones in `temperaments`), option defaults, a `morph` outline it becomes
+ * in some states, `stages` blended by age, `faceOn: 'talk'`.
+ *   registerCreature({ type: 'newt', label: 'Newt', color: '#7bc', faceY: 0.1, outline: () => pts,
+ *     extras: { parts: [{ kind: 'tail', anchor: [0.5, 0.6], len: 0.9, width: 0.2 }] }, temperament: 'curious' })
+ */
+export function registerCreature(def) {
+  if (!def?.type || typeof def.outline !== 'function') throw new Error('bots: registerCreature needs a type and an outline()');
+  presets[def.type] = { faceY: 0, faceScale: 1, ...def, custom: true };
+  if (!types.includes(def.type)) types.push(def.type);
+  palette[def.type] = presets[def.type].color || '#9A62FF';
+  if (def.temperaments) {
+    Object.assign(TEMPERAMENTS, def.temperaments);
+    for (const n of Object.keys(def.temperaments)) if (!TEMPERAMENT_NAMES.includes(n)) TEMPERAMENT_NAMES.push(n);
+  }
+  if (def.temperament) BY_TYPE[def.type] = def.temperament;
+}
 
 /**
  * Add a body shape.

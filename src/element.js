@@ -11,13 +11,13 @@ const NUMBERS = ['size', 'brightness', 'saturation', 'depth', 'light', 'shadow',
   'fur-length', 'fur-density', 'fur-fuzz', 'fur-curl', 'fur-gravity', 'fur-clumps', 'fur-pattern-scale',
   'speed', 'seed', 'turn', 'jump-every', 'jump-height', 'jump-time', 'jump-spin', 'jump-squash', 'jump-stretch', 'jump-lean',
   'face-scale', 'eye-size', 'eye-gap', 'face-x', 'face-y', 'roundness', 'gloss', 'fill-strength',
-  'blink-rate', 'glance-rate', 'breathing', 'jiggle', 'whirl', 'glow'];
+  'blink-rate', 'glance-rate', 'breathing', 'jiggle', 'whirl', 'glow', 'age'];
 const BOOLEANS = ['headphones', 'bow-tie', 'blush', 'eye-shine', 'paused', 'interactive', 'freckles', 'scarf',
   'toss', 'petting', 'social', 'affect', 'announce'];
 const STRINGS = ['type', 'state', 'face', 'color', 'ink', 'shading', 'hat', 'glasses', 'accessory-color', 'path', 'label', 'theme',
   'blush-color', 'renderer', 'quality', 'preset', 'dna', 'identity', 'fur-pattern', 'fur-color2', 'light-color', 'fill-color',
   'rim-color', 'eye-style', 'iris-color', 'brows', 'mouth-style', 'expression', 'whirl-color', 'scarf-color', 'badge',
-  'badge-color', 'ears', 'antennae', 'status', 'mood', 'quirk', 'temperament', 'glow-color'];
+  'badge-color', 'ears', 'antennae', 'status', 'mood', 'quirk', 'temperament', 'glow-color', 'face-on'];
 const JSONS = ['fur', 'material', 'face-options', 'motion', 'wear', 'accessories'];
 // On/off or a level: present (or "true") is on, "false" off, a number sets it.
 const LEVELS = ['sounds'];

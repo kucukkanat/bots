@@ -77,7 +77,7 @@ export const pack = {
   /** Suggested looks: options to spread into an avatar. */
   looks: [
     { type: 'star', hat: 'confetti', expression: 'joy' },
-    { type: 'pill', color: '#2fb36a', hat: 'sombrero' },
+    { type: 'blob', color: '#2fb36a', hat: 'sombrero' },
     { type: 'droid', hat: 'propeller', expression: 'happy' },
   ],
 };

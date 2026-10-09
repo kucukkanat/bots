@@ -2,7 +2,7 @@
 
 # bots
 
-Animated bot avatars for AI agents. Eighteen plush 3D shapes, each with a temperament of its own, with living faces that look around, hop while they work and doze off between tasks — plus hats, glasses, headphones and bow ties, glass and lantern materials, and quirks. Tell one what your agent is doing with `bot.observe()` and it works out the rest. Drawn with WebGL in worker threads, with a plain 2D canvas fallback wherever either is missing: no build step, no dependencies.
+Animated bot avatars for AI agents. Fourteen plush 3D shapes and a cast of fourteen creatures, each with a temperament of its own, with living faces that look around, hop while they work and doze off between tasks — plus hats, glasses, headphones and bow ties, glass and lantern materials, and quirks. Tell one what your agent is doing with `bot.observe()` and it works out the rest. Drawn with WebGL in worker threads, with a plain 2D canvas fallback wherever either is missing: no build step, no dependencies.
 
 **[Live site](https://kucukkanat.github.io/bots/) · [Docs](https://kucukkanat.github.io/bots/docs/) · [Studio](https://kucukkanat.github.io/bots/playground/)** — installable as an app, and works offline after the first visit.
 
@@ -10,9 +10,9 @@ Animated bot avatars for AI agents. Eighteen plush 3D shapes, each with a temper
 
 A from-scratch, framework-agnostic homage to [bot-avatars](https://libraries.dev/bots) by Jakub Antalik (MIT; the type palette follows it).
 
-## Shapes
+## Shapes and the cast
 
-All eighteen types, idle with eyes (left) and working with a mouth (right):
+The fourteen shapes, idle with eyes (left) and working with a mouth (right), and with them the cast: fourteen creatures with parts that move on their own (tails, tendrils, wings, frills, arms), a temperament each, and bodies that change (the pangolin rolls up, the snail retreats, the sprout grows). See [The cast](https://kucukkanat.github.io/bots/docs/creatures.html).
 
 <p align="center">
   <img src="docs/gallery.png" alt="All eighteen bot types, idle, dark theme" width="49%" />
@@ -98,14 +98,16 @@ Dress it with one list: `wear="party-hat round-glasses bow-tie"`. Each thing has
 
 | Option | Values | Default |
 | --- | --- | --- |
-| `type` | clover, flower, triangle, square, blob, ghost, circle, drop, star, droid, mech, alien, hexagon, cat, cloud, pill, pebble, puddle | `clover` |
+| `type` | clover, flower, triangle, blob, ghost, circle, drop, star, droid, mech, alien, hexagon, cat, cloud; the cast: fox, pangolin, owl, axolotl, jelly, moth, sprout, octo, toaster, snail, comet, swarm, orb, glyph (retired: square, pill, pebble, puddle, which resolve to the nearest living body) | `clover` |
 | `state` | `default` (idle), `working`, `sleeping` | `default` |
 | `face` | `eyes`, `mouth` | `eyes` |
 | `size` | px | `64` |
 | `path` | SVG path data in a 100×100 box centred on (50, 50) — your own outline | — |
 | `color`, `ink` | body colour, face colour | type's own, auto |
 | `brightness`, `saturation` | 0–2 | `1` |
-| `shading` | `fabric` (plush fur), `plastic`, `smooth`, `crisp`, `flat`, `glass`, `lantern` | `fabric` |
+| `shading` | `fabric` (plush fur), `plastic`, `smooth`, `crisp`, `flat`, `glass`, `lantern`, `line`, `swarm` | `fabric` |
+| `age` | a lifecycle creature's age, 0 (seed) to 1 (grown) | `1` |
+| `faceOn` | `talk`: the face shows only while something is going on | — |
 | `quirk` | imperfections: `patch`, `cowlick`, `scuff`, `stitches` (one or more) | — |
 | `temperament` | `auto` (the type's own), a name (see below), `none` | `auto` |
 | `light` | degrees clockwise from the top | `295` |
@@ -139,6 +141,18 @@ States change the body, not just the face: thinking stands tall, listening leans
 **Quirks** are imperfections that make it someone: `quirk="patch cowlick"` sews a patch of other cloth low on one side (`patchColor`), stands a tuft up on the crown that sways and won't lie down, `scuff` wears a spot thin, `stitches` runs a seam down the body. The `ragdoll` preset is felt with a seam and a patch.
 
 **Materials**: `shading: 'glass'` is see-through (`opacity`), with light pooling on the side away from the key, a Fresnel rim all round and two window reflections; `shading: 'lantern'` is lit from within (`glow`, `glowColor`), breathing slowly and flaring whenever it thinks, talks or laughs, with its halo spilling out around the body. Both are presets too.
+
+### The cast
+
+```html
+<bot-avatar type="owl" state="thinking"></bot-avatar>     <!-- its head turns right round -->
+<bot-avatar type="octo" affect></bot-avatar>              <!-- an arm lights up per running tool -->
+<bot-avatar type="sprout" age="0.3"></bot-avatar>         <!-- a hatchling; 1 is grown -->
+<bot-avatar type="pangolin" state="error"></bot-avatar>   <!-- rolls into a ball -->
+<bot-avatar type="orb" state="speaking"></bot-avatar>     <!-- no face until it speaks -->
+```
+
+Fourteen creatures beyond the fourteen shapes: fox, pangolin, owl, axolotl, jelly, moth, sprout, octo, toaster, snail, comet, swarm, orb and glyph. Each is a module in `src/creatures/` (an outline, parts, a temperament, defaults, a morph outline, a lifecycle), and `registerCreature()` takes the same format for creatures of your own. Parts are plain data, so they travel to the drawing threads and into exports.
 
 ### Grouped options and presets
 

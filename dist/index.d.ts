@@ -1,19 +1,34 @@
 export type BotType =
-  | 'clover' | 'flower' | 'triangle' | 'square' | 'blob' | 'ghost' | 'circle' | 'drop' | 'star'
-  | 'droid' | 'mech' | 'alien' | 'hexagon' | 'cat' | 'cloud' | 'pill' | 'pebble' | 'puddle';
+  | 'clover' | 'flower' | 'triangle' | 'blob' | 'ghost' | 'circle' | 'drop' | 'star'
+  | 'droid' | 'mech' | 'alien' | 'hexagon' | 'cat' | 'cloud'
+  | 'fox' | 'pangolin' | 'owl' | 'axolotl' | 'jelly' | 'moth' | 'sprout' | 'octo' | 'toaster' | 'snail' | 'comet' | 'swarm' | 'orb' | 'glyph';
 export type BotState = 'default' | 'working' | 'sleeping' | 'listening' | 'thinking' | 'speaking' | 'error' | 'success' | (string & {});
-export type BotShading = 'fabric' | 'plastic' | 'smooth' | 'crisp' | 'flat' | 'glass' | 'lantern';
+export type BotShading = 'fabric' | 'plastic' | 'smooth' | 'crisp' | 'flat' | 'glass' | 'lantern' | 'line' | 'swarm';
 /** Imperfections: a sewn-on patch, a tuft on the crown, a worn spot, a seam. One or more, space-separated or an array. */
 export type BotQuirk = 'patch' | 'cowlick' | 'scuff' | 'stitches';
 /** How a species behaves: motion defaults, a resting-face lean and habits (aloof looks away, shy ducks when poked, dreamy floats, precise snaps). */
-export type BotTemperament = 'eager' | 'sunny' | 'sharp' | 'stoic' | 'wobbly' | 'shy' | 'calm' | 'nervous' | 'showOff' | 'precise' | 'steady' | 'curious' | 'serious' | 'aloof' | 'dreamy' | 'chipper' | 'sleepy';
+export type BotTemperament = 'eager' | 'sunny' | 'sharp' | 'stoic' | 'wobbly' | 'shy' | 'calm' | 'nervous' | 'showOff' | 'precise' | 'steady' | 'curious' | 'serious' | 'aloof' | 'dreamy' | 'chipper' | 'sleepy'
+  | 'sly' | 'scholar' | 'drawn' | 'busy' | 'perky' | 'patient' | 'hive' | 'serene' | (string & {});
+/** A part a creature has beyond its body, drawn with motion of its own (see the Creatures guide). */
+export interface BotPart { kind: 'tail' | 'tendrils' | 'wings' | 'frills' | 'arms' | 'shell' | 'plates' | 'slot' | 'popup' | 'sprig' | 'knob' | 'spiral' | 'streak'; layer?: 'skin' | 'back' | 'front'; [param: string]: unknown }
+/** A creature module: a preset plus parts, a temperament, defaults, a morph outline and a lifecycle. */
+export interface BotCreature {
+  type: string; label: string; color: string; faceY?: number; faceScale?: number;
+  outline: () => Array<[number, number]>;
+  extras?: { parts?: BotPart[]; ears?: { y: number; r: number }; antennae?: Array<{ x: number; len: number; ball: number }> } | null;
+  temperament?: BotTemperament; temperaments?: Record<string, { motion?: Partial<BotOptions>; face?: BotFace; aloof?: number; shy?: number; float?: number; snap?: number; showOff?: number; swivel?: number }>;
+  defaults?: Partial<BotOptions>;
+  morph?: { states: BotState[]; outline: () => Array<[number, number]>; meta?: { faceY?: number; faceScale?: number } };
+  stages?: Array<{ outline: () => Array<[number, number]>; meta?: { faceY?: number; faceScale?: number } }>;
+  faceOn?: 'talk';
+}
 /** What the agent is doing, for observe(). */
 export type BotAgentEvent = 'typing' | 'sent' | 'prompt' | 'token' | 'tool' | 'tool-start' | 'tool-end' | 'done' | 'error' | 'idle' | 'reset';
 export type BotHat = 'none' | 'beanie' | 'party' | 'crown' | 'beret' | 'tophat' | 'cap' | 'witch' | 'halo' | 'bow' | (string & {});
 export type BotEyeStyle = 'round' | 'oval' | 'wide' | 'dot' | 'sleepy' | 'happy' | 'line' | 'star' | 'heart';
 export type BotMouthStyle = 'smile' | 'cat' | 'line' | 'o' | 'teeth' | 'tongue';
 export type BotFurPattern = 'none' | 'two-tone' | 'gradient' | 'tips' | 'spots' | 'stripes' | 'belly' | 'patches';
-export type BotStyle = 'plush' | 'teddy' | 'velvet' | 'mohair' | 'felt' | 'vinyl' | 'clay' | 'sticker' | 'paper' | 'glass' | 'lantern' | 'ragdoll';
+export type BotStyle = 'plush' | 'teddy' | 'velvet' | 'mohair' | 'felt' | 'vinyl' | 'clay' | 'sticker' | 'paper' | 'glass' | 'lantern' | 'ragdoll' | 'line' | 'swarm';
 export type BotExpression = 'neutral' | 'happy' | 'joy' | 'surprised' | 'worried' | 'sad' | 'angry' | 'smug' | 'sleepy' | 'confused' | 'dizzy' | 'love';
 /** Face channels for expressions and custom states. */
 export interface BotFace { brow?: number; browTilt?: number; eyeWide?: number; squint?: number; smile?: number; mouthOpen?: number; happy?: number; dizzy?: number; blushPulse?: number }
@@ -163,6 +178,10 @@ export interface BotOptions {
   glowColor?: string;
   /** Glass material: how see-through, 0–1 (default 0.8). */
   opacity?: number;
+  /** A lifecycle creature's age, 0 (seed) to 1 (grown); blends between its stage outlines. */
+  age?: number;
+  /** 'talk': the face shows only while something is going on (talking, a reaction, a look). */
+  faceOn?: 'talk';
   /** Keep the affect engine's idle timer running (it dozes off after `sleepAfter` seconds, default 120); `tone: false` stops reactions to the reply's tone. */
   affect?: boolean | { sleepAfter?: number; tone?: boolean };
   /** Read each state change out to screen readers from a polite live region ("Clover is thinking"). */
@@ -333,3 +352,12 @@ export declare const QUIRKS: BotQuirk[];
 export declare function wornList(options: BotOptions): string[];
 /** Where a thing goes. */
 export declare function spotOf(name: string): BotSpot;
+
+/** The first eighteen types (what `identity` picks from) and the creatures beyond them. */
+export declare const BASE_TYPES: BotType[];
+export declare const creatures: BotCreature[];
+/** Add a creature of your own, in the same format as the built-in cast. */
+export declare function registerCreature(def: BotCreature): void;
+/** Retired shapes and the living body each resolves to (square → hexagon; pill, pebble, puddle → blob). */
+export declare const RETIRED: Record<string, BotType>;
+export declare function liveType(type: string): BotType;
