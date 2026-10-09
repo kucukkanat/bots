@@ -53,6 +53,37 @@ import { BotAvatar } from '@kucukkanat/bots/react';
 <BotAvatar type="clover" state={busy ? 'working' : 'default'} size={64} />
 ```
 
+### Vue
+
+```vue
+<script setup>
+import { ref } from 'vue';
+import { BotAvatar } from '@kucukkanat/bots/vue';   // or app.use(BotAvatarPlugin) to register it globally
+const avatar = ref(null);                           // avatar.value.bot is the controller
+</script>
+
+<template>
+  <BotAvatar ref="avatar" type="cat" :state="busy ? 'working' : 'default'" :size="64" bow-tie
+             :options="{ wear: { hat: 'party' } }" @poke="onPoke" @ready="(bot) => bot.react('joy')" />
+</template>
+```
+
+Any option works as a prop (kebab or camel case), or all at once with `:options`. Events: `ready`, `poke`, `blink`, `jump`, `land`, `state`. Use the PascalCase tag: `<bot-avatar>` is the custom element.
+
+### Svelte
+
+```svelte
+<script>
+  import { bot } from '@kucukkanat/bots/svelte';
+  let state = 'default';
+</script>
+
+<div use:bot={{ type: 'cat', state, size: 64 }} on:bot-poke={() => (state = 'working')}></div>
+<!-- Svelte 5: onbot-poke={…}. bot-ready's detail.bot (and node.bot) is the controller. -->
+```
+
+An action, so it works in Svelte 4 and 5 with no compile step. The avatar's events bubble as `bot-poke`, `bot-blink`, `bot-jump`, `bot-land` and `bot-state`.
+
 ## Options
 
 | Option | Values | Default |
@@ -166,6 +197,17 @@ const gif = await bot.export({ format: 'gif', duration: 2.4, fps: 20 });   // al
 ```
 
 Frames are rendered offline from a copy of the avatar's simulation; the exporter loads on first use.
+
+#### Stickers
+
+```js
+const sticker = await bot.export({ format: 'sticker' });   // 512px PNG, die-cut white outline
+
+import { exportStickers } from '@kucukkanat/bots/export';
+const zip = await exportStickers([bot, { type: 'cat', hat: 'party' }, 'bot1.WzAsInN0YXIiXQ'], { outline: true });
+```
+
+A pack is a ZIP of transparent PNGs (`01-cat.png`, … named from `label` or `type`) and a `crew.json` with each design's DNA. Designs can be options, live avatars or DNA codes. Options: `size` (512), `outline` (`true` for white, or a colour), `outlineWidth`, `shadow`, `background`, `format: 'webp'`, and `frames: true` for animated (APNG) stickers.
 
 ### Theming with CSS
 

@@ -147,7 +147,8 @@ export declare class BotAvatar {
   on(event: 'poke' | 'blink' | 'jump' | 'land' | 'state', fn: (e: { type: string; bot: BotAvatar; state?: string }) => void): () => void;
   /** The whole design as a short code. */
   readonly dna: string;
-  export(options?: { format?: 'gif' | 'apng' | 'webm' | 'sprite' | 'png' | 'webp'; duration?: number; fps?: number; scale?: number; background?: string }): Promise<Blob>;
+  /** 'sticker' gives a 512px die-cut PNG with a white outline (see StickerOptions). */
+  export(options?: { format?: 'gif' | 'apng' | 'webm' | 'sprite' | 'png' | 'webp' | 'sticker'; duration?: number; fps?: number; scale?: number; background?: string } & StickerOptions): Promise<Blob>;
 }
 
 export declare function registerShape(name: string, def: { path?: string; points?: [number, number][]; color?: string; label?: string; faceY?: number; faceScale?: number }): void;
@@ -222,4 +223,22 @@ export declare const RISE: number;
 
 declare global {
   interface HTMLElementTagNameMap { 'bot-avatar': BotAvatarElement; }
+}
+
+export interface StickerOptions {
+  /** Output edge in pixels (default 512). */
+  size?: number;
+  /** Die-cut outline: true for white, or a colour. Single stickers default to true, packs to false. */
+  outline?: boolean | string;
+  outlineWidth?: number;
+  outlineColor?: string;
+  /** Soft shadow under the outline (default true). */
+  shadow?: boolean;
+  /** Fill behind the sticker; transparent when unset. */
+  background?: string;
+  padding?: number;
+  /** Animated stickers (APNG) instead of stills. */
+  frames?: boolean;
+  duration?: number;
+  fps?: number;
 }

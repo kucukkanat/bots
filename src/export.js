@@ -1,7 +1,8 @@
 // Export: an avatar as an animated GIF, APNG, WebM video, a sprite sheet or a
 // still PNG/WebP. Frames are rendered offline from a copy of the avatar's
 // simulation, so exporting never touches the live animation, and loading
-// this module is deferred until it's used.
+// this module is deferred until it's used. Stickers (stickers.js) load from
+// here on first use too.
 
 import { BotSim } from './engine.js';
 import { drawBot, OVERSCAN } from './render.js';
@@ -37,7 +38,7 @@ export function renderFrames(bot, { duration = 2, fps = 20, scale = 2, size, ful
  * Export an avatar. Resolves to a Blob.
  * @param {import('./bot.js').BotAvatar} bot
  * @param {object} o
- * @param {'gif'|'apng'|'webm'|'sprite'|'png'|'webp'} [o.format]
+ * @param {'gif'|'apng'|'webm'|'sprite'|'png'|'webp'|'sticker'} [o.format]
  * @param {number} [o.duration] seconds (animations)
  * @param {number} [o.fps]
  * @param {number} [o.scale] pixels per CSS px
@@ -45,6 +46,7 @@ export function renderFrames(bot, { duration = 2, fps = 20, scale = 2, size, ful
  */
 export async function exportBot(bot, o = {}) {
   const format = o.format || 'gif';
+  if (format === 'sticker') return import('./stickers.js').then((m) => m.exportSticker(bot, o));
   if (format === 'png' || format === 'webp') {
     const [f] = renderFrames(bot, { ...o, duration: 0, fps: 1 });
     return canvasBlob(f, `image/${format}`);
@@ -66,6 +68,14 @@ export async function exportBot(bot, o = {}) {
     return blob;
   }
   throw new Error(`Unknown export format: ${format}`);
+}
+
+/**
+ * A sticker pack: designs (options, avatars or DNA codes) as transparent PNGs
+ * in a ZIP with a crew.json manifest. Loads stickers.js on first use.
+ */
+export function exportStickers(list, o) {
+  return import('./stickers.js').then((m) => m.exportStickers(list, o));
 }
 
 function canvasBlob(img, type) {
@@ -191,7 +201,7 @@ const CRC = (() => {
   for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
   return t;
 })();
-function crc32(bytes) {
+export function crc32(bytes) {
   let c = 0xffffffff;
   for (const b of bytes) c = CRC[(c ^ b) & 255] ^ (c >>> 8);
   return (c ^ 0xffffffff) >>> 0;
