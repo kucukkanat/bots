@@ -1,5 +1,6 @@
 // <bot-avatar> custom element. Attributes mirror the options in kebab-case:
 // <bot-avatar type="cat" state="working" hat="party" bow-tie size="96"></bot-avatar>
+// The avatar style option is the bot-style attribute, since style is CSS.
 // Grouped options take JSON: <bot-avatar fur='{"length": 2, "pattern": "spots"}'>.
 // Colours can also come from CSS custom properties (--bot-color, --bot-ink,
 // --bot-accessory-color, --bot-blush-color, --bot-fur-color, --bot-light-color,
@@ -14,7 +15,7 @@ const NUMBERS = ['size', 'brightness', 'saturation', 'depth', 'light', 'shadow',
   'blink-rate', 'glance-rate', 'breathing', 'jiggle', 'whirl'];
 const BOOLEANS = ['headphones', 'bow-tie', 'blush', 'eye-shine', 'paused', 'interactive', 'freckles', 'scarf'];
 const STRINGS = ['type', 'state', 'face', 'color', 'ink', 'shading', 'hat', 'glasses', 'accessory-color', 'path', 'label', 'theme',
-  'blush-color', 'renderer', 'quality', 'style', 'dna', 'identity', 'fur-pattern', 'fur-color2', 'light-color', 'fill-color',
+  'blush-color', 'renderer', 'quality', 'bot-style', 'dna', 'identity', 'fur-pattern', 'fur-color2', 'light-color', 'fill-color',
   'rim-color', 'eye-style', 'iris-color', 'brows', 'mouth-style', 'expression', 'whirl-color', 'scarf-color', 'badge',
   'badge-color', 'ears', 'antennae'];
 const JSONS = ['fur', 'material', 'face-options', 'motion', 'wear', 'accessories'];
@@ -26,7 +27,8 @@ const CSS_VARS = {
   irisColor: '--bot-iris-color',
 };
 
-const camel = (s) => s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+// `style` is taken by HTML, so the avatar style is the bot-style attribute.
+const camel = (s) => s === 'bot-style' ? 'style' : s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 
 function readOptions(el) {
   const o = {};
@@ -79,7 +81,9 @@ export class BotAvatarElement extends Base {
     // Attributes removed fall back to the defaults.
     const o = { ...Object.fromEntries(ATTRS.map((a) => [camel(a), undefined])), faceOptions: undefined, ...DEFAULTS, ...readCssVars(this, readOptions(this)) };
     delete o.faceOptions;
-    this.style.width = this.style.height = `${o.size ?? 64}px`;
+    const px = `${o.size ?? 64}px`;
+    if (this.style.width !== px) this.style.width = px;
+    if (this.style.height !== px) this.style.height = px;
     this.bot.set(o);
   }
   /** Re-read CSS custom properties (after a theme or class change). */
