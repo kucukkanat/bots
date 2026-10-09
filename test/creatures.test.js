@@ -7,7 +7,7 @@ import { SHADINGS } from '../src/bot.js';
 import { BotSim } from '../src/engine.js';
 import { normalizeOptions } from '../src/options.js';
 
-const PART_KINDS = ['tail', 'tendrils', 'wings', 'frills', 'arms', 'shell', 'plates', 'slot', 'popup', 'sprig', 'knob', 'spiral', 'streak'];
+const PART_KINDS = ['tail', 'tendrils', 'wings', 'frills', 'arms', 'shell', 'plates', 'slot', 'popup', 'sprig', 'knob', 'spiral', 'streak', 'beak'];
 const okOutline = (s, name) => {
   assert.equal(s.points.length, OUTLINE_POINTS, `${name}: point count`);
   for (const [x, y] of s.points) {

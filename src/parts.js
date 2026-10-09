@@ -102,14 +102,17 @@ function tendrils(ctx, p, env, back) {
     const u = n === 1 ? 0 : -1 + (2 * i) / (n - 1);
     const [X, Y] = proj(u * spread, ay, -D * 0.3 * (1 - Math.abs(u)));
     const sw = Math.sin(time * 1.3 + i * 1.7) * 0.1;
+    // Each strand its own length and thickness, so they read as a fringe, not a comb.
+    const vary = 0.75 + 0.5 * (((i * 7) % 5) / 4), L = len * vary;
     const p0 = [X, Y];
-    const p1 = [X + lx * len * 0.5 + sw * len * 0.3, Y + len * 0.5 + ly * len * 0.3];
-    const p2 = [X + lx * len * 1.1 + sw * len + u * len * 0.15, Y + len * (0.95 + 0.1 * Math.sin(time + i)) + ly * len * 0.5];
+    const p1 = [X + lx * L * 0.5 + sw * L * 0.3, Y + L * 0.5 + ly * L * 0.3];
+    const p2 = [X + lx * L * 1.1 + sw * L + u * L * 0.15, Y + L * (0.95 + 0.1 * Math.sin(time + i)) + ly * L * 0.5];
     const stroke = (w, col) => {
       ctx.strokeStyle = col; ctx.lineWidth = w;
       ctx.beginPath(); ctx.moveTo(...p0); ctx.quadraticCurveTo(...p1, ...p2); ctx.stroke();
     };
-    paint(back, () => stroke(R * (p.width ?? 0.06), shade(color, -0.1)), () => stroke(R * (p.width ?? 0.06) * 0.45, shade(color, 0.25)));
+    const W = R * (p.width ?? 0.06) * (0.8 + 0.4 * (((i * 3) % 4) / 3));
+    paint(back, () => stroke(W, shade(color, -0.1)), () => stroke(W * 0.45, shade(color, 0.25)));
   }
   ctx.restore();
 }
@@ -141,14 +144,16 @@ function wings(ctx, p, env, back) {
   const color = p.color || shade(base, -0.05, 0, 1.1);
   const flap = pose.flap;
   for (const side of [-1, 1]) {
-    const w = env.shape.halfWidthAt(y) * 0.92;
+    // `x` places the root (body units from the centre); else the body's edge at y, pulled in by `inset`.
+    const w = p.x ?? env.shape.halfWidthAt(y) * (p.inset ?? 0.92);
     const [X, Y] = proj(side * w, y, -D * 0.35);
     ctx.save();
     ctx.translate(X, Y);
     // Raised wings foreshorten and tilt up; the far wing is narrower with the turn.
     const turnK = 0.35 + 0.65 * Math.abs(c0);
-    ctx.scale(side * (0.35 + 0.65 * (1 - flap * 0.75)) * turnK, 1);
-    ctx.rotate(-flap * 0.9 - 0.15);
+    ctx.scale(side * (0.35 + 0.65 * (1 - flap * (p.fold ?? 0.75))) * turnK, 1);
+    // `angle` is the resting tilt (radians, negative raises the tip), `beat` how far a flap lifts it.
+    ctx.rotate(-flap * (p.beat ?? 0.9) + (p.angle ?? -0.15));
     const path = wingPath(style, size);
     const lit = 0.5 + 0.5 * side * lx;
     paint(back, () => {
@@ -176,28 +181,38 @@ function frills(ctx, p, env, back) {
   const { R, proj, pose, base, D, time } = env;
   const n = p.count ?? 3, len = (p.len ?? 0.45) * R, y = p.y ?? -0.05;
   const color = p.color || shade(base, 0.12, -12, 1.25);
-  // Spread with attention: brows up and wide eyes fan them out, sleep lets them droop.
-  const spread = clamp(0.3 + pose.brow * 0.6 + pose.eyeWide * 0.6 + pose.flap * 0.15 - pose.sleep * 0.35 + Math.max(0, -pose.smile) * -0.3, 0.05, 1);
+  // Spread with attention: brows up and wide eyes fan them out; sadness and sleep let them droop.
+  const low = clamp(pose.sleep * 0.8 + Math.max(0, -pose.smile) * 0.9 + Math.max(0, -pose.browTilt) * 0.3, 0, 1);
+  const spread = clamp(0.35 + pose.brow * 0.6 + pose.eyeWide * 0.6 + pose.flap * 0.1 - low * 0.5, 0.05, 1);
+  const width = (p.width ?? 0.07) * R;
   ctx.save();
   ctx.lineCap = 'round';
   for (const side of [-1, 1]) {
-    const w = env.shape.halfWidthAt(y) * 0.9;
+    const w = p.x ?? env.shape.halfWidthAt(y) * (p.inset ?? 0.9);
     const [X, Y] = proj(side * w, y, -D * 0.3);
     for (let i = 0; i < n; i++) {
-      const a = (-0.75 + (1.5 * i) / Math.max(1, n - 1)) * spread + 0.25 * (1 - spread);
+      const u = n === 1 ? 0.5 : i / (n - 1);
+      // Fanned out from -0.75 (up) to 0.75 (down) with spread; drooping toward straight down when low.
+      const fan = -0.75 + 1.5 * u, droop = 0.9 + 0.3 * u;
+      const a = fan * spread + droop * (1 - spread) * (0.4 + 0.6 * low) + 0.2 * (1 - spread) * (1 - low);
       const wob = Math.sin(time * 1.4 + i + side) * 0.05;
-      const dx = side * Math.cos(a + wob), dy = Math.sin(a + wob) - 0.1;
-      const p0 = [X, Y], p2 = [X + dx * len, Y + dy * len], p1 = [X + dx * len * 0.5, Y + dy * len * 0.5 - len * 0.12];
+      const dx = side * Math.cos(a + wob), dy = Math.sin(a + wob) - 0.1 * spread;
+      const L = len * (0.85 + 0.3 * (1 - Math.abs(u - 0.5) * 2));
+      const p0 = [X, Y], p2 = [X + dx * L, Y + dy * L], p1 = [X + dx * L * 0.5, Y + dy * L * 0.5 - L * 0.12 * spread];
       paint(back, () => {
-        ctx.strokeStyle = shade(color, -0.1); ctx.lineWidth = R * 0.055;
+        ctx.strokeStyle = shade(color, -0.12); ctx.lineWidth = width;
         ctx.beginPath(); ctx.moveTo(...p0); ctx.quadraticCurveTo(...p1, ...p2); ctx.stroke();
       }, () => {
-        // Feathery nubs along the stalk.
-        ctx.fillStyle = shade(color, 0.15);
-        for (let k = 1; k <= 4; k++) {
-          const [x, yy] = qp(p0, p1, p2, k / 4);
-          ctx.beginPath(); ctx.arc(x, yy, R * (0.045 - k * 0.004), 0, TAU); ctx.fill();
+        // Soft feathering: lobes along the stalk, alternating sides, bigger toward the tip.
+        ctx.fillStyle = shade(color, 0.12);
+        for (let k = 1; k <= 5; k++) {
+          const t = k / 5, [x, yy] = qp(p0, p1, p2, t);
+          const nx = -(dy), ny = dx, sgn = k % 2 ? 1 : -1;
+          const r = width * (0.55 + 0.5 * t);
+          ctx.beginPath(); ctx.arc(x + nx * r * 0.5 * sgn, yy + ny * r * 0.5 * sgn, r, 0, TAU); ctx.fill();
         }
+        ctx.fillStyle = shade(color, 0.3);
+        ctx.beginPath(); ctx.arc(p2[0], p2[1], width * 0.7, 0, TAU); ctx.fill();
       });
     }
   }
@@ -431,8 +446,31 @@ function streak(ctx, p, env, back) {
   ctx.restore();
 }
 
-const KINDS = { tail, tendrils, wings, frills, arms, shell, plates, slot, popup, sprig, knob, spiral: skinSpiral, streak };
-const DEFAULT_LAYER = { plates: 'skin', slot: 'skin', spiral: 'skin', sprig: 'front', knob: 'front' };
+/** A small beak below the eyes, riding on the face. */
+function beak(ctx, p, env, back) {
+  const { R, proj, c0, s, sp, cp, D, pose, shape } = env;
+  const fs = shape.faceScale * (env.look.faceScale ?? 1);
+  const size = (p.size ?? 0.12) * fs;
+  const y = shape.faceY + (p.y ?? 0.17) * fs + pose.lookY * 0.07;
+  const [X, Y] = proj(pose.lookX * 0.09, y, Math.min(1, D * 1.4));
+  const color = p.color || '#E8A83C';
+  ctx.save();
+  ctx.transform(R * c0, -R * s * sp, 0, R * cp, X, Y);
+  const open = pose.mouthOpen * size * 0.6;
+  paint(back, () => {
+    // Upper mandible: a rounded wedge pointing down; the lower one opens with the mouth.
+    ctx.fillStyle = shade(color, -0.22);
+    ctx.beginPath(); ctx.moveTo(-size * 0.5, open * 0.3); ctx.quadraticCurveTo(0, size * 0.9 + open, size * 0.5, open * 0.3); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.moveTo(-size * 0.55, -size * 0.1); ctx.quadraticCurveTo(0, size * 0.95, size * 0.55, -size * 0.1); ctx.quadraticCurveTo(0, size * 0.15, -size * 0.55, -size * 0.1); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = rgba('#ffffff', 0.35);
+    ctx.beginPath(); ctx.ellipse(-size * 0.15, size * 0.1, size * 0.14, size * 0.08, -0.4, 0, TAU); ctx.fill();
+  });
+  ctx.restore();
+}
+
+const KINDS = { tail, tendrils, wings, frills, arms, shell, plates, slot, popup, sprig, knob, spiral: skinSpiral, streak, beak };
+const DEFAULT_LAYER = { plates: 'skin', slot: 'skin', spiral: 'skin', sprig: 'front', knob: 'front', beak: 'front' };
 
 /** Draw every part of `parts` that lives in `layer`. */
 export function drawParts(ctx, parts, layer, env) {
