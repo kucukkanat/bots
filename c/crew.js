@@ -6,7 +6,7 @@
 //   c/#type=cat&hat=party&label=Ada        a studio share link's options (one bot)
 //
 // Names are URI-encoded; a DNA code that carries a label uses it when no name is given.
-import { createBot, decodeDNA, encodeDNA, presets, types } from '../src/index.js';
+import { createBot, decodeDNA, encodeDNA, presets, types, RETIRED } from '../src/index.js';
 import { initTheme } from '../assets/theme.js';
 
 const $ = (id) => document.getElementById(id);
@@ -66,7 +66,7 @@ export function parseCrew(href) {
         delete opts.title;
         delete opts.t;
         delete opts.dna;
-        if (!types.includes(opts.type)) opts.type = 'clover';
+        if (!types.includes(opts.type)) opts.type = RETIRED[opts.type] || 'clover';
         members.push({ dna: encodeDNA(opts), opts, name: opts.label || presets[opts.type]?.label || 'Bot' });
       }
     }

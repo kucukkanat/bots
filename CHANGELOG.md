@@ -9,6 +9,11 @@ All notable changes to `@kucukkanat/bots` are recorded here. The format follows
 The cast release: fourteen creatures beyond the first eighteen shapes, and the
 three pieces of anatomy they needed.
 
+### Removed
+- Square, Pill, Pebble and Puddle: outlines, not characters. The names still
+  resolve (square → hexagon; pill, pebble, puddle → blob; `RETIRED`,
+  `liveType()`), so old DNA codes, crew pages and identities keep working.
+
 ### Added
 - **Creatures** (`src/creatures/`, one module each): fox, pangolin, owl,
   axolotl, jelly, moth, sprout, octo, toaster, snail, comet, swarm, orb and

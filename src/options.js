@@ -9,7 +9,7 @@
 // (The option is `preset`, not `style`: `style` is HTML's and React's own.)
 
 import { mulberry32 } from './engine.js';
-import { presets, BASE_TYPES } from './shapes.js';
+import { presets, RETIRED, liveType } from './shapes.js';
 import { parseWear } from './wear.js';
 export { parseWear };
 
@@ -163,7 +163,8 @@ function hashString(s) {
 export function lookFromId(id) {
   const rand = mulberry32(hashString(String(id)) || 0.5);
   const pick = (arr) => arr[Math.floor(rand() * arr.length)];
-  const types = BASE_TYPES;
+  // The list an id has always drawn from (retired names resolve to their successors), so an id keeps its bot.
+  const types = ['clover', 'flower', 'triangle', 'square', 'blob', 'ghost', 'circle', 'drop', 'star', 'droid', 'mech', 'alien', 'hexagon', 'cat', 'cloud', 'pill', 'pebble', 'puddle'];
   const hue = Math.floor(rand() * 360);
   const sat = 55 + rand() * 30, lit = 52 + rand() * 14;
   const hsl = (h, s, l) => {
@@ -174,7 +175,7 @@ export function lookFromId(id) {
     return '#' + [f(0), f(8), f(4)].map((v) => v.toString(16).padStart(2, '0')).join('');
   };
   return {
-    type: pick(types),
+    type: liveType(pick(types)),
     color: hsl(hue, sat, lit),
     face: rand() < 0.5 ? 'mouth' : 'eyes',
     eyeStyle: pick(['round', 'round', 'round', 'oval', 'dot', 'wide']),
@@ -212,7 +213,8 @@ export function normalizeOptions(opts = {}) {
   const fromDna = flat.dna ? decodeDNA(flat.dna) : {};
   const preset = STYLES[flat.preset ?? fromDna.preset] || {};
   // A creature's own defaults (its material, its eyes) sit under everything else.
-  const type = flat.type ?? fromDna.type ?? fromId.type;
+  let type = flat.type ?? fromDna.type ?? fromId.type;
+  if (type && RETIRED[type]) { type = RETIRED[type]; flat = { ...flat, type }; }
   const own = (type && presets[type]?.defaults) || {};
   return { ...own, ...fromId, ...fromDna, ...preset, ...flat };
 }

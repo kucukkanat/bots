@@ -32,9 +32,9 @@ export const TEMPERAMENTS = {
 
 /** The temperament each built-in type is born with. */
 export const BY_TYPE = {
-  clover: 'eager', flower: 'sunny', triangle: 'sharp', square: 'stoic', blob: 'wobbly', ghost: 'shy', circle: 'calm',
+  clover: 'eager', flower: 'sunny', triangle: 'sharp', blob: 'wobbly', ghost: 'shy', circle: 'calm',
   drop: 'nervous', star: 'showOff', droid: 'precise', mech: 'steady', alien: 'curious', hexagon: 'serious', cat: 'aloof',
-  cloud: 'dreamy', pill: 'chipper', pebble: 'sleepy', puddle: 'wobbly',
+  cloud: 'dreamy',
 };
 // The cast: each creature names its temperament and may bring a new one.
 for (const c of creatures) {

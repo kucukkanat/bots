@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { types, presets, palette, getShape, shapeToSvgPath, OUTLINE_POINTS, BASE_TYPES } from '../src/shapes.js';
+import { types, presets, palette, getShape, shapeToSvgPath, OUTLINE_POINTS, BASE_TYPES, RETIRED } from '../src/shapes.js';
 import { creatures } from '../src/creatures/index.js';
 
-test('the first eighteen come first, then the cast, each with a colour', () => {
-  assert.equal(BASE_TYPES.length, 18);
-  assert.equal(types.length, 18 + creatures.length);
+test('the fourteen shapes come first, then the cast, each with a colour', () => {
+  assert.equal(BASE_TYPES.length, 14);
+  assert.equal(types.length, 14 + creatures.length);
+  for (const [old, live] of Object.entries(RETIRED)) { assert.ok(!types.includes(old)); assert.ok(types.includes(live)); assert.equal(getShape(old), getShape(live)); }
   for (const c of creatures) assert.ok(types.includes(c.type), c.type);
   for (const t of types) assert.match(palette[t], /^#[0-9a-f]{6}$/i);
 });
@@ -29,4 +30,16 @@ for (const t of types) {
 test('svg export is a closed path in the 100 box', () => {
   const d = shapeToSvgPath('clover');
   assert.match(d, /^M[\d.]+ [\d.]+L.*Z$/);
+});
+
+test('retired names resolve in options and identities', async () => {
+  const { normalizeOptions, lookFromId } = await import('../src/options.js');
+  assert.equal(normalizeOptions({ type: 'pill' }).type, 'blob');
+  assert.equal(normalizeOptions({ type: 'square', shading: 'flat' }).type, 'hexagon');
+  // Every id resolves to a living type, and the same id to the same one.
+  for (const id of ['ada@example.com', 'bo', 'kit', 'x1', 'x2', 'x3', 'x4', 'x5', 'x6', 'x7', 'x8', 'x9']) {
+    const t = lookFromId(id).type;
+    assert.ok(types.includes(t), `${id} → ${t}`);
+    assert.equal(lookFromId(id).type, t);
+  }
 });

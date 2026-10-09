@@ -95,8 +95,6 @@ export const presets = {
     }).concat(circle(0, 0, 0.66))), 2) },
   triangle: { label: 'Triangle', color: '#DC48FF', faceY: 0.32, faceScale: 0.88,
     outline: () => roundPoly(triVerts, 0.34) },
-  square: { label: 'Square', color: '#35B8FF', faceY: 0.02, faceScale: 1,
-    outline: () => roundPoly([[-0.86, -0.86], [0.86, -0.86], [0.86, 0.86], [-0.86, 0.86]], 0.36) },
   blob: { label: 'Blob', color: '#2FCB7A', faceY: 0, faceScale: 1,
     outline: () => polar((a) => 0.86 + 0.07 * Math.sin(3 * a + 0.8) + 0.04 * Math.sin(5 * a + 2)) },
   ghost: { label: 'Ghost', color: '#F4F2FA', faceY: -0.08, faceScale: 0.95, outline: ghost },
@@ -131,17 +129,18 @@ export const presets = {
       circle(-0.58, 0.2, 0.4), circle(0.58, 0.2, 0.4), circle(-0.24, -0.18, 0.46),
       circle(0.28, -0.3, 0.5), circle(0, 0.28, 0.5),
     ]), 2) },
-  pill: { label: 'Pill', color: '#ACAAF3', faceY: 0, faceScale: 0.9,
-    outline: () => roundPoly([[-0.98, -0.56], [0.98, -0.56], [0.98, 0.56], [-0.98, 0.56]], 0.56) },
-  pebble: { label: 'Pebble', color: '#ABC793', faceY: 0.02, faceScale: 0.95,
-    outline: () => superellipse(0.96, 0.64, 2.4).map(([x, y]) => [x, y + 0.07 * Math.sin(x * 2.2) + 0.08]) },
-  puddle: { label: 'Puddle', color: '#EE8BDB', faceY: 0, faceScale: 0.95,
-    outline: () => polar((a) => 0.82 + 0.08 * Math.sin(2 * a) + 0.06 * Math.sin(4 * a + 1) + 0.04 * Math.sin(6 * a + 2))
-      .map(([x, y]) => [x * 0.86, y * 1.04]) },
 };
 
-/** The first eighteen: what `identity` picks from, so an id keeps the bot it always had. */
+/** The first fourteen shapes (the cast comes after them). */
 export const BASE_TYPES = Object.keys(presets);
+/**
+ * Retired shapes (1.3: square, pill, pebble and puddle were outlines, not
+ * characters) still resolve, to the nearest living body, so old DNA codes,
+ * crew pages and identities keep working.
+ */
+export const RETIRED = { square: 'hexagon', pill: 'blob', pebble: 'blob', puddle: 'blob' };
+/** A living type for any name: itself, a retired name's successor, or circle. */
+export const liveType = (type) => (presets[type] ? type : presets[RETIRED[type]] ? RETIRED[type] : 'circle');
 // The cast: creatures bring an outline plus parts, a temperament, defaults and morphs.
 for (const c of creatures) presets[c.type] = c;
 
@@ -152,7 +151,7 @@ const cache = new Map();
 
 /** Shape data for a type (cached). */
 export function getShape(type) {
-  const key = presets[type] ? type : 'circle';
+  const key = liveType(type);
   if (!cache.has(key)) {
     const p = presets[key];
     const meta = { type: key, faceY: p.faceY, faceScale: p.faceScale, extras: p.extras || null, faceOn: p.faceOn || null };

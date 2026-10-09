@@ -1,6 +1,6 @@
 export type BotType =
-  | 'clover' | 'flower' | 'triangle' | 'square' | 'blob' | 'ghost' | 'circle' | 'drop' | 'star'
-  | 'droid' | 'mech' | 'alien' | 'hexagon' | 'cat' | 'cloud' | 'pill' | 'pebble' | 'puddle'
+  | 'clover' | 'flower' | 'triangle' | 'blob' | 'ghost' | 'circle' | 'drop' | 'star'
+  | 'droid' | 'mech' | 'alien' | 'hexagon' | 'cat' | 'cloud'
   | 'fox' | 'pangolin' | 'owl' | 'axolotl' | 'jelly' | 'moth' | 'sprout' | 'octo' | 'toaster' | 'snail' | 'comet' | 'swarm' | 'orb' | 'glyph';
 export type BotState = 'default' | 'working' | 'sleeping' | 'listening' | 'thinking' | 'speaking' | 'error' | 'success' | (string & {});
 export type BotShading = 'fabric' | 'plastic' | 'smooth' | 'crisp' | 'flat' | 'glass' | 'lantern' | 'line' | 'swarm';
@@ -358,3 +358,6 @@ export declare const BASE_TYPES: BotType[];
 export declare const creatures: BotCreature[];
 /** Add a creature of your own, in the same format as the built-in cast. */
 export declare function registerCreature(def: BotCreature): void;
+/** Retired shapes and the living body each resolves to (square → hexagon; pill, pebble, puddle → blob). */
+export declare const RETIRED: Record<string, BotType>;
+export declare function liveType(type: string): BotType;

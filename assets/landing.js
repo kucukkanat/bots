@@ -194,7 +194,7 @@ const CREW = [
   { label: 'Hana', role: 'Writer', look: { type: 'flower', scarf: true, scarfColor: '#ffcf4a' } },
   { label: 'Iggy', role: 'Design', look: { type: 'blob', ears: 'bunny', preset: 'velvet' } },
   { label: 'Juno', role: 'Planner', look: { type: 'cloud', hat: 'beret' } },
-  { label: 'Kit', role: 'Data', look: { type: 'pebble', badge: 'AI' } },
+  { label: 'Kit', role: 'Data', look: { type: 'drop', badge: 'AI' } },
   { label: 'Lux', role: 'Security', look: { type: 'pangolin', glasses: 'shades' } },
   { label: 'Mo', role: 'Finance', look: { type: 'hexagon', hat: 'tophat', bowTie: true } },
   { label: 'Pip', role: 'Tutor', look: { type: 'sprout', age: 0.55 } },

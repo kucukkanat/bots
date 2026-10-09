@@ -1,6 +1,6 @@
 <!-- The cast | Fourteen creatures beyond the first eighteen shapes: parts with motion of their own, temperaments, materials, a lifecycle, and how to make your own. -->
 <h1>The cast</h1>
-<p class="sub">The first eighteen bodies are outlines with a face. The cast are someones: each has parts that move on their own, a temperament, a register, and in some cases a second body it becomes.</p>
+<p class="sub">The first fourteen bodies are outlines with a face. The cast are someones: each has parts that move on their own, a temperament, a register, and in some cases a second body it becomes.</p>
 
 <h2>Who they are</h2>
 ::table Creature | What it is | Temperament | Parts and habits
@@ -19,7 +19,7 @@
 `orb` | The serious family: a glass sphere | `serene` (floats, still) | no face until it speaks, reacts or looks (`faceOn: 'talk'`)
 `glyph` | The monochrome line family | `precise` (snap blinks) | the `line` material: an outline in its colour, light on dark pages
 ::end
-<p>Use them like any type: <code>&lt;bot-avatar type="owl"&gt;</code>, <code>createBot(el, { type: 'octo' })</code>. Each brings its own defaults (the jelly is glass, the comet a lantern, the glyph a line); anything you set wins. <code>identity</code> keeps picking from the first eighteen, so an id keeps the bot it always had.</p>
+<p>Use them like any type: <code>&lt;bot-avatar type="owl"&gt;</code>, <code>createBot(el, { type: 'octo' })</code>. Each brings its own defaults (the jelly is glass, the comet a lantern, the glyph a line); anything you set wins. <code>identity</code> keeps the draw it always had, so an id keeps its bot (an id that drew a retired shape gets that shape's successor).</p>
 
 <h2>Parts</h2>
 <p>A part is drawn round the body in one of three layers (painted on it, behind it, in front of it) and moves from the pose: trailing parts lag with a spring the simulation runs, wings and frills beat faster when the bot is busy or airborne, arms light up with running tools, a popup rises on success, a shell shrinks away as the body morphs. The kinds: <code>tail</code>, <code>tendrils</code>, <code>wings</code>, <code>frills</code>, <code>arms</code>, <code>shell</code>, <code>plates</code>, <code>slot</code>, <code>popup</code>, <code>sprig</code>, <code>knob</code>, <code>spiral</code>, <code>streak</code>. Parts are plain data on the creature, so they travel to the drawing threads and into exports.</p>

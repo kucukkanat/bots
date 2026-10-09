@@ -5,7 +5,7 @@
 // applies a change, so dragging a slider costs one bot.set() per frame.
 
 import {
-  createBot, BotAvatar, types, presets, BASE_TYPES, creatures, DEFAULTS, SHADINGS, QUIRKS, TEMPERAMENT_NAMES, HATS, GLASSES, STATES, STYLES, EXPRESSIONS,
+  createBot, BotAvatar, types, presets, BASE_TYPES, RETIRED, creatures, DEFAULTS, SHADINGS, QUIRKS, TEMPERAMENT_NAMES, HATS, GLASSES, STATES, STYLES, EXPRESSIONS,
   EYE_STYLES, MOUTH_STYLES, BROWS, EAR_STYLES, FUR_PATTERNS, lookFromId, decodeDNA, shapeToSvgPath,
   loadRenderer, resolveLook, restPose, OVERSCAN, wearables, parseWear, wornList,
 } from '../src/index.js';
@@ -160,7 +160,7 @@ function decodeHash(str) {
     else if (k === 'sounds') o[k] = v === 'true' || v === '' ? true : v === 'false' ? false : clamp(parseFloat(v) || 0, 0, 1);
     else if (k in STRS) o[k] = v;
   }
-  if (!types.includes(o.type)) o.type = 'clover';
+  if (!types.includes(o.type)) o.type = RETIRED[o.type] || 'clover';
   return o;
 }
 
@@ -1110,9 +1110,9 @@ const LOOKS = [
   { name: 'Party droid', o: { type: 'droid', hat: 'party', shading: 'plastic', face: 'mouth' } },
   { name: 'Wizard', o: { type: 'ghost', hat: 'witch', color: '#9A62FF', eyeStyle: 'oval' } },
   { name: 'Teddy', o: { type: 'blob', preset: 'teddy', ears: 'bear', color: '#C58B5A', face: 'mouth', mouthStyle: 'cat' } },
-  { name: 'DJ', o: { type: 'pill', headphones: true, accessoryColor: '#5B5BF7', face: 'mouth' } },
+  { name: 'DJ', o: { type: 'droid', headphones: true, accessoryColor: '#5B5BF7', face: 'mouth' } },
   { name: 'Sticker', o: { type: 'star', preset: 'sticker', blush: true } },
-  { name: 'Bunny', o: { type: 'pebble', ears: 'bunny', blush: true, color: '#F4EFE6' } },
+  { name: 'Bunny', o: { type: 'blob', ears: 'bunny', blush: true, color: '#F4EFE6' } },
 ];
 const thumbBtn = (label, onclick, extra = {}) => {
   const img = h('img', { alt: '', width: '48', height: '48', decoding: 'async' });

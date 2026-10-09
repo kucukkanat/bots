@@ -50,7 +50,7 @@
     <main id="main" class="doc-main">
       <article class="prose">
 <h1>The cast</h1>
-<p class="sub">The first eighteen bodies are outlines with a face. The cast are someones: each has parts that move on their own, a temperament, a register, and in some cases a second body it becomes.</p>
+<p class="sub">The first fourteen bodies are outlines with a face. The cast are someones: each has parts that move on their own, a temperament, a register, and in some cases a second body it becomes.</p>
 
 <h2 id="who-they-are">Who they are<a class="anchor" href="#who-they-are" aria-label="Link to this section">#</a></h2>
 <div class="table-wrap"><table class="props"><thead><tr><th scope="col">Creature</th><th scope="col">What it is</th><th scope="col">Temperament</th><th scope="col">Parts and habits</th></tr></thead><tbody>
@@ -69,7 +69,7 @@
 <tr><td data-label="Creature"><code>orb</code></td><td data-label="What it is">The serious family: a glass sphere</td><td data-label="Temperament"><code>serene</code> (floats, still)</td><td data-label="Parts and habits">no face until it speaks, reacts or looks (<code>faceOn: 'talk'</code>)</td></tr>
 <tr><td data-label="Creature"><code>glyph</code></td><td data-label="What it is">The monochrome line family</td><td data-label="Temperament"><code>precise</code> (snap blinks)</td><td data-label="Parts and habits">the <code>line</code> material: an outline in its colour, light on dark pages</td></tr>
 </tbody></table></div>
-<p>Use them like any type: <code>&lt;bot-avatar type="owl"&gt;</code>, <code>createBot(el, { type: 'octo' })</code>. Each brings its own defaults (the jelly is glass, the comet a lantern, the glyph a line); anything you set wins. <code>identity</code> keeps picking from the first eighteen, so an id keeps the bot it always had.</p>
+<p>Use them like any type: <code>&lt;bot-avatar type="owl"&gt;</code>, <code>createBot(el, { type: 'octo' })</code>. Each brings its own defaults (the jelly is glass, the comet a lantern, the glyph a line); anything you set wins. <code>identity</code> keeps the draw it always had, so an id keeps its bot (an id that drew a retired shape gets that shape's successor).</p>
 
 <h2 id="parts">Parts<a class="anchor" href="#parts" aria-label="Link to this section">#</a></h2>
 <p>A part is drawn round the body in one of three layers (painted on it, behind it, in front of it) and moves from the pose: trailing parts lag with a spring the simulation runs, wings and frills beat faster when the bot is busy or airborne, arms light up with running tools, a popup rises on success, a shell shrinks away as the body morphs. The kinds: <code>tail</code>, <code>tendrils</code>, <code>wings</code>, <code>frills</code>, <code>arms</code>, <code>shell</code>, <code>plates</code>, <code>slot</code>, <code>popup</code>, <code>sprig</code>, <code>knob</code>, <code>spiral</code>, <code>streak</code>. Parts are plain data on the creature, so they travel to the drawing threads and into exports.</p>
