@@ -185,7 +185,7 @@ function furSkin(shape, look, la, px) {
 
   const S = Math.ceil(SKIN_EXT * 2 * P);
   const canvas = makeCanvas(S, S);
-  const g = canvas.getContext('2d');
+  const g = canvas.getContext('2d', { willReadFrequently: true });
   const rand = mulberry32(0.6180339);
   const lx = Math.sin(la), ly = -Math.cos(la);
   g.fillStyle = '#808080';
@@ -253,6 +253,18 @@ function furSkin(shape, look, la, px) {
   tiers[1].forEach((p, i) => { g.strokeStyle = i < 2 ? `rgba(0,0,0,${0.26 - i * 0.1})` : `rgba(255,255,255,${0.06 + (i - 2) * 0.07})`; g.stroke(p); });
   g.lineWidth = width * 0.85;
   tiers[2].forEach((p, i) => { g.strokeStyle = i < 1 ? 'rgba(0,0,0,0.16)' : `rgba(255,255,255,${0.07 + (i - 1) * 0.08})`; g.stroke(p); });
+
+  // Overlay is only neutral around mid grey: lift or sink the whole skin so
+  // its average sits there, and the fur adds texture without shifting the
+  // body's colour however much of it is showing.
+  const data = g.getImageData(0, 0, S, S).data;
+  let sum = 0, cnt = 0;
+  for (let i = 0; i < data.length; i += 4 * 7) { sum += data[i]; cnt++; }
+  const mean = sum / cnt;
+  if (Math.abs(mean - 128) > 0.5) {
+    g.fillStyle = mean < 128 ? `rgba(255,255,255,${(128 - mean) / (255 - mean)})` : `rgba(0,0,0,${(mean - 128) / mean})`;
+    g.fillRect(0, 0, S, S);
+  }
 
   skin = { canvas, P, S };
   skins.set(key, skin);
@@ -515,28 +527,29 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }) {
       // The baked skin rides on the front of the body with the turn. Seen edge
       // on it would smear, so it gives way to the slices' own shading there.
       const skin = furSkin(shape, look, la, R * dpr);
+      // One copy at a constant strength, so the fur never changes the body's
+      // tone as it turns. It follows the turn, but is never squeezed narrower
+      // than half width: edge on, it still covers the side that shows.
       const zf = D * 0.6, e = SKIN_EXT;
-      const facingK = smoothstep(Math.abs(c0) * 1.4 - 0.2);
-      lc.save();
-      // Overlay can't darken near-white, so pale bodies also take the skin
-      // in 'multiply' to show their pile.
-      const pale = clamp((luminance(base) - 0.5) * 1.2, 0, 0.5);
-      for (const [alpha, dz, op] of [[0.6, -2 * zf, 'overlay'], [1, 0, 'overlay'], [pale, 0, 'multiply']]) {
-        if (alpha <= 0) continue;
-        lc.globalCompositeOperation = op;
-        // A second, fainter copy at the back covers the side that shows mid-turn.
-        if (alpha < 1 && Math.abs(s) < 0.15) continue;
-        const pat = lc.createPattern(skin.canvas, 'no-repeat');
-        if (!pat) continue;
-        const z = zf + dz;
-        // Skin pixels → body units → the front of the body, turned.
-        pat.setTransform(new DOMMatrix([R * c, -R * s * sp, 0, R * cp, R * z * s, R * z * c0 * sp])
+      const cx2 = Math.sign(c) * Math.max(Math.abs(c), 0.5);
+      const pat = lc.createPattern(skin.canvas, 'no-repeat');
+      if (pat) {
+        pat.setTransform(new DOMMatrix([R * cx2, -R * s * sp, 0, R * cp, R * zf * s, R * zf * c0 * sp])
           .translate(-e, -e).scale(1 / skin.P));
-        lc.globalAlpha = alpha * (0.55 + 0.45 * facingK);
+        lc.save();
         lc.fillStyle = pat;
+        lc.globalCompositeOperation = 'overlay';
         lc.fill(body);
+        // Overlay can't darken near-white, so pale bodies also take the skin
+        // in 'multiply' to show their pile.
+        const pale = clamp((luminance(base) - 0.5) * 0.8, 0, 0.3);
+        if (pale > 0) {
+          lc.globalCompositeOperation = 'multiply';
+          lc.globalAlpha = pale;
+          lc.fill(body);
+        }
+        lc.restore();
       }
-      lc.restore();
     }
 
     const q = clamp(120 / Math.max(W, H), 0.2, 0.5);
