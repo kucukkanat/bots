@@ -12,6 +12,11 @@ export type BotExpression = 'neutral' | 'happy' | 'joy' | 'surprised' | 'worried
 /** Face channels for expressions and custom states. */
 export interface BotFace { brow?: number; browTilt?: number; eyeWide?: number; squint?: number; smile?: number; mouthOpen?: number; happy?: number; dizzy?: number; blushPulse?: number }
 export interface BotAccessory { src?: string; image?: CanvasImageSource; x?: number; y?: number; size?: number; rotate?: number; layer?: 'front' | 'back'; crossOrigin?: string }
+/** A badge by the head; 'auto' follows the state (working → loading, thinking → typing, success → done, error → error). */
+export type BotStatus = 'none' | 'typing' | 'loading' | 'done' | 'error' | 'auto';
+export type BotMood = 'neutral' | 'happy' | 'sleepy' | 'excited' | 'grumpy' | 'calm';
+export type BotEventName = 'poke' | 'blink' | 'jump' | 'land' | 'state' | 'say-start' | 'say-end' | 'mood';
+export interface BotEvent { type: BotEventName; bot: BotAvatar; state?: BotState; text?: string; interrupted?: boolean; mood?: BotMood; energy?: number }
 export type BotGlasses = 'none' | 'round' | 'square' | 'shades';
 
 export interface BotPose {
@@ -121,6 +126,12 @@ export interface BotOptions {
   renderer?: 'auto' | 'canvas';
   /** 'auto': without WebGL, trade a little detail for speed. 'high': never. */
   quality?: 'auto' | 'high';
+  /** A status badge by the head (loads on first use). Default 'none'. */
+  status?: BotStatus;
+  /** Bias motion and face by a mood; 'auto' drifts with play and idle time (loads on first use). */
+  mood?: BotMood | 'auto' | 'none';
+  /** Glance at other social bots on the page and react when they're poked (loads on first use). */
+  social?: boolean;
 }
 
 export declare class BotAvatar {
@@ -144,7 +155,16 @@ export declare class BotAvatar {
   setVoice(level: number | null): this;
   /** Keep an eye on an element or a client-space point; null to stop. */
   lookAt(target: Element | { x: number; y: number } | null): this;
-  on(event: 'poke' | 'blink' | 'jump' | 'land' | 'state', fn: (e: { type: string; bot: BotAvatar; state?: string }) => void): () => void;
+  /**
+   * Lip-sync text with no audio: switches to 'speaking' and back, resolves when done.
+   * A new call replaces the utterance; '' or null stops; `append: true` queues streamed chunks.
+   */
+  say(text: string | null, options?: { wpm?: number; append?: boolean }): Promise<void>;
+  /** The current mood while the `mood` option is on, else null. */
+  readonly mood: { name: BotMood; energy: number } | null;
+  /** Load a lazily loaded feature ('say', 'status', 'mood', 'social') and resolve to its controller. */
+  feature(name: string): Promise<unknown>;
+  on(event: BotEventName, fn: (e: BotEvent) => void): () => void;
   /** The whole design as a short code. */
   readonly dna: string;
   export(options?: { format?: 'gif' | 'apng' | 'webm' | 'sprite' | 'png' | 'webp'; duration?: number; fps?: number; scale?: number; background?: string }): Promise<Blob>;
@@ -202,7 +222,7 @@ export declare function buildShape(points: [number, number][], meta?: Partial<Bo
 export declare function shapeToSvgPath(type: BotType): string;
 export declare function shapeFromSvgPath(d: string, base?: BotType): BotShape | null;
 export declare function defineBotAvatar(name?: string): void;
-export declare class BotAvatarElement extends HTMLElement { readonly bot: BotAvatar | null; poke(): void; }
+export declare class BotAvatarElement extends HTMLElement { readonly bot: BotAvatar | null; poke(): void; say(text: string | null, options?: { wpm?: number; append?: boolean }): Promise<void>; }
 export declare function autoInk(color: string): string;
 export declare function adjust(color: string, o?: { brightness?: number; saturation?: number }): string;
 export declare function shade(color: string, amount: number, hue?: number, sat?: number): string;

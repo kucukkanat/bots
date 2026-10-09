@@ -1,19 +1,20 @@
 // React wrapper: <BotAvatar type="clover" state="working" />
 // Kept dependency-free at the library level: React is a peer import here only.
 // onReady(bot) hands over the controller (for react(), speak(), lookAt(), …);
-// onPoke, onBlink, onJump, onLand and onState listen to its events.
+// onPoke, onBlink, onJump, onLand, onState, onSayStart, onSayEnd and onMood
+// listen to its events.
 
 import { createElement, useEffect, useRef } from 'react';
 import { BotAvatar as Controller } from './bot.js';
 
-const EVENTS = { onPoke: 'poke', onBlink: 'blink', onJump: 'jump', onLand: 'land', onState: 'state' };
+const EVENTS = { onPoke: 'poke', onBlink: 'blink', onJump: 'jump', onLand: 'land', onState: 'state', onSayStart: 'say-start', onSayEnd: 'say-end', onMood: 'mood' };
 
-export function BotAvatar({ className, style, onReady, onPoke, onBlink, onJump, onLand, onState, ...options }) {
+export function BotAvatar({ className, style, onReady, onPoke, onBlink, onJump, onLand, onState, onSayStart, onSayEnd, onMood, ...options }) {
   const host = useRef(null);
   const bot = useRef(null);
   const last = useRef('');
   const handlers = useRef({});
-  handlers.current = { onPoke, onBlink, onJump, onLand, onState };
+  handlers.current = { onPoke, onBlink, onJump, onLand, onState, onSayStart, onSayEnd, onMood };
   useEffect(() => {
     const b = (bot.current = new Controller(host.current, options));
     last.current = JSON.stringify(options);

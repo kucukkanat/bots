@@ -337,6 +337,23 @@ export class BotAvatar {
     return this;
   }
 
+  /**
+   * Lip-sync `text` with no audio: the avatar switches to 'speaking', its
+   * mouth follows the letters (vowels open, m/b/p closed, pauses at
+   * punctuation) at `wpm` words a minute, and the state it was in comes back
+   * after. Resolves when it's done. A new call replaces what's being said;
+   * `say('')` stops. For streamed text (LLM tokens), pass `append: true` to
+   * queue each chunk onto the current utterance instead; once it catches up
+   * it waits a moment for more before ending. Fires 'say-start' / 'say-end'.
+   */
+  say(text, options) {
+    if (!text && !this._features.has('say')) return Promise.resolve();
+    return this.feature('say').then((f) => f?.say(text, options));
+  }
+
+  /** The mood ({ name, energy }) while the `mood` option is on, else null. */
+  get mood() { return this._features.get('mood')?.ctl?.current ?? null; }
+
   /** Drive the speaking mouth by hand: 0 (closed) … 1 (wide); null for made-up chatter. */
   setVoice(level) { this.sim.setVoice(level); return this; }
 
@@ -347,7 +364,8 @@ export class BotAvatar {
   lookAt(target) { this._lookAt = target || null; return this; }
 
   /**
-   * Listen for 'poke', 'blink', 'jump', 'land' or 'state'. Returns a function
+   * Listen for 'poke', 'blink', 'jump', 'land', 'state', 'say-start',
+   * 'say-end' or 'mood'. Returns a function
    * that stops listening. The same events bubble from the canvas as
    * 'bot-poke', 'bot-blink', … DOM events.
    */
@@ -542,3 +560,7 @@ export { settings as renderSettings, stats as renderStats } from './pool.js';
 
 // Lazily loaded features: one line each, nothing fetched until used.
 // defineFeature(name, () => import('./features/<name>.js'), optionKey?)
+defineFeature('say', () => import('./features/say.js'));
+defineFeature('status', () => import('./features/status.js'), 'status');
+defineFeature('mood', () => import('./features/mood.js'), 'mood');
+defineFeature('social', () => import('./features/social.js'), 'social');
