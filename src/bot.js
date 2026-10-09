@@ -484,7 +484,7 @@ export class BotAvatar {
    */
   _changed() {
     const p = this.sim.pose, q = this._drawn;
-    if (!q || p.sleep > 0.05 || p.think > 0.05 || (p.whirl > 0.02 && this.options.whirl > 0)) return true;
+    if (!q || p.sleep > 0.05 || p.think > 0.05 || (p.whirl > 0.02 && this.options.whirl > 0) || p.ruffle !== q.ruffle) return true;
     const px = this.options.size * BODY * this.dpr;
     const geo = (Math.abs(p.yaw - q.yaw) + Math.abs(p.pitch - q.pitch)) * 1.6 + Math.abs(p.roll - q.roll) * 2
       + Math.abs(p.x - q.x) + Math.abs(p.y - q.y) + Math.abs(p.sx - q.sx) + Math.abs(p.sy - q.sy) * 2;
@@ -576,3 +576,6 @@ export { settings as renderSettings, stats as renderStats } from './pool.js';
 
 // Lazily loaded features: one line each, nothing fetched until used.
 // defineFeature(name, () => import('./features/<name>.js'), optionKey?)
+defineFeature('toss', () => import('./features/toss.js'), 'toss');
+defineFeature('petting', () => import('./features/petting.js'), 'petting');
+defineFeature('sounds', () => import('./features/sounds.js'), 'sounds');

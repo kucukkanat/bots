@@ -12,13 +12,16 @@ const NUMBERS = ['size', 'brightness', 'saturation', 'depth', 'light', 'shadow',
   'speed', 'seed', 'turn', 'jump-every', 'jump-height', 'jump-time', 'jump-spin', 'jump-squash', 'jump-stretch', 'jump-lean',
   'face-scale', 'eye-size', 'eye-gap', 'face-x', 'face-y', 'roundness', 'gloss', 'fill-strength',
   'blink-rate', 'glance-rate', 'breathing', 'jiggle', 'whirl'];
-const BOOLEANS = ['headphones', 'bow-tie', 'blush', 'eye-shine', 'paused', 'interactive', 'freckles', 'scarf'];
+const BOOLEANS = ['headphones', 'bow-tie', 'blush', 'eye-shine', 'paused', 'interactive', 'freckles', 'scarf',
+  'toss', 'petting'];
 const STRINGS = ['type', 'state', 'face', 'color', 'ink', 'shading', 'hat', 'glasses', 'accessory-color', 'path', 'label', 'theme',
   'blush-color', 'renderer', 'quality', 'preset', 'dna', 'identity', 'fur-pattern', 'fur-color2', 'light-color', 'fill-color',
   'rim-color', 'eye-style', 'iris-color', 'brows', 'mouth-style', 'expression', 'whirl-color', 'scarf-color', 'badge',
   'badge-color', 'ears', 'antennae'];
 const JSONS = ['fur', 'material', 'face-options', 'motion', 'wear', 'accessories'];
-const ATTRS = [...NUMBERS, ...BOOLEANS, ...STRINGS, ...JSONS];
+// On/off or a level: present (or "true") is on, "false" off, a number sets it.
+const LEVELS = ['sounds'];
+const ATTRS = [...NUMBERS, ...BOOLEANS, ...STRINGS, ...JSONS, ...LEVELS];
 
 const CSS_VARS = {
   color: '--bot-color', ink: '--bot-ink', accessoryColor: '--bot-accessory-color', blushColor: '--bot-blush-color',
@@ -36,6 +39,10 @@ function readOptions(el) {
   }
   for (const a of BOOLEANS) if (el.hasAttribute(a)) o[camel(a)] = el.getAttribute(a) !== 'false';
   for (const a of STRINGS) if (el.hasAttribute(a)) o[camel(a)] = el.getAttribute(a);
+  for (const a of LEVELS) if (el.hasAttribute(a)) {
+    const v = el.getAttribute(a);
+    o[camel(a)] = v === '' || v === 'true' ? true : v === 'false' ? false : Number.isFinite(parseFloat(v)) ? parseFloat(v) : true;
+  }
   for (const a of JSONS) if (el.hasAttribute(a)) {
     let v;
     try { v = JSON.parse(el.getAttribute(a)); } catch { continue; }
