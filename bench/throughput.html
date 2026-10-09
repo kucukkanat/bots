@@ -1,0 +1,24 @@
+<!doctype html><meta charset="utf-8"><body><script type="module">
+const qs = new URLSearchParams(location.search);
+const dir = qs.get('dir');
+const { drawBot, OVERSCAN } = await import(dir + 'render.js');
+const { resolveLook } = await import(dir + 'bot.js');
+const { BotSim } = await import(dir + 'engine.js');
+const { types } = await import(dir + 'shapes.js');
+const extra = JSON.parse(qs.get('extra') || '{}');
+const N = 30, F = 60;
+const bots = Array.from({ length: N }, (_, i) => {
+  const c = document.createElement('canvas'); c.width = c.height = 288; document.body.append(c);
+  return { g: c.getContext('2d'), look: resolveLook({ type: types[i % 18], theme: 'light', ...extra }), sim: new BotSim(i / N, i % 3 === 1 ? 'working' : 'default', extra) };
+});
+// warm up
+for (const b of bots) drawBot(b.g, { size: 96, dpr: 2, pose: b.sim.update(1 / 60), look: b.look, time: 0 });
+bots[0].g.getImageData(0, 0, 1, 1);
+await new Promise((r) => setTimeout(r, 200));
+const t0 = performance.now();
+for (let f = 0; f < F; f++) {
+  for (const b of bots) drawBot(b.g, { size: 96, dpr: 2, pose: b.sim.update(1 / 60), look: b.look, time: f / 60 });
+  for (const b of bots) b.g.getImageData(0, 0, 1, 1);
+}
+window.__ms = (performance.now() - t0) / F;
+</script>
