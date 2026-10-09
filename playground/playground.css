@@ -2,7 +2,10 @@
 .crumb { color: var(--muted); font-weight: 500; padding-left: 12px; border-left: 1px solid var(--line); }
 
 .pg { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; padding-top: 24px; padding-bottom: 24px; align-items: start; }
-@media (max-width: 900px) { .pg { grid-template-columns: 1fr; } }
+/* One column on narrow screens: minmax(0, …) so long rows (state buttons,
+   code) scroll inside themselves instead of widening the page. */
+@media (max-width: 900px) { .pg { grid-template-columns: minmax(0, 1fr); } }
+.stage-col, .controls-col, .stage-bar > *, .panel { min-width: 0; }
 
 .stage-col { position: sticky; top: 84px; display: flex; flex-direction: column; gap: 12px; }
 @media (max-width: 900px) { .stage-col { position: static; } }
@@ -139,3 +142,14 @@ textarea.path {
 .text-input.wide { width: 100%; }
 .dna { display: flex; gap: 8px; align-items: center; }
 .dna .text-input { flex: 1; }
+
+@media (max-width: 600px) {
+  .pg { padding-top: 12px; gap: 16px; }
+  .stage { border-radius: 20px; }
+  .stage-bar .seg { width: 100%; flex-wrap: wrap; overflow: visible; }
+  .stage-bar .seg button { flex: 1 1 auto; }
+  .stage-actions .btn.small { flex: 1 1 auto; }
+  .group .body { padding: 0 12px 14px; }
+  .adv-bar { flex-direction: column; align-items: stretch; }
+  .adv-bar .ctl { grid-template-columns: 1fr; }
+}

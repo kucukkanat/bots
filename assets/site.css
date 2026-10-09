@@ -56,6 +56,9 @@ code, pre, kbd { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Me
 
 .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
 @media (max-width: 600px) { .wrap { padding: 0 16px; } }
+/* Avatars draw a little past their box (hops never clip); that overhang must
+   never make the page scroll sideways. */
+html, body { overflow-x: clip; }
 
 /* Header */
 .top {
@@ -139,6 +142,15 @@ table.props th { font-size: 12px; text-transform: uppercase; letter-spacing: .06
 table.props tr:last-child td { border-bottom: 0; }
 table.props td:first-child { white-space: nowrap; font-weight: 600; }
 .table-scroll { overflow-x: auto; border-radius: 16px; }
+/* On phones the options table becomes a list of cards. */
+@media (max-width: 600px) {
+  table.props, table.props tbody, table.props tr, table.props td { display: block; width: 100%; }
+  table.props thead { display: none; }
+  table.props tr { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  table.props td { padding: 2px 0; border: 0; }
+  table.props td:first-child { white-space: normal; }
+  table.props td:last-child::before { content: 'Default: '; color: var(--muted); }
+}
 
 .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
 .row .card { flex: 1 1 140px; }

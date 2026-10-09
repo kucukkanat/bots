@@ -196,7 +196,7 @@ function seg(key, label, values, labels = values) {
 function select(key, label, values, labels = values) {
   const sel = h('select', { 'aria-label': label }, ...values.map((v, i) => h('option', { value: v }, labels[i])));
   sel.addEventListener('change', () => update({ [key]: sel.value }));
-  syncs.push(() => { sel.value = opts[key] ?? defaultOf(key, opts); });
+  syncs.push(() => { sel.value = opts[key] ?? defaultOf(key, opts) ?? ''; });
   return row(label, sel);
 }
 function text(key, label, placeholder) {
