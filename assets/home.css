@@ -1,7 +1,7 @@
 /* Landing page only. */
 
 /* Hero ------------------------------------------------------------------- */
-.hero { position: relative; padding: 56px 0 0; isolation: isolate; }
+.hero { position: relative; padding: 44px 0 0; isolation: isolate; }
 .hero::before {
   content: ''; position: absolute; z-index: -1; left: 0; right: 0; top: 0; height: 1100px; pointer-events: none;
   background:
@@ -19,8 +19,8 @@
 .pill code { background: none; border: 0; padding: 0; color: var(--text); font-size: 12.5px; }
 .pill-tag { background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 11.5px; padding: 3px 9px; border-radius: 99px; letter-spacing: .01em; }
 .hero h1 {
-  font-size: clamp(40px, 6.6vw, 76px); line-height: 1.02; letter-spacing: -0.048em; font-weight: 800;
-  margin: 22px 0 18px; text-wrap: balance;
+  font-size: clamp(40px, 6.6vw, 70px); line-height: 1.02; letter-spacing: -0.048em; font-weight: 800;
+  margin: 20px 0 16px; text-wrap: balance;
 }
 .glow {
   background: linear-gradient(100deg, var(--accent) 10%, #b26bff 45%, var(--warm) 90%);
@@ -32,7 +32,7 @@
 
 /* The demo window */
 .demo {
-  margin: 48px auto 0; max-width: 1000px; border-radius: 24px; background: var(--card);
+  margin: 40px auto 0; max-width: 1000px; border-radius: 24px; background: var(--card);
   border: 1px solid var(--line); box-shadow: var(--shadow-lg); overflow: hidden;
 }
 .demo-bar {
@@ -41,7 +41,7 @@
 }
 .demo-bar i { width: 11px; height: 11px; border-radius: 50%; background: var(--line-2); }
 .demo-bar span { margin: 0 auto; transform: translateX(-24px); font: 500 12px/1 var(--mono); color: var(--muted); }
-.demo-body { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); height: 460px; }
+.demo-body { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); height: 440px; }
 
 .stage {
   position: relative; display: grid; place-items: center; overflow: hidden;

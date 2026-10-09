@@ -66,7 +66,7 @@ export function enhanceCode(root = document) {
       pre.replaceWith(box);
       box.append(pre);
     }
-    box.append(copyButton(() => pre.textContent));
+    box.append(copyButton(() => pre.textContent.replace(/^\$ /gm, '')));
   }
 }
 

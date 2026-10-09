@@ -72,8 +72,8 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 a { color: inherit; }
-code, pre, kbd { font-family: var(--mono); font-size: 13px; }
-:not(pre) > code { background: var(--bg-2); padding: 2px 6px; border-radius: 6px; border: 1px solid var(--line); font-size: 0.86em; }
+code, pre, kbd { font-family: var(--mono); font-size: 13px; font-variant-ligatures: none; }
+:not(pre) > code { background: var(--bg-2); padding: 2px 6px; border-radius: 6px; border: 1px solid var(--line); font-size: 0.86em; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 img, svg { max-width: 100%; }
 /* An avatar reserves its box before the library defines the element. */
 bot-avatar { display: inline-block; line-height: 0; }

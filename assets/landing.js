@@ -186,7 +186,6 @@ const crewCards = CREW.map((m, i) => {
   const card = document.createElement('button');
   card.type = 'button';
   card.className = 'crew-card';
-  card.setAttribute('role', 'listitem');
   card.setAttribute('aria-pressed', String(i === 0));
   card.setAttribute('aria-label', `Hire ${m.label}, ${m.role}`);
   const slot = document.createElement('div');
