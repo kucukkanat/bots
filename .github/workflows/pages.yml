@@ -72,9 +72,10 @@ jobs:
       - name: Assemble site
         run: |
           mkdir _site
-          cp -r index.html assets playground src dist docs c LICENSE _site/
+          cp -r index.html manifest.webmanifest sw.js assets playground src dist docs c LICENSE _site/
           rm -rf _site/docs/src _site/docs/build.mjs _site/docs/screenshots.mjs
           touch _site/.nojekyll
+          node scripts/precache.mjs _site
       - uses: actions/configure-pages@v5
         with:
           enablement: true

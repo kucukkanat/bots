@@ -7,6 +7,10 @@ All notable changes to `@kucukkanat/bots` are recorded here. The format follows
 ## [Unreleased] - 1.1.0
 
 ### Added
+- The site is a PWA: installable (manifest, icons rendered from the plush bot),
+  and offline after the first visit. Each deploy precaches the whole site as
+  one versioned set (`scripts/precache.mjs` writes it into `sw.js`), so pages
+  never mix files from two deploys; a new deploy offers a reload.
 - **Agent features** (each a lazily loaded module): `bot.say(text, { wpm, append })`
   lip-syncs from text with no audio, and streams LLM tokens with `append`;
   `status` badges (`typing`, `loading`, `done`, `error`, `auto`); `mood`

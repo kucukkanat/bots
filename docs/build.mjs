@@ -79,7 +79,10 @@ export function head(root, title, description, extraCss = '') {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="${root}assets/site.css" />${extraCss}
-  <link rel="icon" href="${root}assets/favicon.svg" type="image/svg+xml" />`;
+  <link rel="icon" href="${root}assets/favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="${root}manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="${root}assets/icons/apple-touch-icon.png" />
+  <script type="module" src="${root}assets/pwa.js"></script>`;
 }
 
 export function footer(root) {
