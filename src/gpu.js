@@ -516,9 +516,21 @@ export class GpuBody {
       gl.disable(gl.BLEND);
     }
 
-    // 5. Resolve to the top-left of the drawing buffer and hand it over.
+    // 5. Hand it over from the top-left of the drawing buffer. Resolving a
+    //    multisampled buffer only works between identical rectangles, and the
+    //    shared canvas is often bigger than this avatar (it grows for the
+    //    largest one drawn), so resolve into a texture of the same size first,
+    //    then copy that into place.
     const ch = this.canvas.height;
+    const out = this._target('out', W, H);
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, ms.fb);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, out.fb);
+    gl.blitFramebuffer(0, 0, W, H, 0, 0, W, H, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, this.canvas.width, ch);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, out.fb);
     gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
     gl.blitFramebuffer(0, 0, W, H, 0, ch - H, W, ch, gl.COLOR_BUFFER_BIT, gl.NEAREST);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
