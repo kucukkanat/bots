@@ -50,10 +50,11 @@ export default {
     parts: [
       // The tail: three streaks from one root, trailing the body's motion and longer the faster it
       // goes. Behind the body the first listed lands on top: a short pale core over a golden streak
-      // over a long amber one, so it fades from hot to ember along its length.
-      { kind: 'streak', anchor: ROOT, len: 0.7, color: '#FFF0A8', layer: 'back' },
-      { kind: 'streak', anchor: ROOT, len: 1.05, color: '#FFC84A', layer: 'back' },
-      { kind: 'streak', anchor: ROOT, len: 1.35, color: '#FF9E3D', layer: 'back' },
+      // over a long orange one, so it fades from hot to ember along its length. The two deeper
+      // layers are what shows on a light page, where the pale core and the sparkles wash out.
+      { kind: 'streak', anchor: ROOT, len: 0.7, color: '#FFF2B0', layer: 'back' },
+      { kind: 'streak', anchor: ROOT, len: 1.1, color: '#FFC240', layer: 'back' },
+      { kind: 'streak', anchor: ROOT, len: 1.3, color: '#FF8E32', layer: 'back' },
     ],
   },
   temperament: 'showOff',
