@@ -23,7 +23,7 @@ const GROUPS = {
     angle: 'light', color: 'lightColor', fill: 'fillColor', fillStrength: 'fillStrength', rimColor: 'rimColor',
     shadow: 'shadow', highlight: 'highlight', rim: 'rim', spread: 'spread',
   },
-  material: { shading: 'shading', roundness: 'roundness', gloss: 'gloss', depth: 'depth' },
+  material: { shading: 'shading', roundness: 'roundness', gloss: 'gloss', depth: 'depth', glow: 'glow', glowColor: 'glowColor', quirk: 'quirk' },
   face: {
     features: 'face', ink: 'ink', x: 'faceX', y: 'faceY', scale: 'faceScale', blush: 'blush', blushColor: 'blushColor',
     brows: 'brows', mouth: 'mouthStyle', freckles: 'freckles', expression: 'expression',
@@ -93,6 +93,9 @@ export const STYLES = {
   clay: { shading: 'smooth', roundness: 0.8, highlight: 0.8, shadow: 0.9 },
   sticker: { shading: 'crisp', depth: 0.3, roundness: 0.4 },
   paper: { shading: 'flat', depth: 0.25, roundness: 0.2 },
+  glass: { shading: 'glass', roundness: 0.9, highlight: 1.2 },
+  lantern: { shading: 'lantern', roundness: 0.85 },
+  ragdoll: { shading: 'fabric', furLength: 0.5, furDensity: 1.3, furFuzz: 0.4, furCurl: 0.3, quirk: 'stitches patch', roundness: 0.7 },
 };
 
 // --- Expressions -----------------------------------------------------------------
@@ -129,6 +132,7 @@ const DNA_KEYS = [
   'turn', 'blinkRate', 'glanceRate', 'breathing', 'jiggle', 'whirl', 'whirlColor', 'jumpEvery', 'jumpHeight', 'jumpTime',
   'jumpSpin', 'jumpSquash', 'jumpStretch', 'jumpLean', 'scarf', 'scarfColor', 'badge', 'badgeColor', 'ears', 'antennae',
   'path', 'preset', 'label', 'toss', 'petting', 'sounds', 'status', 'mood', 'social',
+  'quirk', 'temperament', 'affect', 'announce', 'glow', 'glowColor',
 ];
 const b64 = {
   enc: (s) => {
@@ -221,6 +225,7 @@ export function normalizeOptions(opts = {}) {
     else flat[k] = v;
   }
   for (const k of Object.keys(flat)) if (flat[k] === undefined) delete flat[k];
+  if (Array.isArray(flat.quirk)) flat.quirk = flat.quirk.join(' ');
   if (worn) { delete flat.wear; flat = { ...worn, ...flat }; }
   const fromId = flat.identity ? lookFromId(flat.identity) : {};
   const fromDna = flat.dna ? decodeDNA(flat.dna) : {};

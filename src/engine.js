@@ -64,10 +64,12 @@ class Blinker {
     this.wait = min + rand() * (max - min);
     this.t = -1;
     this.double = false;
+    // Machines blink in a snap: shut, then open, no ease.
+    this.snap = !!opts.snap;
   }
   update(dt) {
     if (this.t >= 0) {
-      this.t += dt / 0.17;
+      this.t += dt / (this.snap ? 0.11 : 0.17);
       if (this.t >= 1) {
         this.t = -1;
         if (this.double) { this.double = false; this.wait = 0.12; }
@@ -78,7 +80,8 @@ class Blinker {
       this.double = this.rand() < 0.22;
       this.emit('blink');
     }
-    return this.t < 0 ? 1 : 1 - Math.sin(this.t * Math.PI);
+    if (this.t < 0) return 1;
+    return this.snap ? (this.t < 0.6 ? 0 : 1) : 1 - Math.sin(this.t * Math.PI);
   }
 }
 
@@ -93,15 +96,27 @@ class Idle {
     this.glance = (1 + rand() * 2) / (opts.glanceRate ?? 1);
     this.jumpP = -1;
     this.jumpWait = this.nextJump();
+    // Aloof: now and then it ignores the pointer and looks the other way.
+    this.ignore = 0; this.ignoreWait = 3 + rand() * 5;
+    // Shy: a poke makes it duck and blush instead of hopping.
+    this.duck = -1;
   }
   nextJump() {
     const every = this.opts.jumpEvery ?? 8;
     return every > 0 ? every * (0.6 + this.rand() * 0.8) : Infinity;
   }
-  poke() { if (this.jumpP < 0) { this.jumpP = 0; this.emit('jump'); } }
+  poke() {
+    if (this.opts.shy) { if (this.duck < 0) this.duck = 0; return; }
+    if (this.jumpP < 0) { this.jumpP = 0; this.emit('jump'); }
+  }
   update(dt, t, pointer) {
     const o = this.opts;
     const turn = o.turn ?? 1;
+    let aloof = 0;
+    if (o.aloof && pointer) {
+      if (this.ignore > 0) { this.ignore -= dt; aloof = Math.min(1, this.ignore / 0.4, 1); }
+      else if ((this.ignoreWait -= dt) <= 0) { this.ignore = 1.6 + this.rand() * 2; this.ignoreWait = 4 + this.rand() * 6; }
+    } else this.ignore = 0;
     if ((this.glance -= dt) <= 0) {
       // Look to a corner, hold, swing across to the opposite one.
       this.side = -this.side;
@@ -111,32 +126,48 @@ class Idle {
       this.glance = (1.6 + this.rand() * 2.8) / (o.glanceRate ?? 1);
     }
     let tx = this.look.tx, ty = this.look.ty;
-    if (pointer) { tx = pointer.x; ty = pointer.y; }
+    if (pointer) {
+      tx = pointer.x; ty = pointer.y;
+      // Looking the other way, chin up a touch.
+      if (aloof) { tx = -pointer.x * 0.8 * aloof + tx * (1 - aloof); ty = (pointer.y * 0.3 - 0.15) * aloof + ty * (1 - aloof); }
+    }
     this.look.x = approach(this.look.x, tx, pointer ? 9 : 5, dt);
     this.look.y = approach(this.look.y, ty, pointer ? 9 : 5, dt);
 
     if (this.jumpP < 0 && (this.jumpWait -= dt) <= 0) { this.jumpP = 0; this.emit('jump'); }
     let j = { y: 0, sx: 1, sy: 1, spin: 0 };
+    const fl = o.float ? 1 : 0;
     if (this.jumpP >= 0) {
-      this.jumpP += dt / (o.jumpTime ?? 0.95);
-      j = jumpCurve(this.jumpP, (o.jumpHeight ?? 0.42), { squash: o.jumpSquash ?? 1, stretch: o.jumpStretch ?? 1 });
+      // Floating things rise and settle with no crouch or landing squash.
+      this.jumpP += dt / (o.jumpTime ?? (fl ? 1.5 : 0.95));
+      j = jumpCurve(this.jumpP, (o.jumpHeight ?? (fl ? 0.3 : 0.42)), { squash: fl ? 0 : (o.jumpSquash ?? 1), stretch: fl ? 0.4 : (o.jumpStretch ?? 1) });
       if (this.jumpP >= 1) { this.jumpP = -1; this.jumpWait = this.nextJump(); j.spin = 0; this.emit('land'); }
+    }
+    let duck = 0;
+    if (this.duck >= 0) {
+      this.duck += dt / 1.2;
+      duck = Math.sin(Math.min(1, this.duck) * Math.PI);
+      if (this.duck >= 1) this.duck = -1;
     }
     const breath = Math.sin(t * 2.1) * (o.breathing ?? 1);
     const spins = o.jumpSpin ?? 1;
+    const bob = fl ? Math.sin(t * 1.3) * 0.035 : 0;
     return {
       ...REST,
       yaw: this.look.x * 0.62 * turn + j.spin * Math.PI * 2 * spins,
-      pitch: this.look.y * 0.32,
-      roll: -this.look.x * 0.04 + (j.y ? Math.sin(j.spin * Math.PI) * 0.1 * (o.jumpLean ?? 1) : 0),
-      y: j.y,
-      sx: j.sx * (1 - 0.008 * breath),
-      sy: j.sy * (1 + 0.014 * breath),
+      pitch: this.look.y * 0.32 + duck * 0.12,
+      roll: -this.look.x * 0.04 + (j.y ? Math.sin(j.spin * Math.PI) * 0.1 * (o.jumpLean ?? 1) : 0) + (fl ? Math.sin(t * 0.9) * 0.025 : 0),
+      y: j.y - bob + duck * 0.1,
+      sx: j.sx * (1 - 0.008 * breath) * (1 + duck * 0.06),
+      sy: j.sy * (1 + 0.014 * breath) * (1 - duck * 0.1),
       whirl: j.y && spins ? Math.sin(j.spin * Math.PI) : 0,
       lookX: this.look.x,
-      lookY: this.look.y,
+      lookY: this.look.y + duck * 0.3,
       eyeOpen: this.blink.update(dt),
-      smile: 0.3,
+      smile: 0.3 - aloof * 0.25 - duck * 0.2,
+      squint: aloof * 0.35,
+      eyeWide: -duck * 0.5,
+      blushPulse: duck,
     };
   }
 }
@@ -202,23 +233,33 @@ class Sleeping {
     this.nod = -1;
     this.nodWait = 4 + rand() * 5;
   }
-  poke() { this.nod = 0; }
+  poke() { if (!this.opts.snap) this.nod = 0; }
   update(dt, t) {
+    const o = this.opts;
     let nod = 0;
     if (this.nod >= 0) {
       this.nod += dt / 1.4;
       nod = Math.sin(Math.min(1, this.nod) * Math.PI) * (1 - this.nod * 0.3);
       if (this.nod >= 1) { this.nod = -1; this.nodWait = 6 + this.rand() * 6; }
-    } else if ((this.nodWait -= dt) <= 0) this.nod = 0;
-    const breath = Math.sin(t * 1.25) * (this.opts.breathing ?? 1);
+    } else if (!o.snap && (this.nodWait -= dt) <= 0) this.nod = 0;
+    const breath = Math.sin(t * 1.25) * (o.breathing ?? 1);
+    // Powered down: a machine sits square and still, mouth shut.
+    if (o.snap) {
+      return {
+        ...REST, pitch: 0.14 + breath * 0.006, y: 0.04, sx: 1.04 - 0.004 * breath, sy: 0.94 + 0.008 * breath,
+        lookY: 0.3, eyeOpen: 0, smile: 0, mouthOpen: 0, sleep: 1,
+      };
+    }
+    // Flopped: the body settles wider and lower, a floating one drifts.
+    const bob = o.float ? Math.sin(t * 0.8) * 0.03 : 0;
     return {
       ...REST,
       yaw: -0.12,
       pitch: 0.34 + nod * 0.16 + breath * 0.025,
       roll: 0.1 + nod * 0.03,
-      y: 0.05,
-      sx: 1.02 - 0.012 * breath,
-      sy: 0.97 + 0.03 * breath,
+      y: 0.05 - bob,
+      sx: 1.06 - 0.012 * breath,
+      sy: 0.92 + 0.03 * breath,
       lookX: -0.1,
       lookY: 0.35,
       eyeOpen: 0,
@@ -256,7 +297,7 @@ class Listening {
     return {
       ...REST,
       yaw: lx * 0.35, pitch: -0.07 + ly * 0.2 + nod * 0.09, roll: Math.sin(t * 0.8) * 0.05 + 0.04,
-      sx: 1 - 0.008 * breath, sy: 1 + 0.014 * breath,
+      sx: 0.99 - 0.008 * breath, sy: 1.03 + 0.014 * breath,
       lookX: lx, lookY: ly, eyeOpen: this.blink.update(dt),
       smile: 0.45, brow: 0.35, eyeWide: 0.15,
     };
@@ -282,7 +323,7 @@ class Thinking {
     return {
       ...REST,
       yaw: this.look.x * 0.45 + Math.sin(t * 0.9) * 0.05, pitch: this.look.y * 0.25, roll: this.side * 0.05 + Math.sin(t * 0.9) * 0.03,
-      sx: 1 - 0.006 * breath, sy: 1 + 0.01 * breath,
+      sx: 0.965 - 0.006 * breath, sy: 1.055 + 0.01 * breath,
       lookX: this.look.x, lookY: this.look.y, eyeOpen: this.blink.update(dt),
       smile: 0.05, mouthOpen: 0.08, brow: 0.45, browTilt: 0.35, squint: 0.2, think: 1,
     };
@@ -343,9 +384,11 @@ class ErrorState {
       if (this.shake >= 1) { this.shake = 0; this.wait = 3 + this.rand() * 3; }
     } else if ((this.wait -= dt) <= 0) this.shake = 0.001;
     const [lx, ly] = gaze(pointer, 0, 0.2, t, 0.06);
+    const breath = Math.sin(t * 1.6) * (this.opts.breathing ?? 1);
     return {
       ...REST,
-      yaw: lx * 0.3 + sh * 0.35, pitch: 0.08 + ly * 0.2, roll: sh * 0.05, y: 0.02,
+      yaw: lx * 0.3 + sh * 0.35, pitch: 0.08 + ly * 0.2, roll: sh * 0.05, y: 0.03,
+      sx: 1.045 - 0.006 * breath, sy: 0.935 + 0.01 * breath,
       lookX: lx + sh * 0.3, lookY: ly, eyeOpen: this.blink.update(dt),
       smile: -0.6, brow: 0.1, browTilt: -0.8,
     };
@@ -450,11 +493,11 @@ function blend(a, b, t) {
 /** Still pose for a state: what reduced-motion and `paused` show. */
 export function restPose(state) {
   if (state === 'working') return { ...REST, smile: 1, mouthOpen: 0.45, lookY: 0.1 };
-  if (state === 'sleeping') return { ...REST, pitch: 0.3, roll: 0.08, y: 0.05, eyeOpen: 0, smile: 0, mouthOpen: 0.25, lookY: 0.35, sleep: 1 };
-  if (state === 'listening') return { ...REST, pitch: -0.07, roll: 0.04, smile: 0.45, brow: 0.35, eyeWide: 0.15 };
-  if (state === 'thinking') return { ...REST, yaw: 0.25, pitch: -0.14, lookX: 0.55, lookY: -0.55, smile: 0.05, mouthOpen: 0.08, brow: 0.45, browTilt: 0.35, squint: 0.2, think: 1 };
+  if (state === 'sleeping') return { ...REST, pitch: 0.3, roll: 0.08, y: 0.05, sx: 1.06, sy: 0.92, eyeOpen: 0, smile: 0, mouthOpen: 0.25, lookY: 0.35, sleep: 1 };
+  if (state === 'listening') return { ...REST, pitch: -0.07, roll: 0.04, sx: 0.99, sy: 1.03, smile: 0.45, brow: 0.35, eyeWide: 0.15 };
+  if (state === 'thinking') return { ...REST, yaw: 0.25, pitch: -0.14, sx: 0.965, sy: 1.055, lookX: 0.55, lookY: -0.55, smile: 0.05, mouthOpen: 0.08, brow: 0.45, browTilt: 0.35, squint: 0.2, think: 1 };
   if (state === 'speaking') return { ...REST, smile: 0.55, mouthOpen: 0.45, brow: 0.3, talk: 1 };
-  if (state === 'error') return { ...REST, pitch: 0.08, y: 0.02, smile: -0.6, brow: 0.1, browTilt: -0.8 };
+  if (state === 'error') return { ...REST, pitch: 0.08, y: 0.03, sx: 1.045, sy: 0.935, smile: -0.6, brow: 0.1, browTilt: -0.8 };
   if (state === 'success') return { ...REST, happy: 0.6, smile: 1, mouthOpen: 0.4, brow: 0.4 };
   if (custom.has(state)) { const d = custom.get(state); return { ...REST, ...(d.pose || d.keyframes?.[0]?.pose) }; }
   return { ...REST };
@@ -531,8 +574,14 @@ export class BotSim {
         this.pose = blend(prev, cur, easeInOut(this.mix));
       }
     } else this.pose = cur;
-    // Only what's switched on costs anything: an expression, a reaction, a jiggle.
+    // Only what's switched on costs anything: a temperament, an expression, a reaction, a jiggle.
     const pose = this.pose;
+    const tf = this.opts.temperamentFace;
+    if (tf) {
+      // A lean on the face, under everything else; smaller while asleep.
+      const w = 1 - pose.sleep * 0.7;
+      for (const k in tf) pose[k] = clamp(pose[k] + tf[k] * w, -1, 1);
+    }
     if (this.opts.expressionFace) layer(pose, this.opts.expressionFace, 1);
     if (this.reaction) {
       const r = this.reaction;

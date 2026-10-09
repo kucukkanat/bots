@@ -5,13 +5,14 @@
 // applies a change, so dragging a slider costs one bot.set() per frame.
 
 import {
-  createBot, BotAvatar, types, presets, DEFAULTS, SHADINGS, HATS, GLASSES, STATES, STYLES, EXPRESSIONS,
+  createBot, BotAvatar, types, presets, DEFAULTS, SHADINGS, QUIRKS, TEMPERAMENT_NAMES, HATS, GLASSES, STATES, STYLES, EXPRESSIONS,
   EYE_STYLES, MOUTH_STYLES, BROWS, EAR_STYLES, FUR_PATTERNS, lookFromId, decodeDNA, shapeToSvgPath,
   loadRenderer, resolveLook, restPose, OVERSCAN,
 } from '../src/index.js';
 import { FEATURE_OPTIONS } from '../src/bot.js';
 import { initTheme } from '../assets/theme.js';
 import { libUrl } from '../assets/lib-url.js';
+import { BY_TYPE as BY_TYPE_TEMPERAMENT } from '../src/temperament.js';
 
 performance.mark('studio:start');
 const LIB = libUrl();
@@ -48,7 +49,7 @@ const canSay = () => FORCE || typeof BotAvatar.prototype.say === 'function';
 
 /** The material in effect: set, from the preset, or the default plush. */
 const shadingOf = (o) => o.shading ?? STYLES[o.preset]?.shading ?? 'fabric';
-const fabricOr = (a, b) => (o) => (shadingOf(o) === 'fabric' ? a : b);
+const fabricOr = (a, b, more = {}) => (o) => { const sh = shadingOf(o); return sh === 'fabric' ? a : (more[sh] ?? b); };
 const NUMERIC = {
   brightness: { min: 0.3, max: 2, step: 0.01, def: 1 },
   saturation: { min: 0, max: 2.5, step: 0.01, def: 1 },
@@ -56,9 +57,10 @@ const NUMERIC = {
   eyeGap: { min: 0.5, max: 1.6, step: 0.01, def: 1 },
   faceScale: { min: 0.6, max: 1.5, step: 0.01, def: 1 },
   light: { min: 0, max: 360, step: 1, def: fabricOr(295, 300) },
-  shadow: { min: 0, max: 2, step: 0.01, def: fabricOr(1.15, 0.6) },
-  highlight: { min: 0, max: 2, step: 0.01, def: fabricOr(1.2, 1.3) },
-  rim: { min: 0, max: 2, step: 0.01, def: fabricOr(0.6, 0.5) },
+  shadow: { min: 0, max: 2, step: 0.01, def: fabricOr(1.15, 0.6, { glass: 0.4, lantern: 0.45 }) },
+  highlight: { min: 0, max: 2, step: 0.01, def: fabricOr(1.2, 1.3, { glass: 1.1, lantern: 0.9 }) },
+  rim: { min: 0, max: 2, step: 0.01, def: fabricOr(0.6, 0.5, { glass: 1.2, lantern: 0.35 }) },
+  glow: { min: 0, max: 2, step: 0.01, def: 1 },
   spread: { min: 0.4, max: 2.5, step: 0.01, def: 1.4 },
   depth: { min: 0.2, max: 2, step: 0.01, def: 0.65 },
   furLength: { min: 0.3, max: 2.5, step: 0.01, def: 1 },
@@ -70,7 +72,7 @@ const NUMERIC = {
   turn: { min: 0, max: 2, step: 0.01, def: 1 },
   jumpEvery: { min: 0, max: 20, step: 0.5, def: 8 },
   roundness: { min: 0, max: 1, step: 0.01, def: 1 },
-  gloss: { min: 0, max: 2, step: 0.01, def: 0 },
+  gloss: { min: 0, max: 2, step: 0.01, def: fabricOr(0, 0, { glass: 0.9 }) },
   fillStrength: { min: 0, max: 1, step: 0.01, def: 0.5 },
   furClumps: { min: 0, max: 1, step: 0.01, def: 0 },
   furPatternScale: { min: 0.3, max: 3, step: 0.01, def: 1 },
@@ -90,7 +92,7 @@ const NUMERIC = {
 };
 const BOOLS = {
   headphones: false, bowTie: false, blush: false, eyeShine: true, interactive: true, paused: false, freckles: false, scarf: false,
-  social: false, toss: false, petting: false,
+  social: false, toss: false, petting: false, affect: false, announce: false,
 };
 const STRS = {
   type: 'clover', state: 'default', face: 'eyes', shading: 'fabric', hat: 'none', glasses: 'none', color: undefined, ink: undefined,
@@ -98,12 +100,13 @@ const STRS = {
   lightColor: undefined, fillColor: undefined, rimColor: undefined, eyeStyle: 'round', irisColor: undefined, brows: 'auto',
   mouthStyle: 'smile', expression: 'neutral', whirlColor: undefined, scarfColor: undefined, badge: undefined, badgeColor: undefined,
   ears: 'none', antennae: 'auto', blushColor: undefined, status: 'none', mood: 'auto',
+  quirk: undefined, temperament: 'auto', glowColor: undefined,
 };
 // `sounds` is a boolean or a volume (0–1).
 const SPECIAL = { sounds: false };
 const KEYS = [...Object.keys(STRS), ...Object.keys(NUMERIC), ...Object.keys(BOOLS), ...Object.keys(SPECIAL)];
 // Options that belong to the newer agent/play features: only sent when supported.
-const NEW_KEYS = ['status', 'mood', 'social', 'toss', 'petting', 'sounds'];
+const NEW_KEYS = ['status', 'mood', 'social', 'toss', 'petting', 'sounds', 'affect', 'announce'];
 
 const defaultOf = (key, o) => {
   // A preset's values are the starting point its controls show.
@@ -724,12 +727,30 @@ tabPanel('wear', () => {
 
 // --- Material & light ----------------------------------------------------------------
 
+const glowRows = [range('glow', 'Glow'), colors('glowColor', 'Glow colour', ['#FFD27A', '#FF8FC8', '#7AD7FF', '#B6FF7A', '#FFFFFF'], { auto: 'Body tint' })];
+syncs.push(() => glowRows.forEach((r) => { r.hidden = shadingOf(opts) !== 'lantern'; }));
+const quirkSet = () => new Set((opts.quirk || '').split(/\s+/).filter(Boolean));
+const QUIRK_LABELS = { patch: 'Patch', cowlick: 'Cowlick', scuff: 'Scuff', stitches: 'Stitches' };
+const quirkChips = QUIRKS.map((q) => {
+  const b = h('button', { type: 'button', class: 'chip', 'aria-pressed': 'false', onclick: () => {
+    const set = quirkSet();
+    set.has(q) ? set.delete(q) : set.add(q);
+    update({ quirk: set.size ? [...set].join(' ') : undefined });
+  } }, QUIRK_LABELS[q] || title(q));
+  syncs.push(() => b.setAttribute('aria-pressed', String(quirkSet().has(q))));
+  return b;
+});
+
 tabPanel('light', () => [
   grp('Material',
-    seg('shading', 'Material', SHADINGS, ['Plush', 'Plastic', 'Smooth', 'Crisp', 'Flat']),
+    chipRow('shading', 'Material', SHADINGS, ['Plush', 'Plastic', 'Smooth', 'Crisp', 'Flat', 'Glass', 'Lantern']),
     range('roundness', 'Roundness'),
     range('gloss', 'Gloss'),
-    range('depth', 'Depth')),
+    range('depth', 'Depth'),
+    ...glowRows),
+  grp('Quirks',
+    h('div', { class: 'chips' }, ...quirkChips),
+    note('Imperfections that make it someone: a sewn-on patch, a tuft that won’t lie down, a worn spot, a seam.')),
   grp('Light',
     range('light', 'Light angle', { fmt: (v) => `${Math.round(v)}°` }),
     range('shadow', 'Shadow'),
@@ -788,8 +809,20 @@ const playGroup = grp('Play',
   when(supports('sounds'), volumeRow));
 if (!['toss', 'petting', 'sounds'].some(supports)) playGroup.hidden = true;
 
+const TEMPERAMENT_LABELS = { showOff: 'Show-off' };
+const temperamentNote = note('');
+syncs.push(() => {
+  const own = BY_TYPE_TEMPERAMENT[opts.type];
+  temperamentNote.textContent = (opts.temperament ?? 'auto') === 'auto' && own
+    ? `${presets[opts.type]?.label || 'This type'} is ${TEMPERAMENT_LABELS[own] || title(own).toLowerCase()} by nature: its glances, blinks, hops and resting face follow. Sliders below still win.`
+    : 'A temperament sets how it glances, blinks, breathes and hops, leans its resting face, and gives it habits: aloof looks away, shy ducks when poked, dreamy floats, precise snaps.';
+});
+
 tabPanel('motion', () => [
   playGroup,
+  grp('Character',
+    select('temperament', 'Temperament', ['auto', ...TEMPERAMENT_NAMES, 'none'], ['Its own', ...TEMPERAMENT_NAMES.map((n) => TEMPERAMENT_LABELS[n] || title(n)), 'None']),
+    temperamentNote),
   grp('Motion',
     range('speed', 'Speed', { fmt: (v) => `${(+v).toFixed(2)}×` }),
     range('turn', 'Look around'),
@@ -859,6 +892,37 @@ bot.on('say-end', () => { sayLog.textContent = 'done'; });
 
 const STATE_LABELS = { default: 'Idle', working: 'Working', sleeping: 'Sleeping', listening: 'Listening', thinking: 'Thinking', speaking: 'Speaking', error: 'Error', success: 'Success' };
 
+// Observe: a pretend agent turn, fed to bot.observe() event by event.
+const observeLog = h('span', { class: 'say-log', 'aria-live': 'polite' });
+let turnTimer = 0;
+const canObserve = () => typeof bot.observe === 'function';
+function stopTurn() { clearTimeout(turnTimer); turnTimer = 0; }
+function runTurn(steps) {
+  stopTurn();
+  if (!canObserve()) { toast('observe() isn’t in this build of the library yet'); return; }
+  showCaption('');
+  let i = 0;
+  const next = () => {
+    if (i >= steps.length) { turnTimer = 0; hideCaption(1800); return; }
+    const [wait, event, data, text] = steps[i++];
+    turnTimer = setTimeout(() => {
+      observeLog.textContent = `observe('${event}'${data ? ', ' + JSON.stringify(data) : ''})`;
+      if (text) showCaption(text, true);
+      bot.observe(event, data || {});
+      next();
+    }, wait);
+  };
+  next();
+}
+const tokens = (text, gap = 130) => text.split(/(?<=\s)/).map((w) => [gap + Math.random() * 120, 'token', { text: w }, w]);
+const TURNS = {
+  reply: () => [[0, 'typing'], [900, 'sent'], [1300, 'token', { text: '' }], ...tokens('Sure thing! I found three matches. '), ...tokens('Want me to open the first one?'), [600, 'done']],
+  tool: () => [[0, 'sent'], [1200, 'tool', { name: 'search' }], [2600, 'tool-end'], ...tokens('Done. The report is in your inbox! '), [500, 'done']],
+  slow: () => [[0, 'sent'], [8000, 'token', { text: '' }], ...tokens('Sorry, that took a while. Here it is.'), [500, 'done']],
+  error: () => [[0, 'sent'], [900, 'tool', { name: 'deploy' }], [1800, 'error', { message: 'timeout' }]],
+};
+const turnBtn = (label, key, extra = {}) => h('button', { type: 'button', class: 'sbtn', onclick: () => runTurn(TURNS[key]()), ...extra }, label);
+
 // A second bot that only appears for `social`, to show glances between bots.
 function setFriend(on) {
   const el = $('friend');
@@ -886,6 +950,12 @@ const dnaOut = h('code', { class: 'dna-out' });
 syncs.push(() => { if (activeTab === 'agent') dnaOut.textContent = bot.dna; });
 
 tabPanel('agent', () => [
+  grp('Observe',
+    h('p', { class: 'note' }, 'Tell it what the agent is doing and it works out the rest: ', h('code', {}, 'bot.observe(event)'), '.'),
+    h('div', { class: 'btn-row' }, turnBtn('Reply', 'reply', { class: 'sbtn primary', title: 'typing → sent → tokens → done' }), turnBtn('Tool call', 'tool'), turnBtn('Slow reply', 'slow', { title: 'No token for eight seconds' }), turnBtn('Error', 'error'), observeLog),
+    toggles(
+      when(supports('affect'), toggle('affect', 'Dozes off when nothing happens', { hint: 'affect: true keeps the idle timer running' })),
+      when(supports('announce'), toggle('announce', 'Announce states to screen readers')))),
   when(canSay(), grp('Talk',
     h('label', { class: 'lbl block', for: 'say-text' }, 'Lip-sync from text, as an agent replies'),
     sayText,

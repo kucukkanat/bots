@@ -4,7 +4,59 @@ All notable changes to `@kucukkanat/bots` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 1.1.0
+## [1.2.0] - 2026-10-09
+
+The character release: the bots stop being eighteen outlines with the same
+face and become eighteen someones. Decided here, too: the avatars stay 2.5D.
+The stacked-silhouette renderer already carries weight, light and fur better
+than a first mesh pipeline would, so the money went on what makes a character
+feel real (temperament, metamorphosis, materials, imperfection, and an avatar
+that understands the agent) rather than on polygons. A true-3D surface
+(spatial, AR) is a renderer behind the same DNA, when it comes.
+
+### Added
+- **The affect engine**: `bot.observe(event, data)` (`typing`, `sent`,
+  `token`, `tool`, `tool-end`, `done`, `error`, `idle`, `reset`). It picks the
+  states, the gaze, the reactions and the lip-sync from what the agent is
+  doing: listens while the user types, thinks and frets when the first token
+  is slow, says each token and reacts to the tone of every sentence, works
+  through tool calls, celebrates once it has finished talking, gets sheepish at
+  a run of errors, and with `affect: true` dozes off after two minutes of
+  nothing. A lazily loaded module (`features/affect.js`); `<bot-avatar>` has
+  `observe()` and an `affect` attribute. The landing page's chat now runs on it.
+- **Temperaments**: every type is born with one (`src/temperament.js`): motion
+  defaults, a lean on the resting face, and habits. Aloof cats look away from
+  the pointer; shy ghosts duck and blush when poked; dreamy clouds and ghosts
+  float with no landing squash; precise droids and steady mechs blink in a
+  snap and power down to sleep; show-off stars spin twice. `temperament` picks
+  another by name or `'none'`; anything you set wins over it.
+- **Metamorphosis**: states change the body. Thinking stands tall, listening
+  leans in, error slumps wider, sleeping flattens out (still poses too).
+- **Materials**: `shading: 'glass'` (see-through, light pooling on the far
+  side, a Fresnel rim, two window reflections; `opacity`) and
+  `shading: 'lantern'` (lit from within, breathing, flaring when it thinks,
+  talks or laughs, a halo behind the body; `glow`, `glowColor`). Presets
+  `glass`, `lantern` and `ragdoll`.
+- **Quirks**: `quirk` takes `patch` (sewn on, `patchColor`), `cowlick`,
+  `scuff` and `stitches`, one or more.
+- **Accessibility**: `announce: true` reads each change of state to screen
+  readers from one shared polite live region (`features/announce.js`).
+- Studio: Glass and Lantern materials with glow controls, a Quirks row, a
+  Temperament picker under Motion, and an Observe group on the Agent tab that
+  plays a reply, a tool call, a slow reply and an error through `observe()`.
+- Docs: `observe()` leads the agent recipes; options for materials, quirks
+  and temperaments.
+- Tests for temperaments, habits, metamorphosis, the affect engine and the
+  new options (`test/character.test.js`).
+
+### Changed
+- Size budgets rise with the character work (measured plus ~5%): the library
+  entry is 19.9 KB gzipped (budget 21, was 18.5), the renderer 29.7 (budget
+  31.2, was 28.5). `temperament.js` is loaded with the library, since the
+  simulation needs it from the first frame; the affect engine is its own
+  lazily loaded 1.8 KB module.
+
+## [1.1.0]
 
 ### Added
 - `wear` takes a list of things by name: `wear="party-hat round-glasses bow-tie"`

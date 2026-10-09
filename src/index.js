@@ -1,9 +1,10 @@
-export { BotAvatar, createBot, resolveLook, DEFAULTS, SHADINGS, HATS, GLASSES, STATES, renderSettings, renderStats,
+export { BotAvatar, createBot, resolveLook, DEFAULTS, SHADINGS, QUIRKS, HATS, GLASSES, STATES, renderSettings, renderStats,
   registerShape, registerHat, registerState, STYLES, EXPRESSIONS, encodeDNA, decodeDNA, lookFromId, normalizeOptions, parseWear } from './bot.js';
 export { BotAvatarElement, defineBotAvatar } from './element.js';
 export { BotSim, restPose, jumpCurve } from './engine.js';
 export { OVERSCAN, BODY, RISE, EYE_STYLES, MOUTH_STYLES, BROWS, EAR_STYLES, FUR_PATTERNS, HAT_STYLES } from './constants.js';
 export { loadRenderer } from './pool.js';
+export { TEMPERAMENTS, TEMPERAMENT_NAMES, temperamentFor } from './temperament.js';
 export { presets, types, palette, getShape, buildShape, shapeToSvgPath, shapeFromSvgPath } from './shapes.js';
 export { autoInk, adjust, shade, mix } from './color.js';
 

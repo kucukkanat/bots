@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Agent recipes · bots docs</title>
-  <meta name="description" content="Wire bots to an AI agent: states for each step of a turn, streaming LLM text into say() for lip-sync, status badges, moods, voice and crews." />
+  <meta name="description" content="Wire bots to an AI agent: observe() works out the look from what the agent does; or states for each step of a turn, streaming LLM text into say(), status badges, moods, voice and crews." />
   <meta name="theme-color" content="#f5f4f0" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#111016" media="(prefers-color-scheme: dark)" />
   <script>try{var t=localStorage.getItem('bots-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
@@ -52,7 +52,25 @@
 <h1>Agent recipes</h1>
 <p class="sub">An avatar earns its place when it shows what the agent is doing. These recipes wire one to a chat turn: listening, thinking, streaming the reply with lip-sync, tool calls, errors and rest.</p>
 
+<h2 id="the-short-way-observe">The short way: observe()<a class="anchor" href="#the-short-way-observe" aria-label="Link to this section">#</a></h2>
+<p>Tell the avatar what the agent is doing and it works out how to look. One call per event, no states to manage:</p>
+<pre class="code" data-lang="js">const bot = createBot('#agent', { type: 'clover', size: 96, status: 'auto', affect: true, announce: true });
+
+input.addEventListener('input', () =&gt; bot.observe('typing', { target: input }));
+async function ask(question) {
+  bot.observe('sent');                                   // thinks; frets if the first token is slow
+  for await (const chunk of stream(question)) {
+    if (chunk.tool) bot.observe('tool', { name: chunk.tool });     // works through a tool call
+    else if (chunk.toolDone) bot.observe('tool-end');
+    else bot.observe('token', { text: chunk.text });     // says it, reacts to its tone
+  }
+  bot.observe('done');                                   // waits for the mouth, then a happy hop
+}
+// and on failure: bot.observe('error', { message })  — worried; sheepish after three in a minute</pre>
+<p>What it does with each event: <code>typing</code> listens and watches the input; <code>sent</code> thinks, and gives a worried glance every six seconds the first token doesn't come; <code>token</code> streams the text into <code>say()</code> (pass <code>say: false</code> to keep the mouth still) and reacts to the tone of each sentence (glad, sorry, surprised); <code>tool</code> works, <code>tool-end</code> goes back to thinking; <code>done</code> celebrates once it has finished talking, then settles to idle; <code>error</code> frowns, and a run of three errors in a minute makes it blush and squirm; <code>idle</code> rests; with <code>affect: true</code> it dozes off after two minutes of nothing (<code>affect: { sleepAfter: 60 }</code> to change). <code>setState()</code>, <code>react()</code> and <code>lookAt()</code> still work over the top.</p>
+
 <h2 id="a-turn-step-by-step">A turn, step by step<a class="anchor" href="#a-turn-step-by-step" aria-label="Link to this section">#</a></h2>
+<p>The same turn by hand, for when you want every state under your own control:</p>
 <div class="table-wrap"><table class="props"><thead><tr><th scope="col">Your agent is…</th><th scope="col">Call</th><th scope="col">The bot</th></tr></thead><tbody>
 <tr><td data-label="Your agent is…">waiting for input</td><td data-label="Call"><code>setState('default')</code></td><td data-label="The bot">looks around, blinks</td></tr>
 <tr><td data-label="Your agent is…">watching the user type</td><td data-label="Call"><code>setState('listening')</code>, <code>lookAt(input)</code></td><td data-label="The bot">leans in, eyes on the box</td></tr>
@@ -137,6 +155,7 @@ bot.on('state', (e) =&gt; { if (e.state === 'default') rest(); });</pre>
   <li>Give each avatar a <code>label</code>; the canvas is an image named after it and its state, e.g. “Clover, thinking”.</li>
   <li>The avatar is decoration for what your chat UI already says. Keep the reply text in the DOM, in a <code>role="log"</code> region.</li>
   <li>With <code>prefers-reduced-motion</code>, avatars hold each state's still pose.</li>
+  <li><code>announce: true</code> reads each change of state to screen readers from one polite live region shared by every avatar on the page (“Clover is thinking”), so nothing is said only by the picture.</li>
 </ul>
       </article>
       <nav class="pager" aria-label="Previous and next page">

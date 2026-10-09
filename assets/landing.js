@@ -33,14 +33,25 @@ function log(call) {
   clearTimeout(log.t);
   log.t = setTimeout(() => ticker.classList.remove('flash'), 600);
 }
-function setState(s) {
-  bot.setState(s);
+function showState(s) {
   stage.dataset.state = s;
   $('state-word').textContent = WORDS[s] || s;
+}
+function setState(s) {
+  bot.setState(s);
+  showState(s);
   log(`bot.setState('${s}')`);
 }
+// The affect engine picks the states from what the agent is doing; the page just shows them.
+bot.on('state', (e) => showState(e.state));
+const canObserve = has(bot, 'observe');
+function observe(event, data) {
+  if (!canObserve) return Promise.resolve();
+  if (event !== 'token') log(`bot.observe('${event}'${data ? ', ' + JSON.stringify(data) : ''})`);
+  return bot.observe(event, data);
+}
 function setStatus(s) { bot.set({ status: s }); }
-setState('default');
+showState('default');
 
 let mq = heroSize();
 addEventListener('resize', () => { const s = heroSize(); if (s !== mq) { mq = s; bot.set({ size: s }); } });
@@ -64,6 +75,10 @@ const REPLIES = [
     text: "I'm a plush little avatar for AI agents. I listen while you type, think while the model works and move my mouth as the answer streams in. Like right now." },
   { re: /hat|party|dress|wear/i, then: () => { bot.set({ hat: 'party', accessoryColor: '#5b5bf7' }); log("bot.set({ hat: 'party' })"); has(bot, 'react') && bot.react('joy'); },
     text: "Party mode! Hats, glasses, scarves, ears and badges all ease in live, and packs add more for Halloween, winter and parties." },
+  { re: /lantern|glow|light up|glass|material/i, then: () => { const glass = /glass/i.test(lastQ); bot.set({ shading: glass ? 'glass' : 'lantern', hat: 'none' }); log(`bot.set({ shading: '${glass ? 'glass' : 'lantern'}' })`); },
+    text: "Materials! Plush is the default, but I can be glass, with light pooling through me, or a lantern that glows from inside, brighter whenever I think or talk. There's plastic, clay, felt and paper too." },
+  { re: /who are you really|personality|temperament|character/i, then: () => { bot.set({ type: 'cat', hat: 'none', shading: 'fabric' }); log("bot.set({ type: 'cat' })"); },
+    text: "Every shape has a temperament. The cat is aloof and looks away when you watch it, the ghost is shy and ducks when poked, the droid blinks in a snap and powers down to sleep. Try moving the pointer over me now." },
   { re: /error|fail|wrong|break|bug/i, end: 'error', then: () => has(bot, 'react') && bot.react('worried'),
     text: "Uh-oh. When a tool call fails I show it with setState('error'). Call setState('success') once things recover." },
   { re: /install|npm|cdn|use you|get you|setup|set up/i,
@@ -79,7 +94,8 @@ const FALLBACK = [
   "Noted! Try asking me to put on a party hat, or to show you an error.",
 ];
 let fallbackI = 0;
-const replyFor = (q) => REPLIES.find((r) => r.re.test(q)) || { text: FALLBACK[fallbackI++ % FALLBACK.length] };
+let lastQ = '';
+const replyFor = (q) => { lastQ = q; return REPLIES.find((r) => r.re.test(q)) || { text: FALLBACK[fallbackI++ % FALLBACK.length] }; };
 
 let busy = false;
 function setBusy(b) {
@@ -88,24 +104,23 @@ function setBusy(b) {
   chips.forEach((c) => (c.disabled = b));
 }
 
-/** Stream `text` into `el` word by word; with say(), lip-sync follows the same words. */
+/** Stream `text` into `el` word by word, each word a token the bot observes (and says). */
 async function speakInto(el, text) {
-  const words = text.split(/(\s+)/);
+  const words = text.split(/(?<=\s)/);
   const wpm = 230;
   const per = reduced ? 0 : 60000 / wpm;
   messages.setAttribute('aria-busy', 'true');
-  setState('speaking');
-  let spoken = null;
-  if (has(bot, 'say')) {
-    log(`bot.say('${text.slice(0, 18)}…')`);
-    try { spoken = bot.say(text, { wpm }); } catch { spoken = null; }
-  } else if (has(bot, 'setVoice')) bot.setVoice(null);
+  if (!canObserve) { setState('speaking'); if (has(bot, 'say')) bot.say(text, { wpm }); }
+  let first = true;
   for (const w of words) {
     el.textContent += w;
     messages.scrollTop = messages.scrollHeight;
-    if (w.trim() && per) await sleep(per * (/[.,!?]$/.test(w) ? 1.8 : 1));
+    if (canObserve) {
+      if (first) { log(`bot.observe('token', { text: '${w.trim()}' })`); first = false; }
+      observe('token', { text: w, wpm });
+    }
+    if (w.trim() && per) await sleep(per * (/[.,!?]\s*$/.test(w) ? 1.8 : 1));
   }
-  if (spoken && typeof spoken.then === 'function') await Promise.race([spoken.catch(() => {}), sleep(1500)]);
   messages.removeAttribute('aria-busy');
 }
 
@@ -113,8 +128,7 @@ let idleTimer = 0;
 async function respond(q, reply) {
   setBusy(true);
   clearTimeout(idleTimer);
-  bot.lookAt?.(null);
-  setState('thinking');
+  if (canObserve) observe('sent'); else { bot.lookAt?.(null); setState('thinking'); }
   setStatus('typing');
   const dots = addMsg('bot');
   dots.classList.add('typing');
@@ -127,11 +141,16 @@ async function respond(q, reply) {
   await speakInto(el, reply.text);
   reply.then?.();
   const end = reply.end || 'success';
-  setState(end);
+  if (canObserve) {
+    // The engine waits for the mouth to finish, then celebrates (or frets) on its own.
+    await observe(end === 'error' ? 'error' : 'done');
+    if (end === 'error') bot.react?.('worried');
+  } else setState(end);
   setStatus(end === 'error' ? 'error' : 'done');
-  await sleep(end === 'sleeping' ? 3200 : 2000);
+  await sleep(end === 'sleeping' ? 3400 : 2600);
   setStatus('none');
-  if (stage.dataset.state === end) setState(document.activeElement === input && input.value ? 'listening' : 'default');
+  if (end === 'sleeping') setState('sleeping');
+  else if (!canObserve && stage.dataset.state === end) setState(document.activeElement === input && input.value ? 'listening' : 'default');
   setBusy(false);
 }
 
@@ -146,13 +165,13 @@ function ask(q) {
 $('composer').addEventListener('submit', (e) => { e.preventDefault(); ask(input.value); });
 chips.forEach((c) => c.addEventListener('click', () => ask(c.textContent)));
 input.addEventListener('focus', () => { if (!busy && has(bot, 'lookAt')) { bot.lookAt(input); log('bot.lookAt(input)'); } });
-input.addEventListener('blur', () => { if (!busy) { bot.lookAt?.(null); if (stage.dataset.state === 'listening') setState('default'); } });
+input.addEventListener('blur', () => { if (!busy) { bot.lookAt?.(null); if (stage.dataset.state === 'listening') (canObserve ? observe('idle') : setState('default')); } });
 input.addEventListener('input', () => {
   if (busy) return;
-  if (input.value && stage.dataset.state !== 'listening') setState('listening');
-  if (!input.value && stage.dataset.state === 'listening') setState('default');
+  if (input.value && stage.dataset.state !== 'listening') (canObserve ? observe('typing', { target: input }) : setState('listening'));
+  if (!input.value && stage.dataset.state === 'listening') (canObserve ? observe('idle') : setState('default'));
   clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => { if (!busy && stage.dataset.state === 'listening') setState('default'); }, 6000);
+  idleTimer = setTimeout(() => { if (!busy && stage.dataset.state === 'listening') (canObserve ? observe('idle') : setState('default')); }, 6000);
 });
 
 // ---------------------------------------------------------------------------

@@ -39,8 +39,11 @@ createBot('#agent', { type: 'cat', face: 'mouth', hat: 'party', bowTie: true, ac
 `color` | body colour, any CSS hex colour | the shape's own
 `ink` | face colour | auto: dark on light bodies
 `brightness`, `saturation` | 0–2 | `1`
-`shading` | `fabric` (plush fur), `plastic`, `smooth`, `crisp`, `flat` | `fabric`
-`preset` | `plush`, `teddy`, `velvet`, `mohair`, `felt`, `vinyl`, `clay`, `sticker`, `paper`: a named look that sets many options at once | —
+`shading` | `fabric` (plush fur), `plastic`, `smooth`, `crisp`, `flat`, `glass` (see-through, light pooling on the far side, a Fresnel rim), `lantern` (lit from within: glows brighter while it thinks, talks or laughs) | `fabric`
+`glow`, `glowColor` | lantern: strength 0–2, colour | `1`, a lighter body tint
+`opacity` | glass: how see-through, 0–1 | `0.8`
+`quirk` | imperfections, one or more: `patch` (sewn-on, coloured by `patchColor`), `cowlick`, `scuff`, `stitches` | —
+`preset` | `plush`, `teddy`, `velvet`, `mohair`, `felt`, `vinyl`, `clay`, `sticker`, `paper`, `glass`, `lantern`, `ragdoll`: a named look that sets many options at once | —
 `roundness` | 1 a pillow, 0 a slab | per shading
 `gloss` | 0–1 | per shading
 `depth` | 0.2–2, thickness when turned | `0.65`
@@ -107,6 +110,7 @@ createBot('#agent', { type: 'cat', face: 'mouth', hat: 'party', bowTie: true, ac
 
 <h2>Motion</h2>
 ::table Option | Values | Default
+`temperament` | `auto` (the type's own), `none`, or one of `eager`, `sunny`, `sharp`, `stoic`, `wobbly`, `shy`, `calm`, `nervous`, `showOff`, `precise`, `steady`, `curious`, `serious`, `aloof`, `dreamy`, `chipper`, `sleepy` | `auto`
 `speed` | animation speed multiplier | `1`
 `turn` | how far it looks round | `1`
 `blinkRate`, `glanceRate` | multipliers | `1`
@@ -115,6 +119,8 @@ createBot('#agent', { type: 'cat', face: 'mouth', hat: 'party', bowTie: true, ac
 `jumpEvery` | seconds between idle hops, 0 = never | `8`
 `jumpHeight`, `jumpTime`, `jumpSpin`, `jumpSquash`, `jumpStretch`, `jumpLean` | shape of a hop | `1`
 ::end
+<p>A temperament is what a species is like beyond its outline: it fills in the motion options you don't set (how often it glances, blinks and hops, how it breathes), leans the resting face, and gives it habits. <b>aloof</b> (the cat) ignores the pointer now and then and looks the other way; <b>shy</b> (the ghost) ducks and blushes when poked instead of hopping; <b>dreamy</b> and <b>shy</b> float, bobbing above the ground with no landing squash; <b>precise</b> and <b>steady</b> (droid, mech) blink in a snap and power down square and still to sleep; <b>showOff</b> (the star) spins twice. Set any motion option and it wins over the temperament's.</p>
+<p>States also change the body, not just the face: thinking stands tall, listening leans in, error slumps wider, sleeping flattens out.</p>
 <p><code>prefers-reduced-motion</code> shows each state's still pose instead of animating.</p>
 
 <h2>Rendering</h2>
@@ -146,7 +152,7 @@ createBot('#agent', {
 ::table Group | Options
 `fur` | `length`, `density`, `fuzz`, `curl`, `gravity`, `clumps`, `pattern`, `color`, `scale`
 `light` | `angle`, `color`, `fill`, `fillStrength`, `rimColor`, `shadow`, `highlight`, `rim`, `spread`
-`material` | `shading`, `roundness`, `gloss`, `depth`
+`material` | `shading`, `roundness`, `gloss`, `depth`, `glow`, `glowColor`, `quirk`
 `face` | `features` (`eyes`/`mouth`), `eyes: { style, size, gap, shine, iris }`, `brows`, `mouth`, `freckles`, `x`, `y`, `scale`, `blush`, `blushColor`, `ink`, `expression`
 `motion` | `speed`, `turn`, `blinkRate`, `glanceRate`, `breathing`, `jiggle`, `whirl`, `whirlColor`, `jump: { every, height, time, spin, squash, stretch, lean }`
 `wear` | a list (`'party-hat round-glasses bow-tie'`, or an array), or an object of `hat`, `glasses`, `headphones`, `bowTie`, `color`, `scarf`, `scarfColor`, `badge`, `badgeColor`, `ears`, `antennae`, `accessories`

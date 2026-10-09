@@ -14,6 +14,7 @@ const bot = createBot(target, options);
 ::table Method | What it does
 `set(options)` | Change any options; the look eases into them. Pass `undefined` to drop one back to its default. Returns the bot.
 `setState(state)` | Switch state: `default`, `listening`, `thinking`, `speaking`, `working`, `success`, `error`, `sleeping`, or a registered one.
+`observe(event, data?)` | Tell it what the agent is doing and let it work out the rest: `'typing'` (`{ target }`), `'sent'`, `'token'` (`{ text }`: said with lip-sync, its tone read), `'tool'` / `'tool-end'` (`{ name }`), `'done'`, `'error'` (`{ message }`), `'idle'`, `'reset'`. Loads the affect module on first use. See <a href="agents.html">Agent recipes</a>.
 `say(text, { wpm, append })` | Lip-sync from text: the mouth shapes follow the words at `wpm` (words per minute). `append: true` adds to what it's already saying, for streamed text. Returns a Promise that resolves when it has finished talking.
 `react(expression, duration?)` | A moment's expression over any state: `happy`, `joy`, `surprised`, `worried`, `sad`, `angry`, `smug`, `sleepy`, `confused`, `dizzy`, `love`, or an object of face channels. Default 1.6 s.
 `speak(source?)` | The mouth follows audio: a `MediaStream` (mic), an `<audio>`/`<video>` element, or a Web Audio node from any `AudioContext`. Switches to `speaking`; `speak()` with nothing stops and restores the previous state.

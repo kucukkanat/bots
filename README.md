@@ -2,7 +2,7 @@
 
 # bots
 
-Animated bot avatars for AI agents. Eighteen plush 3D shapes with living faces that look around, hop while they work and doze off between tasks — plus hats, glasses, headphones and bow ties. Drawn with WebGL in worker threads, with a plain 2D canvas fallback wherever either is missing: no build step, no dependencies.
+Animated bot avatars for AI agents. Eighteen plush 3D shapes, each with a temperament of its own, with living faces that look around, hop while they work and doze off between tasks — plus hats, glasses, headphones and bow ties, glass and lantern materials, and quirks. Tell one what your agent is doing with `bot.observe()` and it works out the rest. Drawn with WebGL in worker threads, with a plain 2D canvas fallback wherever either is missing: no build step, no dependencies.
 
 **[Live site](https://kucukkanat.github.io/bots/) · [Docs](https://kucukkanat.github.io/bots/docs/) · [Studio](https://kucukkanat.github.io/bots/playground/)** — installable as an app, and works offline after the first visit.
 
@@ -105,7 +105,9 @@ Dress it with one list: `wear="party-hat round-glasses bow-tie"` (one hat, one p
 | `path` | SVG path data in a 100×100 box centred on (50, 50) — your own outline | — |
 | `color`, `ink` | body colour, face colour | type's own, auto |
 | `brightness`, `saturation` | 0–2 | `1` |
-| `shading` | `fabric` (plush fur), `plastic`, `smooth`, `crisp`, `flat` | `fabric` |
+| `shading` | `fabric` (plush fur), `plastic`, `smooth`, `crisp`, `flat`, `glass`, `lantern` | `fabric` |
+| `quirk` | imperfections: `patch`, `cowlick`, `scuff`, `stitches` (one or more) | — |
+| `temperament` | `auto` (the type's own), a name (see below), `none` | `auto` |
 | `light` | degrees clockwise from the top | `295` |
 | `shadow`, `highlight`, `rim` | 0–2 | per shading |
 | `spread`, `depth` | how far the light wraps; thickness when turned | `1.4`, `0.65` |
@@ -128,6 +130,16 @@ Dress it with one list: `wear="party-hat round-glasses bow-tie"` (one hat, one p
 
 Everything below is optional: leave it out and the avatar looks, moves and costs exactly what it did. Most of it is resolved once, before drawing (presets, Bot DNA, ids, colours, fur patterns are baked into the fur texture), so turning it on costs nothing per frame; the rest (brows, trails, audio) costs only while it's showing.
 
+### Character
+
+Every shape has a **temperament**: motion defaults (how often it glances, blinks and hops, how it breathes), a lean on its resting face, and habits. The cat is *aloof* and ignores the pointer now and then to look the other way; the ghost is *shy* and ducks and blushes when poked instead of hopping; the cloud is *dreamy* and floats, bobbing above the ground; the droid is *precise*, blinks in a snap and powers down square and still to sleep; the star is a *show-off* and spins twice. `temperament: 'nervous'` gives any shape another one (`eager`, `sunny`, `sharp`, `stoic`, `wobbly`, `shy`, `calm`, `nervous`, `showOff`, `precise`, `steady`, `curious`, `serious`, `aloof`, `dreamy`, `chipper`, `sleepy`), `'none'` a blank slate, and any motion option you set wins over it.
+
+States change the body, not just the face: thinking stands tall, listening leans in, error slumps wider, sleeping flattens out.
+
+**Quirks** are imperfections that make it someone: `quirk="patch cowlick"` sews a patch of other cloth low on one side (`patchColor`), stands a tuft up on the crown that sways and won't lie down, `scuff` wears a spot thin, `stitches` runs a seam down the body. The `ragdoll` preset is felt with a seam and a patch.
+
+**Materials**: `shading: 'glass'` is see-through (`opacity`), with light pooling on the side away from the key, a Fresnel rim all round and two window reflections; `shading: 'lantern'` is lit from within (`glow`, `glowColor`), breathing slowly and flaring whenever it thinks, talks or laughs, with its halo spilling out around the body. Both are presets too.
+
 ### Grouped options and presets
 
 Flat options and grouped objects are interchangeable; groups are easier to read and write:
@@ -135,7 +147,7 @@ Flat options and grouped objects are interchangeable; groups are easier to read 
 ```js
 createBot('#agent', {
   type: 'cat',
-  preset: 'teddy',                      // plush, teddy, velvet, mohair, felt, vinyl, clay, sticker, paper
+  preset: 'teddy',                      // plush, teddy, velvet, mohair, felt, vinyl, clay, sticker, paper, glass, lantern, ragdoll
   fur: { length: 1.6, clumps: 0.6, pattern: 'stripes', color: '#8b5a2b', scale: 1.2 },
   light: { angle: 290, color: '#ffe7b3', fill: '#4c6fff', fillStrength: 0.4, rimColor: '#7ad7ff' },
   material: { roundness: 0.8, gloss: 0.4 },
@@ -151,7 +163,7 @@ In HTML, groups take JSON: `<bot-avatar fur='{"pattern":"spots"}'>` (the face gr
 | --- | --- |
 | `fur` | `length`, `density`, `fuzz`, `curl`, `gravity`, `clumps`, `pattern` (`none`, `two-tone`, `gradient`, `tips`, `spots`, `stripes`, `belly`, `patches`), `color` (second colour), `scale` |
 | `light` | `angle`, `color` (key light), `fill` (shade-side tint) and `fillStrength`, `rimColor`, `shadow`, `highlight`, `rim`, `spread` |
-| `material` | `shading`, `roundness` (1 a pillow, 0 a slab), `gloss`, `depth` |
+| `material` | `shading`, `roundness` (1 a pillow, 0 a slab), `gloss`, `depth`, `glow`, `glowColor`, `quirk` |
 | `face` | `features` (`eyes`/`mouth`), `eyes: { style, size, gap, shine, iris }`, `brows` (`auto`, `none`, `soft`, `thick`, `line`), `mouth` (`smile`, `cat`, `line`, `o`, `teeth`, `tongue`), `freckles`, `x`, `y`, `scale`, `blush`, `blushColor`, `ink`, `expression` |
 | `motion` | `speed`, `turn`, `blinkRate`, `glanceRate`, `breathing`, `jiggle`, `whirl`, `whirlColor`, `jump: { every, height, time, spin, squash, stretch, lean }` |
 | `wear` | a list (`'party-hat round-glasses bow-tie'`, or an array), or `hat` (`beanie`, `party`, `crown`, `beret`, `tophat`, `cap`, `witch`, `halo`, `bow`, or your own), `glasses`, `headphones`, `bowTie`, `color`, `scarf`, `scarfColor`, `badge` (up to 3 characters), `badgeColor`, `ears` (`cat`, `bunny`, `bear`, `round`), `antennae` (`auto`, `none`, `one`, `two`), `accessories` |
@@ -226,6 +238,22 @@ A pack is a ZIP of transparent PNGs (`01-cat.png`, … named from `label` or `ty
 ## Agent features
 
 Each loads on first use (a small module of its own); left off, they cost nothing.
+
+### Let it understand the agent
+
+```js
+const bot = createBot('#agent', { type: 'clover', status: 'auto', affect: true });
+input.oninput = () => bot.observe('typing', { target: input });   // listens, eyes on the box
+bot.observe('sent');                                               // thinks; frets if the first token is slow
+for await (const chunk of stream) bot.observe('token', { text: chunk });   // says it, reacts to its tone
+bot.observe('tool', { name: 'search' }); bot.observe('tool-end');  // works, then back to thinking
+bot.observe('done');                                               // waits for the mouth, then a happy hop
+bot.observe('error', { message });                                 // worried; sheepish after three in a minute
+```
+
+`observe()` is the whole integration for most chat UIs: it picks the states, the gaze, the reactions and the lip-sync from what the agent is doing, and `setState()`, `react()` and `lookAt()` still work over the top. With `affect: true` it also dozes off after two minutes of nothing (`affect: { sleepAfter: 60 }`); `affect: { tone: false }` stops the reactions to the reply's tone. `announce: true` reads each change of state to screen readers ("Clover is thinking").
+
+### The rest, by hand
 
 ```js
 // Lip-sync from text, no audio: vowels open, m/b/p close, punctuation pauses.
