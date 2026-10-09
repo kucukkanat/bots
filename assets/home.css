@@ -128,7 +128,7 @@
 /* Crew strip */
 .crew-strip {
   display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: thin;
-  padding: 8px max(24px, calc((100vw - 1072px) / 2)) 20px; scroll-padding: 0 24px;
+  padding: 8px max(24px, calc((100vw - 1072px) / 2)) 20px; scroll-padding-inline: max(24px, calc((100vw - 1072px) / 2));
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 32px), transparent);
   mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 32px), transparent);
 }
@@ -226,7 +226,7 @@
   .demo-body { grid-template-columns: minmax(0, 1fr); height: auto; }
   .stage { height: 250px; border-right: 0; border-bottom: 1px solid var(--line); }
   .stage-bot { width: 170px; height: 170px; }
-  .chat { height: 420px; }
+  .chat { height: 380px; }
   .bench { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 600px) {
@@ -241,10 +241,12 @@
   .ticker { display: none; }
   .stat { padding: 18px 16px; }
   .stat b { font-size: 34px; }
-  .crew-strip { padding-left: 16px; padding-right: 16px; }
+  .crew-strip { padding-left: 16px; padding-right: 16px; scroll-padding-inline: 16px; }
   .crew-card { width: 132px; }
   .cta { padding: 36px 18px 40px; }
   .actions .btn { flex: 1 1 auto; }
+  .snippets pre.code { min-height: 0; }
+  .feat-vis { height: 130px; }
 }
 @media (max-width: 480px) {
   .features { grid-template-columns: minmax(0, 1fr); }

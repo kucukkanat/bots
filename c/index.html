@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>A crew of bots</title>
+  <meta name="description" content="A shareable crew of animated bot avatars, encoded in the link." />
+  <meta name="theme-color" content="#f5f4f0" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#111016" media="(prefers-color-scheme: dark)" />
+  <script>try{var t=localStorage.getItem('bots-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/site.css" />
+  <link rel="modulepreload" href="../src/index.js" />
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+  <style>
+    .crew-page { padding: 56px 0 0; text-align: center; position: relative; isolation: isolate; }
+    .crew-page::before {
+      content: ''; position: absolute; z-index: -1; inset: 0 0 auto; height: 700px; pointer-events: none;
+      background:
+        radial-gradient(520px 320px at 25% 40%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%),
+        radial-gradient(520px 320px at 75% 50%, color-mix(in srgb, var(--warm) 12%, transparent), transparent 70%);
+    }
+    .kicker { font: 600 12.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .12em; color: var(--accent); margin: 0 0 14px; }
+    .crew-page h1 { font-size: clamp(34px, 6vw, 60px); line-height: 1.05; letter-spacing: -0.045em; font-weight: 800; margin: 0 0 12px; overflow-wrap: anywhere; }
+    .crew-page .sub { color: var(--muted); font-size: 17px; margin: 0 auto 28px; max-width: 560px; }
+    .toolbar { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 40px; }
+    .members { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 220px)); justify-content: center; gap: 14px; }
+    .members.solo { grid-template-columns: minmax(0, 360px); }
+    .member {
+      background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 22px 12px 14px; display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 0; min-width: 0;
+    }
+    .member .slot { display: grid; place-items: center; }
+    .member figcaption { font-weight: 700; font-size: 16px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 4px; }
+    .member .kind { color: var(--muted); font-size: 12.5px; margin-top: -4px; }
+    .member .acts { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; justify-content: center; }
+    .member .acts a, .member .acts button {
+      font: inherit; font-size: 12px; font-weight: 600; color: var(--muted); background: var(--bg-2); border: 1px solid var(--line);
+      border-radius: 99px; padding: 4px 10px; text-decoration: none; cursor: pointer;
+    }
+    .member .acts a:hover, .member .acts button:hover { color: var(--text); }
+    .empty { max-width: 560px; margin: 0 auto; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 28px 24px; text-align: left; }
+    .empty h2 { margin: 0 0 8px; font-size: 20px; letter-spacing: -0.02em; }
+    .empty p { color: var(--muted); margin: 0 0 14px; }
+    .empty pre.code { font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+    .empty .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .made { margin-top: 48px; color: var(--muted); font-size: 13px; }
+    .made a { color: var(--text); }
+    .toast {
+      position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+      background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-weight: 600; font-size: 14px;
+      transition: opacity .2s, transform .2s; z-index: 100;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    @media (max-width: 600px) {
+      .crew-page { padding-top: 36px; }
+      .members { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+      .members.solo { grid-template-columns: minmax(0, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="../"><img src="../assets/favicon.svg" alt="" width="28" height="28" /> bots</a>
+      <nav class="nav" aria-label="Main">
+        <a class="hide-sm" href="../">Home</a>
+        <a href="../docs/">Docs</a>
+        <a href="../playground/">Studio</a>
+        <a class="icon" href="https://github.com/kucukkanat/bots" aria-label="GitHub"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
+        <button id="theme" class="icon" type="button" aria-label="Toggle theme"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 2.75a7.25 7.25 0 0 1 0 14.5z" fill="currentColor"/></svg></button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="crew-page">
+    <div class="wrap">
+      <p class="kicker" id="kicker">Crew</p>
+      <h1 id="title">A crew of bots</h1>
+      <p class="sub" id="sub">Every bot on this page lives in the link: share it and the same crew shows up.</p>
+      <div class="toolbar" id="toolbar" hidden>
+        <div class="seg" id="state-seg" role="group" aria-label="Everyone's state">
+          <button type="button" data-v="default" aria-pressed="true">Idle</button>
+          <button type="button" data-v="working" aria-pressed="false">Working</button>
+          <button type="button" data-v="thinking" aria-pressed="false">Thinking</button>
+          <button type="button" data-v="success" aria-pressed="false">Party</button>
+          <button type="button" data-v="sleeping" aria-pressed="false">Asleep</button>
+        </div>
+        <button class="btn small" type="button" id="copy-link">Copy link</button>
+      </div>
+      <div class="members" id="members"></div>
+      <div class="empty" id="empty" hidden>
+        <h2>No bots in this link</h2>
+        <p>Crew pages show the bots encoded in their address: Bot DNA codes after the <code>#</code>, separated by commas, each with an optional <code>~name</code>.</p>
+        <pre class="code" id="example" data-nocopy></pre>
+        <div class="actions"><a class="btn small primary" id="sample" href="#">See a sample crew</a><a class="btn small" href="../playground/">Make bots in the studio</a></div>
+      </div>
+      <p class="made">Made with <a href="../">bots</a> · <a href="../playground/">design your own</a></p>
+    </div>
+  </main>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="crew.js"></script>
+</body>
+</html>

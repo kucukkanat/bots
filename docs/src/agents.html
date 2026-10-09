@@ -1,0 +1,104 @@
+<!-- Agent recipes | Wire bots to an AI agent: states for each step of a turn, streaming LLM text into say() for lip-sync, status badges, moods, voice and crews. -->
+<h1>Agent recipes</h1>
+<p class="sub">An avatar earns its place when it shows what the agent is doing. These recipes wire one to a chat turn: listening, thinking, streaming the reply with lip-sync, tool calls, errors and rest.</p>
+
+<h2>A turn, step by step</h2>
+::table Your agent is… | Call | The bot
+waiting for input | `setState('default')` | looks around, blinks
+watching the user type | `setState('listening')`, `lookAt(input)` | leans in, eyes on the box
+waiting for the first token | `setState('thinking')`, `set({ status: 'typing' })` | eyes up, thought bubble, typing badge
+streaming the answer | `say(chunk, { append: true })` | mouth follows the words
+running a tool | `setState('working')`, `set({ status: 'loading' })` | busy bounce, spinner badge
+done | `setState('success')`, `set({ status: 'done' })` | a happy hop
+failed | `setState('error')`, `react('worried')` | frowns, shakes its head
+idle for a while | `setState('sleeping')` | dozes off
+::end
+<p class="note"><b>Shortcut:</b> <code>status: 'auto'</code> picks the badge from the state for you, and <code>mood: 'auto'</code> lets the resting face follow how the conversation is going.</p>
+
+<h2>Stream an LLM into say()</h2>
+<p>Most chat APIs stream the reply as text chunks. Hand each chunk to <code>say()</code> with <code>append: true</code> and the mouth keeps going for as long as text keeps coming; await the last call to know when it has finished talking.</p>
+```js
+import { createBot } from '@kucukkanat/bots';
+
+const bot = createBot('#agent', { type: 'clover', size: 96, status: 'auto', mood: 'auto' });
+const input = document.querySelector('#prompt');
+
+input.addEventListener('input', () => bot.setState(input.value ? 'listening' : 'default'));
+input.addEventListener('focus', () => bot.lookAt(input));
+input.addEventListener('blur', () => bot.lookAt(null));
+
+async function ask(question, onText) {
+  bot.lookAt(null);
+  bot.setState('thinking');
+  try {
+    const res = await fetch('/api/chat', { method: 'POST', body: JSON.stringify({ question }) });
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    let speaking = Promise.resolve();
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      onText(value);                                  // show it in your chat UI
+      speaking = bot.say(value, { append: true });    // and say it
+    }
+    await speaking;
+    bot.setState('success');
+  } catch (err) {
+    bot.setState('error');
+    bot.react('worried');
+    throw err;
+  }
+}
+```
+<p>The same works for any SDK that gives you an async iterator of text:</p>
+```js
+bot.setState('thinking');
+for await (const text of stream.textStream) bot.say(text, { append: true });
+```
+<p><code>wpm</code> sets the speaking pace (words per minute). If your UI reveals text at a fixed pace, use the same pace for both so the mouth and the words line up.</p>
+
+<h2>Without say()</h2>
+<p>On versions without <code>say()</code>, or when you'd rather not lip-sync, the <code>speaking</code> state makes up its own chatter. Feature-detect to support both:</p>
+```js
+if (typeof bot.say === 'function') await bot.say(reply);
+else { bot.setState('speaking'); await revealText(reply); }
+bot.setState('success');
+```
+
+<h2>Tool calls</h2>
+```js
+agent.on('tool_start', (tool) => { bot.setState('working'); bot.set({ status: 'loading' }); });
+agent.on('tool_end', () => { bot.setState('thinking'); bot.set({ status: 'typing' }); });
+```
+
+<h2>Voice and text-to-speech</h2>
+<p>If your agent talks out loud, let the audio drive the mouth instead of the text. <code>speak()</code> takes a mic stream, an <code>&lt;audio&gt;</code> element or any Web Audio node:</p>
+```js
+const audio = new Audio(ttsUrl);
+bot.speak(audio);       // mouth follows the sound, state becomes 'speaking'
+await audio.play();
+audio.onended = () => bot.speak();   // back to the state it was in
+```
+<p>With viseme timings from your TTS provider, drive the mouth yourself with <code>bot.setVoice(level)</code>, 0 closed to 1 wide.</p>
+
+<h2>Rest between turns</h2>
+```js
+let nap;
+const rest = () => { clearTimeout(nap); nap = setTimeout(() => bot.setState('sleeping'), 60_000); };
+bot.on('state', (e) => { if (e.state === 'default') rest(); });
+```
+
+<h2>A crew of agents</h2>
+<p>For multi-agent apps, give every agent a stable look from its id, and let them notice each other:</p>
+```js
+for (const agent of agents) {
+  createBot(agent.el, { identity: agent.id, size: 48, social: true, status: 'auto' });
+}
+```
+<p>Share a whole crew as a link with a <a href="../c/">crew page</a>: DNA codes in the URL, no server.</p>
+
+<h2>Accessibility</h2>
+<ul>
+  <li>Give each avatar a <code>label</code>; the canvas is an image named after it and its state, e.g. “Clover, thinking”.</li>
+  <li>The avatar is decoration for what your chat UI already says. Keep the reply text in the DOM, in a <code>role="log"</code> region.</li>
+  <li>With <code>prefers-reduced-motion</code>, avatars hold each state's still pose.</li>
+</ul>

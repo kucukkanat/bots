@@ -1,0 +1,77 @@
+<!-- Performance | How bots renders: worker threads, WebGL2, the 2D canvas fallback, caching, frame budgets and quality economies, plus how to benchmark and the perf gate. -->
+<h1>Performance</h1>
+<p class="sub">Avatars sit beside the real work, so they're built to stay out of its way: drawing happens off the main thread, nothing is redrawn that didn't change, and every optional feature loads only when it's used.</p>
+
+<h2>Where it draws</h2>
+<p>Each avatar's canvas is handed to a worker thread with <code>OffscreenCanvas</code>, so drawing runs off the main thread and avatars spread over up to four cores. The page keeps its frame rate however many there are.</p>
+<ul>
+  <li>A worker is only used once it has started and said so. Without worker support, or for a canvas you pass in yourself, the same renderer runs on the main thread.</li>
+  <li>Each worker has at most one batch of frames in flight, so a slow one draws less often instead of falling behind.</li>
+  <li><code>renderSettings.workers = false</code> turns workers off; <code>renderSettings.maxWorkers</code> changes the cap. Set them before the first avatar.</li>
+</ul>
+
+<h2>WebGL</h2>
+<p>With a hardware GPU, bodies are drawn with WebGL2:</p>
+<ul>
+  <li>The stacked silhouette is rasterised once (multisampled), and every light pass is a GPU blur of it at its own scale, taken from the silhouette's mipmap in about 13 taps.</li>
+  <li>One shader lays down body colour, fur skin, turn shading, light, highlights and edge fuzz; the outline hairs follow as one batch of thin quads. Faces and things worn are painted on top in 2D.</li>
+  <li>It matches the 2D renderer to within a fraction of a level per pixel.</li>
+  <li>Software-emulated WebGL is refused, a lost context falls back, and a thread whose GPU turns out too slow switches to 2D, so every browser gets the fastest path it really has.</li>
+</ul>
+
+<h2>The 2D fallback</h2>
+<p>Built to stay cheap with many avatars on a page:</p>
+<ul>
+  <li><strong>Adaptive depth.</strong> The body is its outline stacked through its depth, with only as many slices as the turn needs: one when facing you, more as front and back pull apart.</li>
+  <li><strong>No clips, no layers.</strong> The body goes down first, so everything on it is painted with <code>source-atop</code>, and what sits behind it with <code>destination-over</code>.</li>
+  <li><strong>Deferred, reused light.</strong> Shadow, occlusion and rim are blurred once in a small buffer and stretched back over the crisp body. Buffers are kept between frames and re-lit only when the outline has really changed.</li>
+  <li><strong>Baked plush.</strong> Fur is baked once per shape into a grey skin and blended with each body colour once, then laid on with a plain draw.</li>
+</ul>
+
+<h2>Only draw what changed</h2>
+<ul>
+  <li>A frame is skipped when the pose moved less than a quarter of a device pixel, so a resting avatar breathing in sub-pixel steps is mostly free.</li>
+  <li>Off-screen avatars stop drawing (an <code>IntersectionObserver</code> per avatar), and so do avatars in background tabs.</li>
+  <li>All avatars share one animation loop. When the page can't keep up, they take turns redrawing while their simulations keep real time.</li>
+  <li>With <code>prefers-reduced-motion</code>, avatars hold each state's still pose.</li>
+</ul>
+
+<h2>Quality economies</h2>
+<p>With <code>quality: 'auto'</code> and no WebGL, the 2D path trades a little detail for speed: light is re-computed after slightly larger movements, high-density screens draw at 1.5× instead of 2×, and avatars of 48 px or less animate at half rate. With WebGL, or <code>quality: 'high'</code>, nothing is traded.</p>
+
+<h2>What you pay for</h2>
+::table Thing | Cost
+Core module | One ES module graph, about 60 kB gzipped, no dependencies.
+Exporter | Loaded on the first `export()`.
+Optional features | `say`, `toss`, `petting`, `sounds`, moods and status badges each load on first use.
+Presets, DNA, identity, fur patterns | Resolved once when options change; nothing per frame.
+Brows, trails, audio analysis | Only while they're showing.
+::end
+
+<h2>Tips</h2>
+<ul>
+  <li>Give each avatar's host a fixed width and height so nothing moves when it appears.</li>
+  <li>Use the size you show: a 40 px avatar draws far fewer pixels than a 96 px one scaled down.</li>
+  <li>For long lists, create avatars as rows scroll into view and <code>destroy()</code> them when they leave.</li>
+  <li><code>renderer: 'canvas'</code> skips WebGL setup for a handful of tiny avatars.</li>
+</ul>
+
+<h2>Benchmarks</h2>
+<p>With the repository served locally (<code>npm start</code>):</p>
+```sh
+# a grid of avatars; reports the page's frame rate and each avatar's
+open http://localhost:8000/bench/grid.html?n=30&size=96
+
+# compare the paths
+open "http://localhost:8000/bench/grid.html?n=30&size=96&workers=off"
+open "http://localhost:8000/bench/grid.html?n=30&size=96&renderer=canvas&quality=high&budget=off"
+```
+
+<h2>The perf gate</h2>
+<p><code>scripts/perf.mjs</code> renders 30 avatars × 60 frames in headless Chromium and compares draw time between two builds or two option sets, alternating runs to cancel drift. New features have to show they cost nothing when they're off.</p>
+```sh
+node scripts/perf.mjs                                    # current src vs v1.0.0, default look
+node scripts/perf.mjs '{"ears":"cat"}'                   # the same, with options
+node scripts/perf.mjs --ab '{}' '{"mood":"happy"}'       # current src, option set A vs B
+MAX=3 RUNS=8 node scripts/perf.mjs                       # fail if more than 3% slower
+```

@@ -1,0 +1,162 @@
+<!-- Options | Every bots option: shapes, states, behaviour, looks, light, fur, face, motion, things to wear and rendering, as JavaScript options and HTML attributes. -->
+<h1>Options</h1>
+<p class="sub">Every option works as a JavaScript option in <code>camelCase</code> and as an attribute in <code>kebab-case</code>. Leave one out and you get the default; set one later with <code>bot.set()</code> or by changing the attribute, and the avatar eases into it.</p>
+
+```html
+<bot-avatar type="cat" face="mouth" hat="party" bow-tie accessory-color="#5b5bf7"></bot-avatar>
+```
+```js
+createBot('#agent', { type: 'cat', face: 'mouth', hat: 'party', bowTie: true, accessoryColor: '#5b5bf7' });
+```
+
+<h2>Basics</h2>
+::table Option | Values | Default
+`type` | `clover`, `flower`, `triangle`, `square`, `blob`, `ghost`, `circle`, `drop`, `star`, `droid`, `mech`, `alien`, `hexagon`, `cat`, `cloud`, `pill`, `pebble`, `puddle`, or one you registered | `clover`
+`state` | `default` (idle), `listening`, `thinking`, `speaking`, `working`, `success`, `error`, `sleeping`, or one you registered | `default`
+`face` | `eyes`, `mouth` | `eyes`
+`size` | box size in px | `64`
+`label` | accessible name for the canvas | the shape's name
+`seed` | 0–1, offsets blinks and glances so a crew doesn't move in step | random
+`interactive` | eyes follow the pointer, click to hop | `true`
+`paused` | freeze on the current frame | `false`
+`pose` | held pose while paused, e.g. `{ yaw: 0.8 }` | —
+`theme` | `auto`, `light`, `dark`: tunes the floor shadow and thought bubble to the page | `auto`
+::end
+
+<h2>Behaviour</h2>
+<p>Opt-in behaviours for agents. Each loads its code the first time it's switched on, so the ones you don't use cost nothing.</p>
+::table Option | Values | Default
+`status` | `none`, `typing`, `loading`, `done`, `error`, or `auto` (follows the state) — a small badge beside the avatar | `none`
+`mood` | `auto` (follows the conversation), `neutral`, `happy`, `sleepy`, `excited`, `grumpy`, `calm` | `neutral`
+`social` | bots on the same page glance at each other | `false`
+`toss` | drag the avatar and throw it; it bounces back home | `false`
+`petting` | stroke it with the pointer and it leans into your hand | `false`
+`sounds` | soft sounds for hops, pokes and reactions; `true` or a volume 0–1 | `false`
+::end
+
+<h2>Colour &amp; material</h2>
+::table Option | Values | Default
+`color` | body colour, any CSS hex colour | the shape's own
+`ink` | face colour | auto: dark on light bodies
+`brightness`, `saturation` | 0–2 | `1`
+`shading` | `fabric` (plush fur), `plastic`, `smooth`, `crisp`, `flat` | `fabric`
+`preset` | `plush`, `teddy`, `velvet`, `mohair`, `felt`, `vinyl`, `clay`, `sticker`, `paper`: a named look that sets many options at once | —
+`roundness` | 1 a pillow, 0 a slab | per shading
+`gloss` | 0–1 | per shading
+`depth` | 0.2–2, thickness when turned | `0.65`
+`path` | SVG path data in a 100×100 box centred on (50, 50): your own outline | —
+::end
+
+<h2>Light</h2>
+::table Option | Values | Default
+`light` | degrees clockwise from the top, or the `light` group below | `295`
+`shadow`, `highlight`, `rim` | 0–2 | per shading
+`spread` | 0.4–2.5, how far the light wraps round | `1.4`
+`lightColor` | key light colour | white
+`fillColor`, `fillStrength` | shade-side tint and how much of it | none
+`rimColor` | rim light colour | white
+::end
+
+<h2>Fur</h2>
+<p>For <code>shading: 'fabric'</code>. The fur is baked once per shape, so none of these cost anything per frame.</p>
+::table Option | Values | Default
+`furLength` | 0.3–2.5 | `1`
+`furDensity` | 0.3–2 | `1.6`
+`furFuzz` | 0–1, soft edge | `0.9`
+`furCurl` | 0–1 | `0.7`
+`furGravity` | 0–1, how much the pile droops | `0.9`
+`furClumps` | 0–1 | `0`
+`furPattern` | `none`, `two-tone`, `gradient`, `tips`, `spots`, `stripes`, `belly`, `patches` | `none`
+`furColor2` | second colour for patterns | auto
+`furPatternScale` | pattern size | `1`
+::end
+
+<h2>Face</h2>
+::table Option | Values | Default
+`eyeStyle` | `round`, `oval`, `wide`, `dot`, `sleepy`, `happy`, `line`, `star`, `heart` | `round`
+`eyeSize`, `eyeGap` | 0.5–1.8, 0.5–1.6 | `1`
+`eyeShine` | highlight in the eyes | `true`
+`irisColor` | coloured irises | none
+`brows` | `auto`, `none`, `soft`, `thick`, `line` | `auto`
+`mouthStyle` | `smile`, `cat`, `line`, `o`, `teeth`, `tongue` | `smile`
+`faceX`, `faceY`, `faceScale` | move and scale the face | `0`, `0`, `1`
+`blush`, `blushColor` | rosy cheeks | `false`
+`freckles` | boolean | `false`
+`expression` | a held face: `neutral`, `happy`, `joy`, `surprised`, `worried`, `sad`, `angry`, `smug`, `sleepy`, `confused`, `dizzy`, `love`, or an object of channels | `neutral`
+::end
+<p>Expression channels: `brow`, `browTilt`, `eyeWide`, `squint`, `smile` (−1 frown … 1), `mouthOpen`, `happy`, `dizzy`, `blushPulse`.</p>
+
+<h2>Things to wear</h2>
+::table Option | Values | Default
+`hat` | `none`, `beanie`, `party`, `crown`, `beret`, `tophat`, `cap`, `witch`, `halo`, `bow`, or from a pack or your own | `none`
+`glasses` | `none`, `round`, `square`, `shades` | `none`
+`headphones`, `bowTie` | boolean | `false`
+`accessoryColor` | colour of hats, headphones and the bow tie | soft black
+`scarf`, `scarfColor` | boolean, colour | `false`
+`badge`, `badgeColor` | up to 3 characters on the body | —
+`ears` | `none`, `cat`, `bunny`, `bear`, `round` | `none`
+`antennae` | `auto`, `none`, `one`, `two` | `auto`
+`accessories` | images pinned to the body: `[{ src, x, y, size, rotate, layer }]` | —
+::end
+
+<h2>Motion</h2>
+::table Option | Values | Default
+`speed` | animation speed multiplier | `1`
+`turn` | how far it looks round | `1`
+`blinkRate`, `glanceRate` | multipliers | `1`
+`breathing`, `jiggle` | multipliers | `1`
+`whirl`, `whirlColor` | the swirl while working | `1`
+`jumpEvery` | seconds between idle hops, 0 = never | `8`
+`jumpHeight`, `jumpTime`, `jumpSpin`, `jumpSquash`, `jumpStretch`, `jumpLean` | shape of a hop | `1`
+::end
+<p><code>prefers-reduced-motion</code> shows each state's still pose instead of animating.</p>
+
+<h2>Rendering</h2>
+::table Option | Values | Default
+`renderer` | `auto`: WebGL2 when there's a hardware GPU, else 2D. `canvas`: always 2D | `auto`
+`quality` | `auto`: without WebGL, trade a little detail for speed. `high`: never | `auto`
+`floorShadow` | the soft shadow underneath | `true`
+::end
+<p>See <a href="performance.html">Performance</a> for what each path does.</p>
+
+<h2>Grouped options</h2>
+<p>Flat options and grouped objects are interchangeable; groups are easier to read and write:</p>
+```js
+createBot('#agent', {
+  type: 'cat',
+  preset: 'teddy',
+  fur: { length: 1.6, clumps: 0.6, pattern: 'stripes', color: '#8b5a2b', scale: 1.2 },
+  light: { angle: 290, color: '#ffe7b3', fill: '#4c6fff', fillStrength: 0.4, rimColor: '#7ad7ff' },
+  material: { roundness: 0.8, gloss: 0.4 },
+  face: { eyes: { style: 'oval', iris: '#3b82f6' }, brows: 'soft', mouth: 'cat', freckles: true, expression: 'smug' },
+  motion: { blinkRate: 1.4, breathing: 1.5, jump: { height: 0.5, spin: 2, squash: 1.3 } },
+  wear: { hat: 'witch', ears: 'bunny', scarf: true, badge: 'AI', antennae: 'two' },
+});
+```
+<p>In HTML, groups take JSON. The face group is <code>face-options</code>, because <code>face</code> is the eyes/mouth switch:</p>
+```html
+<bot-avatar type="cat" fur='{"pattern":"spots"}' face-options='{"mouth":"cat"}'></bot-avatar>
+```
+::table Group | Options
+`fur` | `length`, `density`, `fuzz`, `curl`, `gravity`, `clumps`, `pattern`, `color`, `scale`
+`light` | `angle`, `color`, `fill`, `fillStrength`, `rimColor`, `shadow`, `highlight`, `rim`, `spread`
+`material` | `shading`, `roundness`, `gloss`, `depth`
+`face` | `features` (`eyes`/`mouth`), `eyes: { style, size, gap, shine, iris }`, `brows`, `mouth`, `freckles`, `x`, `y`, `scale`, `blush`, `blushColor`, `ink`, `expression`
+`motion` | `speed`, `turn`, `blinkRate`, `glanceRate`, `breathing`, `jiggle`, `whirl`, `whirlColor`, `jump: { every, height, time, spin, squash, stretch, lean }`
+`wear` | `hat`, `glasses`, `headphones`, `bowTie`, `color`, `scarf`, `scarfColor`, `badge`, `badgeColor`, `ears`, `antennae`, `accessories`
+::end
+
+<h2>DNA and identity</h2>
+<p>Two ways to get a whole look from one string:</p>
+```js
+const code = bot.dna;                          // 'bot1.…': the whole design, URL-safe
+createBot('#copy', { dna: code });             // the same bot again
+createBot('#user', { identity: user.email });  // a stable look of its own for every id
+```
+<p>Options you pass alongside <code>dna</code>, <code>identity</code> or <code>preset</code> win over theirs. DNA codes are what the <a href="../playground/">studio</a> shares and what <a href="../c/">crew pages</a> are made of.</p>
+
+<h2>CSS variables</h2>
+<p><code>&lt;bot-avatar&gt;</code> reads colours from CSS where no attribute sets them: `--bot-color`, `--bot-ink`, `--bot-accessory-color`, `--bot-blush-color`, `--bot-fur-color`, `--bot-light-color`, `--bot-fill-color`, `--bot-rim-color` and `--bot-iris-color`. Call <code>el.refresh()</code> after changing them.</p>
+```css
+.team-red bot-avatar { --bot-color: #ff5c5c; --bot-accessory-color: #2b2833; }
+```

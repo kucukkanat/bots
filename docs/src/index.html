@@ -1,0 +1,65 @@
+<!-- Getting started | Install bots and put a living avatar next to your AI agent in a few lines: custom element, JavaScript API and framework wrappers. -->
+<h1>Getting started</h1>
+<p class="sub">bots is one dependency-free ES module that draws plush, animated avatars for AI agents and apps. This page gets one on screen and wired to your agent in about five minutes.</p>
+
+<div class="demo-row">
+  <figure><bot-avatar type="clover" face="mouth" size="88" style="width:88px;height:88px"></bot-avatar><figcaption>default</figcaption></figure>
+  <figure><bot-avatar type="cat" state="thinking" size="88" style="width:88px;height:88px"></bot-avatar><figcaption>thinking</figcaption></figure>
+  <figure><bot-avatar type="droid" state="working" face="mouth" size="88" style="width:88px;height:88px"></bot-avatar><figcaption>working</figcaption></figure>
+  <figure><bot-avatar type="alien" state="sleeping" size="88" style="width:88px;height:88px"></bot-avatar><figcaption>sleeping</figcaption></figure>
+</div>
+
+<h2>Install</h2>
+<p>From npm, for projects with a bundler:</p>
+```sh
+npm i @kucukkanat/bots
+```
+<p>Or straight from a CDN, with no build step at all. The module registers the <code>&lt;bot-avatar&gt;</code> element as soon as it loads:</p>
+```html
+<script type="module" src="https://cdn.jsdelivr.net/gh/kucukkanat/bots@main/src/index.js"></script>
+```
+<p class="note"><b>Self-hosting?</b> Copy the <code>src/</code> folder anywhere your site serves static files. The renderer starts its worker threads from that folder, so keep the files together.</p>
+
+<h2>Your first bot</h2>
+<p>Drop the element anywhere. Every option is an attribute in kebab-case; change one and the avatar eases into its new look.</p>
+```html
+<bot-avatar type="clover" size="96"></bot-avatar>
+<bot-avatar type="cat" face="mouth" hat="party" bow-tie></bot-avatar>
+```
+<p>Eighteen shapes ship in the box: `clover`, `flower`, `triangle`, `square`, `blob`, `ghost`, `circle`, `drop`, `star`, `droid`, `mech`, `alien`, `hexagon`, `cat`, `cloud`, `pill`, `pebble` and `puddle`. The <a href="../playground/">studio</a> shows them all and writes the markup for you.</p>
+
+<h2>From JavaScript</h2>
+<p><code>createBot()</code> puts an avatar in any element (or a selector) and hands back a controller:</p>
+```js
+import { createBot } from '@kucukkanat/bots';
+
+const bot = createBot('#agent', { type: 'droid', size: 96, glasses: 'round' });
+
+bot.setState('thinking');   // while your agent works
+bot.set({ hat: 'crown' });  // change anything, it eases in
+bot.poke();                 // hop and turn round
+bot.destroy();              // remove it and free its canvas
+```
+<p>The element exposes the same controller as <code>el.bot</code>, and forwards the common methods (<code>el.poke()</code>, <code>el.react()</code>, <code>el.lookAt()</code>…).</p>
+
+<h2>Agent states</h2>
+<p>States are how the avatar tells people what your agent is doing. Switch them as your agent moves through a turn:</p>
+::table State | Looks like | Use it when
+`default` | idle: looks around, blinks, the odd hop | nothing is happening
+`listening` | leans in, smiles, nods now and then | the user is typing or talking
+`thinking` | eyes up and aside, a thought bubble | the model is working on a reply
+`speaking` | mouth moves | the reply is streaming or being read out
+`working` | busy bouncing | a tool call or long task is running
+`success` | a happy hop | the task finished
+`error` | frowns, shakes its head | something failed
+`sleeping` | eyes closed, Z's | idle for a while
+::end
+<p>For a full turn wired to a streaming model, see <a href="agents.html">Agent recipes</a>.</p>
+
+<h2>Next steps</h2>
+<div class="cards">
+  <a class="card-link" href="options.html"><b>Options</b><span>Every look and behaviour switch, in one table.</span></a>
+  <a class="card-link" href="agents.html"><b>Agent recipes</b><span>Stream an LLM into <code>say()</code>, states and status badges.</span></a>
+  <a class="card-link" href="frameworks.html"><b>Frameworks</b><span>React, Vue and Svelte wrappers.</span></a>
+  <a class="card-link" href="performance.html"><b>Performance</b><span>Worker threads, WebGL and the 2D fallback.</span></a>
+</div>

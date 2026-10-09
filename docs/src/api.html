@@ -1,0 +1,106 @@
+<!-- API reference | createBot, the BotAvatar controller's methods, properties and events, the bot-avatar element, and every export of @kucukkanat/bots. -->
+<h1>API reference</h1>
+<p class="sub">The module exports a factory, a custom element, a few registration hooks and some constants. Types ship in <code>src/index.d.ts</code>.</p>
+
+<h2>createBot()</h2>
+```js
+import { createBot } from '@kucukkanat/bots';
+
+const bot = createBot(target, options);
+```
+<p><code>target</code> is an element (a canvas is made inside it), a selector string, or a <code>&lt;canvas&gt;</code> to draw into directly. <code>options</code> are the <a href="options.html">options</a>. It returns a <code>BotAvatar</code> controller; <code>new BotAvatar(target, options)</code> does the same.</p>
+
+<h2>Methods</h2>
+::table Method | What it does
+`set(options)` | Change any options; the look eases into them. Pass `undefined` to drop one back to its default. Returns the bot.
+`setState(state)` | Switch state: `default`, `listening`, `thinking`, `speaking`, `working`, `success`, `error`, `sleeping`, or a registered one.
+`say(text, { wpm, append })` | Lip-sync from text: the mouth shapes follow the words at `wpm` (words per minute). `append: true` adds to what it's already saying, for streamed text. Returns a Promise that resolves when it has finished talking.
+`react(expression, duration?)` | A moment's expression over any state: `happy`, `joy`, `surprised`, `worried`, `sad`, `angry`, `smug`, `sleepy`, `confused`, `dizzy`, `love`, or an object of face channels. Default 1.6 s.
+`speak(source?)` | The mouth follows audio: a `MediaStream` (mic), an `<audio>`/`<video>` element, or a Web Audio node from any `AudioContext`. Switches to `speaking`; `speak()` with nothing stops and restores the previous state.
+`setVoice(level)` | Drive the speaking mouth by hand, 0–1 (e.g. from TTS visemes); `null` for made-up chatter.
+`lookAt(target)` | Keep an eye on an element or a client-space point `{ x, y }`; `null` to stop. The pointer still wins when it comes close.
+`poke()` | Hop and turn round, as a click does.
+`on(event, fn)` | Listen for an event (below). Returns a function that stops listening.
+`feature(name)` | Load an optional feature now rather than on first use. Resolves to its controller.
+`export(options?)` | Render an animation or still to a `Blob`. See <a href="export.html">Export</a>.
+`toDataURL({ full?, scale? })` | PNG of the current frame.
+`draw()` | Draw one frame now (paused avatars, tests).
+`destroy()` | Stop, remove the canvas it made, and free its worker slot.
+::end
+
+<h2>Properties</h2>
+::table Property | Value
+`ready` | Promise that resolves to the bot once it has a renderer (a worker thread or the main thread).
+`dna` | The whole design as a short URL-safe code, `bot1.…`.
+`options` | The current, normalised options.
+`canvas` | The canvas it draws into.
+`webgl` | Whether its frames are painted with WebGL.
+`pose` | The live pose (yaw, pitch, mouthOpen…), read-only.
+::end
+
+<h2>Events</h2>
+```js
+const off = bot.on('land', () => playThud());
+off(); // stop listening
+
+el.addEventListener('bot-blink', (e) => console.log(e.detail));   // the same, as bubbling DOM events
+```
+::table Event | When
+`poke` | Clicked or `poke()`d.
+`blink` | Blinked.
+`jump` | Left the floor.
+`land` | Landed.
+`state` | The state changed; `e.state` is the new one.
+`say-start`, `say-end` | `say()` started or finished talking.
+::end
+<p>Every event is also dispatched from the canvas as a bubbling DOM event named <code>bot-&lt;event&gt;</code>, so you can listen on any ancestor.</p>
+
+<h2>The &lt;bot-avatar&gt; element</h2>
+<p>Importing the module defines <code>&lt;bot-avatar&gt;</code>. Every option is an attribute in kebab-case; booleans are present or absent (or <code>"false"</code>); grouped options take JSON.</p>
+```html
+<bot-avatar id="agent" type="cat" state="thinking" size="96" bow-tie fur='{"pattern":"spots"}'></bot-avatar>
+<script type="module">
+  const el = document.querySelector('#agent');
+  el.setAttribute('state', 'speaking');   // attributes are live
+  el.bot.say('Hello!');                   // the controller, for everything else
+</script>
+```
+::table Member | What it is
+`bot` | The `BotAvatar` controller (after the element is connected).
+`poke()`, `react()`, `speak()`, `setVoice()`, `lookAt()` | Shortcuts to the controller.
+`dna` | The design's DNA code.
+`refresh()` | Re-read attributes and CSS variables (after changing `--bot-*` variables).
+::end
+
+<h2>Registering your own</h2>
+::table Function | Adds
+`registerShape(name, { path or points, color, label, faceY, faceScale })` | A shape, from SVG path data in a 100×100 box.
+`registerHat(name, { layers, width, lift })` | A hat, from layers of SVG path data with fill or stroke.
+`registerState(name, { pose, keyframes, duration, loop, blink })` | A state: a held pose or a keyframed loop.
+::end
+<p>See <a href="plugins.html">Plugins &amp; packs</a> for examples.</p>
+
+<h2>Other exports</h2>
+::table Export | What it is
+`BotAvatar`, `BotAvatarElement`, `defineBotAvatar(name?)` | The controller class, the element class, and a way to define the element under another tag name.
+`encodeDNA(options)`, `decodeDNA(code)` | Options ⇄ DNA codes.
+`lookFromId(id)` | The look `identity` would give an id.
+`normalizeOptions(options)` | Flat options from grouped ones, presets, DNA and identity.
+`exportBot(bot, options)` | The function behind `bot.export()`.
+`renderSettings` | Global switches, set before the first avatar: `workers` (default `true`), `maxWorkers` (default 4), `softwareWebGL`.
+`renderStats` | `{ drawn }`: frames drawn so far on every thread, for benchmarks.
+`types`, `presets`, `palette` | Shape names, their labels and colours.
+`STATES`, `SHADINGS`, `HATS`, `GLASSES`, `EYE_STYLES`, `MOUTH_STYLES`, `BROWS`, `EAR_STYLES`, `FUR_PATTERNS`, `STYLES`, `EXPRESSIONS` | The accepted values, for building UIs.
+`DEFAULTS` | The default options.
+`BotSim`, `drawBot`, `resolveLook`, `restPose` | The simulation and the 2D renderer, for drawing frames yourself.
+::end
+
+<h2>Framework entry points</h2>
+::table Import | Gives you
+`@kucukkanat/bots` | Everything above; defines `<bot-avatar>`.
+`@kucukkanat/bots/react` | `<BotAvatar>` component.
+`@kucukkanat/bots/vue` | `BotAvatar` component.
+`@kucukkanat/bots/svelte` | `bot` action.
+`@kucukkanat/bots/export` | `exportStickers()` and the exporters.
+::end
+<p>Usage for each is in <a href="frameworks.html">Frameworks</a>.</p>

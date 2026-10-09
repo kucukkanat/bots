@@ -62,6 +62,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 html { scroll-padding-top: 84px; -webkit-text-size-adjust: 100%; }
 body {
@@ -165,10 +166,11 @@ pre.code .n { color: #ffc27a; }
 .copy-btn {
   position: absolute; top: 10px; right: 10px; z-index: 1;
   height: 28px; padding: 0 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06); color: #cfcbe0; font: 600 12px/1 "Inter", system-ui, sans-serif; cursor: pointer;
+  background: #2a2833; color: #cfcbe0; font: 600 12px/1 "Inter", system-ui, sans-serif; cursor: pointer;
+  box-shadow: -14px 0 12px -2px var(--code-bg);
   transition: background .12s ease, color .12s ease;
 }
-.copy-btn:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+.copy-btn:hover { background: #393644; color: #fff; }
 .copy-btn.done { color: #9be29b; }
 
 .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
