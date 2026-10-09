@@ -101,14 +101,14 @@ const STRS = {
   accessoryColor: undefined, path: undefined, label: undefined, preset: undefined, furPattern: 'none', furColor2: undefined,
   lightColor: undefined, fillColor: undefined, rimColor: undefined, eyeStyle: 'round', irisColor: undefined, brows: 'auto',
   mouthStyle: 'smile', expression: 'neutral', whirlColor: undefined, scarfColor: undefined, badge: undefined, badgeColor: undefined,
-  ears: 'none', antennae: 'auto', blushColor: undefined, status: 'none', mood: 'auto',
+  ears: 'none', antennae: 'auto', blushColor: undefined, status: 'none',
   quirk: undefined, temperament: 'auto', glowColor: undefined, faceOn: undefined,
 };
 // `sounds` is a boolean or a volume (0–1).
 const SPECIAL = { sounds: false };
 const KEYS = [...Object.keys(STRS), ...Object.keys(NUMERIC), ...Object.keys(BOOLS), ...Object.keys(SPECIAL)];
 // Options that belong to the newer agent/play features: only sent when supported.
-const NEW_KEYS = ['status', 'mood', 'social', 'toss', 'petting', 'sounds', 'affect', 'announce'];
+const NEW_KEYS = ['status', 'social', 'toss', 'petting', 'sounds', 'affect', 'announce'];
 
 const defaultOf = (key, o) => {
   // A preset's values are the starting point its controls show.
@@ -546,7 +546,6 @@ tabPanel('look', () => [
   grp('Finish',
     select('preset', 'Preset', ['', ...Object.keys(STYLES)], ['Custom', ...Object.keys(STYLES).map(title)]),
     ageRow),
-  grp('Body parts', ...bodyParts()),
   grp('Custom outline',
     h('label', { class: 'lbl block', for: 'path' }, 'Your own SVG path, drawn in place of the shape'),
     pathArea,
@@ -615,23 +614,6 @@ syncs.push(() => {
   for (const t of tiles) t.b.setAttribute('aria-pressed', String(t.on()));
   refreshTiles();
 });
-
-// --- Body parts (on the Body tab) ------------------------------------------------------
-
-function bodyParts() {
-  const ears = [['none', 'No ears'], ...EAR_STYLES.filter((v) => v !== 'none').map((v) => [v, `${title(v)} ears`])];
-  const ants = [['auto', "Shape's own"], ['none', 'No antennae'], ['one', 'Antenna'], ['two', 'Antennae']];
-  return [
-    tileGrid(ears.map(([v, label]) => ({
-      key: `ears:${v}`, label, look: () => ({ ears: v, thumbZoom: 1.3, thumbDy: -0.08 }),
-      on: () => (opts.ears || 'none') === v, tap: () => update({ ears: v === 'none' ? undefined : v }),
-    }))),
-    tileGrid(ants.map(([v, label]) => ({
-      key: `antennae:${v}`, label, look: () => ({ antennae: v, thumbZoom: 1.3, thumbDy: -0.08 }),
-      on: () => (opts.antennae || 'auto') === v, tap: () => update({ antennae: v === 'auto' ? undefined : v }),
-    }))),
-  ];
-}
 
 // --- Wear ----------------------------------------------------------------------------
 
@@ -778,7 +760,7 @@ const quirkChips = QUIRKS.map((q) => {
 
 tabPanel('light', () => [
   grp('Material',
-    chipRow('shading', 'Material', SHADINGS, ['Plush', 'Plastic', 'Smooth', 'Crisp', 'Flat', 'Glass', 'Lantern', 'Line', 'Swarm']),
+    chipRow('shading', 'Material', SHADINGS, ['Plush', 'Plastic', 'Smooth', 'Crisp', 'Flat', 'Glass', 'Lantern', 'Line']),
     range('roundness', 'Roundness'),
     range('gloss', 'Gloss'),
     range('depth', 'Depth'),
@@ -1003,7 +985,6 @@ tabPanel('agent', () => [
       return b;
     })),
     when(supports('status'), chipRow('status', 'Status badge', ['none', 'typing', 'loading', 'done', 'error', 'auto'], ['None', 'Typing…', 'Loading', 'Done', 'Error', 'Auto'])),
-    when(supports('mood'), select('mood', 'Mood', ['auto', 'neutral', 'happy', 'sleepy', 'excited', 'grumpy', 'calm'], ['Automatic', 'Neutral', 'Happy', 'Sleepy', 'Excited', 'Grumpy', 'Calm'])),
     when(supports('social'), toggles(toggle('social', 'Social: glance at other bots (adds a friend)')))),
   grp('React',
     h('div', { class: 'chips' }, ...['happy', 'joy', 'surprised', 'love', 'confused', 'worried', 'sad', 'angry', 'dizzy', 'smug'].map((e) =>

@@ -6,19 +6,24 @@ All notable changes to `@kucukkanat/bots` are recorded here. The format follows
 
 ## [1.3.0] - 2026-10-09
 
-The cast release: twelve creatures beyond the first shapes, and the
+The cast release: nine creatures beyond the first shapes, and the
 three pieces of anatomy they needed.
 
 ### Removed
+- The Studio's Mood control on the Agent tab (the `mood` option still works
+  for code and DNA).
+- The Studio's body-parts controls (ears, antennae): body parts belong to a
+  creature's design, not to the wardrobe. The `ears` and `antennae` options
+  still work for code and DNA.
 - Square, Pill, Pebble and Puddle: outlines, not characters. The names still
   resolve (square → hexagon; pill, pebble, puddle → blob; `RETIRED`,
   `liveType()`), so old DNA codes, crew pages and identities keep working.
-  Pangolin and axolotl were cut from the cast before release (they resolve
-  to hexagon and blob).
+  Pangolin, axolotl, swarm, orb and glyph were cut from the cast before
+  release (they resolve to hexagon, blob, blob, circle and hexagon).
 
 ### Added
 - **Creatures** (`src/creatures/`, one module each): fox, owl, jelly, moth,
-  sprout, octo, toaster, snail, comet, swarm, orb and glyph. Each is a preset plus parts, a temperament, option defaults, and for
+  sprout, octo, toaster, snail and comet. Each is a preset plus parts, a temperament, option defaults, and for
   some a second outline or a lifecycle. `creatures` and `BASE_TYPES` are
   exported; `identity` keeps picking from the first eighteen.
 - **Parts** (`src/parts.js`): tails, tendrils, wings, frills, arms, shells,
@@ -31,14 +36,12 @@ three pieces of anatomy they needed.
   some states, `pose.morph`) and `stages` (a lifecycle blended by the `age`
   option). Blends are quantised and cached and keep the base fur skin.
 - **Registers**: `shading: 'line'` (an outline only, flipping to light on
-  dark pages) and `shading: 'swarm'` (dots that gather into the shape and
-  scatter when it is low); `faceOn: 'talk'` hides the face until something
-  is going on. Habit `swivel` (the owl's head turns right round while it
+  dark pages); `faceOn: 'talk'` hides the face until something is going on. Habit `swivel` (the owl's head turns right round while it
   thinks).
 - `registerCreature(def)` and the `geometry` export (outline helpers moved to
   `src/geometry.js`), so creatures of your own use the same format.
-- Studio: a Creatures section, an Age slider for lifecycle creatures, Line
-  and Swarm materials, a see-through slider for glass, a face-only-while-busy
+- Studio: a Creatures section, an Age slider for lifecycle creatures, a Line
+  material, a see-through slider for glass, a face-only-while-busy
   toggle. Docs: "The cast".
 
 ## [1.2.0] - 2026-10-09

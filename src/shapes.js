@@ -138,7 +138,7 @@ export const BASE_TYPES = Object.keys(presets);
  * characters) still resolve, to the nearest living body, so old DNA codes,
  * crew pages and identities keep working.
  */
-export const RETIRED = { square: 'hexagon', pill: 'blob', pebble: 'blob', puddle: 'blob', pangolin: 'hexagon', axolotl: 'blob' };
+export const RETIRED = { square: 'hexagon', pill: 'blob', pebble: 'blob', puddle: 'blob', pangolin: 'hexagon', axolotl: 'blob', swarm: 'blob', orb: 'circle', glyph: 'hexagon' };
 /** A living type for any name: itself, a retired name's successor, or circle. */
 export const liveType = (type) => (presets[type] ? type : presets[RETIRED[type]] ? RETIRED[type] : 'circle');
 // The cast: creatures bring an outline plus parts, a temperament, defaults and morphs.

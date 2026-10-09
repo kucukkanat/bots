@@ -1,4 +1,4 @@
-<!-- The cast | Twelve creatures beyond the first fourteen shapes: parts with motion of their own, temperaments, materials, a lifecycle, and how to make your own. -->
+<!-- The cast | Nine creatures beyond the first fourteen shapes: parts with motion of their own, temperaments, materials, a lifecycle, and how to make your own. -->
 <h1>The cast</h1>
 <p class="sub">The first fourteen bodies are outlines with a face. The cast are someones: each has parts that move on their own, a temperament, a register, and in some cases a second body it becomes.</p>
 
@@ -13,9 +13,6 @@
 `toaster` | The appliance | `perky` | a slot, a lever, and toast that pops on success
 `snail` | The patient one: eyes on stalks, a shell | `patient` (slow) | retreats into its shell on error and to sleep
 `comet` | The fast-mode mascot: a lantern star | `showOff` (spins) | a streak that lengthens with speed
-`swarm` | The crew: dots that gather into one shape | `hive` (floats) | the `swarm` material; scatters when it is low
-`orb` | The serious family: a glass sphere | `serene` (floats, still) | no face until it speaks, reacts or looks (`faceOn: 'talk'`)
-`glyph` | The monochrome line family | `precise` (snap blinks) | the `line` material: an outline in its colour, light on dark pages
 ::end
 <p>Use them like any type: <code>&lt;bot-avatar type="owl"&gt;</code>, <code>createBot(el, { type: 'octo' })</code>. Each brings its own defaults (the jelly is glass, the comet a lantern, the glyph a line); anything you set wins. <code>identity</code> keeps the draw it always had, so an id keeps its bot (an id that drew a retired shape gets that shape's successor).</p>
 
@@ -26,7 +23,7 @@
 <p>A creature can have another outline it becomes in some states (<code>morph</code>): the snail's shell. The body blends between the two over a moment, keeping its fur. A creature can also have a lifecycle (<code>stages</code>): the sprout is a seed at <code>age: 0</code>, a hatchling at <code>0.5</code>, grown at <code>1</code>. Age is yours to keep (a count of sessions, days since it hatched); pass it back and it grows.</p>
 ```html
 <bot-avatar type="sprout" age="0.2"></bot-avatar>
-<bot-avatar type="orb" state="speaking"></bot-avatar>   <!-- the face appears -->
+<bot-avatar type="snail" state="sleeping"></bot-avatar>   <!-- retreats into its shell -->
 ```
 
 <h2>Your own creature</h2>

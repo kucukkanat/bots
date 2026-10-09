@@ -69,7 +69,6 @@ export const STYLES = {
   paper: { shading: 'flat', depth: 0.25, roundness: 0.2 },
   glass: { shading: 'glass', roundness: 0.9, highlight: 1.2 },
   line: { shading: 'line' },
-  swarm: { shading: 'swarm' },
   lantern: { shading: 'lantern', roundness: 0.85 },
   ragdoll: { shading: 'fabric', furLength: 0.5, furDensity: 1.3, furFuzz: 0.4, furCurl: 0.3, quirk: 'stitches patch', roundness: 0.7 },
 };

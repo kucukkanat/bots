@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>The cast · bots docs</title>
-  <meta name="description" content="Twelve creatures beyond the first fourteen shapes: parts with motion of their own, temperaments, materials, a lifecycle, and how to make your own." />
+  <meta name="description" content="Nine creatures beyond the first fourteen shapes: parts with motion of their own, temperaments, materials, a lifecycle, and how to make your own." />
   <meta name="theme-color" content="#f5f4f0" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#111016" media="(prefers-color-scheme: dark)" />
   <script>try{var t=localStorage.getItem('bots-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
@@ -63,9 +63,6 @@
 <tr><td data-label="Creature"><code>toaster</code></td><td data-label="What it is">The appliance</td><td data-label="Temperament"><code>perky</code></td><td data-label="Parts and habits">a slot, a lever, and toast that pops on success</td></tr>
 <tr><td data-label="Creature"><code>snail</code></td><td data-label="What it is">The patient one: eyes on stalks, a shell</td><td data-label="Temperament"><code>patient</code> (slow)</td><td data-label="Parts and habits">retreats into its shell on error and to sleep</td></tr>
 <tr><td data-label="Creature"><code>comet</code></td><td data-label="What it is">The fast-mode mascot: a lantern star</td><td data-label="Temperament"><code>showOff</code> (spins)</td><td data-label="Parts and habits">a streak that lengthens with speed</td></tr>
-<tr><td data-label="Creature"><code>swarm</code></td><td data-label="What it is">The crew: dots that gather into one shape</td><td data-label="Temperament"><code>hive</code> (floats)</td><td data-label="Parts and habits">the <code>swarm</code> material; scatters when it is low</td></tr>
-<tr><td data-label="Creature"><code>orb</code></td><td data-label="What it is">The serious family: a glass sphere</td><td data-label="Temperament"><code>serene</code> (floats, still)</td><td data-label="Parts and habits">no face until it speaks, reacts or looks (<code>faceOn: 'talk'</code>)</td></tr>
-<tr><td data-label="Creature"><code>glyph</code></td><td data-label="What it is">The monochrome line family</td><td data-label="Temperament"><code>precise</code> (snap blinks)</td><td data-label="Parts and habits">the <code>line</code> material: an outline in its colour, light on dark pages</td></tr>
 </tbody></table></div>
 <p>Use them like any type: <code>&lt;bot-avatar type="owl"&gt;</code>, <code>createBot(el, { type: 'octo' })</code>. Each brings its own defaults (the jelly is glass, the comet a lantern, the glyph a line); anything you set wins. <code>identity</code> keeps the draw it always had, so an id keeps its bot (an id that drew a retired shape gets that shape's successor).</p>
 
@@ -75,7 +72,7 @@
 <h2 id="bodies-that-change">Bodies that change<a class="anchor" href="#bodies-that-change" aria-label="Link to this section">#</a></h2>
 <p>A creature can have another outline it becomes in some states (<code>morph</code>): the snail's shell. The body blends between the two over a moment, keeping its fur. A creature can also have a lifecycle (<code>stages</code>): the sprout is a seed at <code>age: 0</code>, a hatchling at <code>0.5</code>, grown at <code>1</code>. Age is yours to keep (a count of sessions, days since it hatched); pass it back and it grows.</p>
 <pre class="code" data-lang="html">&lt;bot-avatar type="sprout" age="0.2"&gt;&lt;/bot-avatar&gt;
-&lt;bot-avatar type="orb" state="speaking"&gt;&lt;/bot-avatar&gt;   &lt;!-- the face appears --&gt;</pre>
+&lt;bot-avatar type="snail" state="sleeping"&gt;&lt;/bot-avatar&gt;   &lt;!-- retreats into its shell --&gt;</pre>
 
 <h2 id="your-own-creature">Your own creature<a class="anchor" href="#your-own-creature" aria-label="Link to this section">#</a></h2>
 <p>The built-in cast lives in <code>src/creatures/</code>, one module each, and <code>registerCreature()</code> takes the same format:</p>
