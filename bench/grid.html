@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><title>Frame-rate bench</title>
+<!-- Serve the repo (`npm start`) and open /bench/grid.html?n=30&size=96&shading=fabric.
+     Renders a grid of avatars and reports the page's frame rate after 4 s. -->
+<style>body{margin:0;display:flex;flex-wrap:wrap;gap:8px;background:#f4f2ee;font:14px system-ui}#out{position:fixed;right:8px;bottom:8px}</style>
+<body><output id="out">measuring…</output><script type="module">
+import { BotAvatar, types } from '../src/index.js';
+const qs = new URLSearchParams(location.search);
+const n = +(qs.get('n') || 30), size = +(qs.get('size') || 96), shading = qs.get('shading') || 'fabric';
+for (let i = 0; i < n; i++) {
+  const d = document.createElement('div');
+  d.style.width = d.style.height = size + 'px';
+  document.body.append(d);
+  new BotAvatar(d, { type: types[i % types.length], size, seed: i / n, shading, interactive: false, state: i % 3 === 1 ? 'working' : 'default' });
+}
+await new Promise((r) => setTimeout(r, 1000));
+let frames = 0; const t0 = performance.now();
+await new Promise((res) => { const f = () => { frames++; performance.now() - t0 < 4000 ? requestAnimationFrame(f) : res(); }; requestAnimationFrame(f); });
+window.__result = (frames / ((performance.now() - t0) / 1000)).toFixed(1) + ' fps';
+document.getElementById('out').textContent = window.__result;
+</script>

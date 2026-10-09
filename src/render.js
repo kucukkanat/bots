@@ -3,7 +3,7 @@
 // rounding off toward front and back), turned by the pose's yaw and pitch.
 // Light, fur, the face and anything worn are laid over it.
 
-import { shade, mix, rgba, clamp } from './color.js';
+import { shade, rgba, clamp, parseColor } from './color.js';
 import { mulberry32, smoothstep } from './engine.js';
 
 /** The canvas is this much larger than the avatar's box, so hops never clip. */
@@ -28,42 +28,241 @@ function shapePath(shape) {
   return shape._path;
 }
 
-// --- Fur ---------------------------------------------------------------------
+// --- Scratch surfaces ----------------------------------------------------------
+//
+// Frames are drawn one avatar at a time, so every avatar shares the same few
+// offscreen canvases: the body layer (lit in isolation, then composited once)
+// and two small light buffers.
 
-const furTiles = new Map();
-function furTile(length, density, curl) {
-  const key = `${length.toFixed(2)}|${density.toFixed(2)}|${curl.toFixed(2)}`;
-  if (furTiles.has(key)) return furTiles.get(key);
-  const S = 160;
-  const c = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(S, S) : Object.assign(document.createElement('canvas'), { width: S, height: S });
-  const g = c.getContext('2d');
-  const rand = mulberry32(0.4242);
-  const n = Math.round(900 * density);
-  g.lineCap = 'round';
-  for (let pass = 0; pass < 2; pass++) {
-    for (let i = 0; i < n; i++) {
-      const x = rand() * S, y = rand() * S;
-      const a = Math.PI / 2 + (rand() - 0.5) * 1.3;
-      const l = (5 + rand() * 9) * length;
-      const bend = (rand() - 0.5) * curl * l * 0.8;
-      const dark = pass === 0;
-      g.strokeStyle = dark ? `rgba(0,0,0,${0.05 + rand() * 0.08})` : `rgba(255,255,255,${0.06 + rand() * 0.12})`;
-      g.lineWidth = dark ? 1.4 : 0.9;
-      const ox = dark ? 0 : Math.cos(a) * 1.2, oy = dark ? 0 : Math.sin(a) * 1.2;
-      for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]) {
-        const x0 = x + dx + ox, y0 = y + dy + oy;
-        if (x0 < -20 || x0 > S + 20 || y0 < -20 || y0 > S + 20) continue;
-        g.beginPath();
-        g.moveTo(x0, y0);
-        g.quadraticCurveTo(x0 + Math.cos(a) * l * 0.5 - Math.sin(a) * bend, y0 + Math.sin(a) * l * 0.5 + Math.cos(a) * bend, x0 + Math.cos(a) * l, y0 + Math.sin(a) * l);
-        g.stroke();
-      }
-    }
+const makeCanvas = (w, h) => (typeof OffscreenCanvas !== 'undefined'
+  ? new OffscreenCanvas(w, h)
+  : Object.assign(document.createElement('canvas'), { width: w, height: h }));
+
+const surfaces = {};
+function surface(name, w, h, x = 0, y = 0, cw = w, ch = h) {
+  let s = surfaces[name];
+  if (!s) {
+    const canvas = makeCanvas(w, h);
+    s = surfaces[name] = { canvas, ctx: canvas.getContext('2d') };
+  } else if (s.canvas.width < w || s.canvas.height < h) {
+    s.canvas.width = Math.max(s.canvas.width, w);
+    s.canvas.height = Math.max(s.canvas.height, h);
   }
-  furTiles.set(key, c);
-  return c;
+  const g = s.ctx;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.globalCompositeOperation = 'source-over';
+  g.globalAlpha = 1;
+  g.clearRect(x, y, cw, ch);
+  return g;
 }
 
+// --- Deferred light ------------------------------------------------------------
+//
+// Inner shadows, occlusion and the rim are all "a colour, minus a blurred and
+// shifted copy of the silhouette". Blurring is the expensive part and the
+// result is soft by nature, so it is computed in a small buffer (a fraction of
+// the canvas resolution) and stretched back over the body layer, which keeps the
+// silhouette itself crisp.
+//
+// Each canvas keeps its light buffers between frames. A hop only moves the
+// silhouette, so the buffer is redrawn shifted; it is re-lit only once the turn,
+// tilt or squash has changed the outline by more than about one buffer pixel.
+
+const FAR = 4096;
+const lightCache = new WeakMap();
+
+/** Paint `color × (1 − blur(silhouette shifted by ox, oy))` into `g` (light buffer px). */
+function innerShadowInto(g, M, q, path, { color, blur, ox, oy }, dpr, w, h) {
+  // The silhouette is drawn far off the buffer and only its shadow lands on
+  // it: a blur that works in every browser, on a handful of pixels.
+  g.setTransform(M.a * q, M.b * q, M.c * q, M.d * q, M.e * q - FAR, M.f * q);
+  g.shadowColor = '#000';
+  g.shadowBlur = Math.max(0, blur * dpr * q);
+  g.shadowOffsetX = FAR + ox * dpr * q;
+  g.shadowOffsetY = oy * dpr * q;
+  g.fillStyle = '#000';
+  g.fill(path);
+  g.shadowColor = 'transparent';
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.globalCompositeOperation = 'source-out';
+  g.fillStyle = color;
+  g.fillRect(0, 0, w, h);
+  g.globalCompositeOperation = 'source-over';
+}
+
+/**
+ * Light the body layer with one or more inner-shadow passes merged into a
+ * single cached buffer.
+ * @param lc     body layer context (its transform is the body frame)
+ * @param owner  the frame's context: the cache belongs to its canvas
+ * @param key    everything the passes depend on besides the pose
+ * @param pose   [yaw, pitch, roll, sx, sy] and the device-px scale of each
+ */
+function lightLayer(lc, owner, name, path, passes, dpr, q, key, pose, reach) {
+  const M = lc.getTransform();
+  const { width: W, height: H } = owner.canvas;
+  const w = Math.ceil(W * q) + 2, h = Math.ceil(H * q) + 2;
+  let slots = lightCache.get(owner);
+  if (!slots) lightCache.set(owner, (slots = {}));
+  let e = slots[name];
+  if (!e || e.w !== w || e.h !== h) {
+    const canvas = e?.canvas || makeCanvas(w, h);
+    canvas.width = w; canvas.height = h;
+    e = slots[name] = { canvas, ctx: canvas.getContext('2d'), w, h, key: null };
+  }
+  let moved = Infinity;
+  if (e.key === key) {
+    moved = 0;
+    for (let i = 0; i < pose.length; i++) moved += Math.abs(pose[i] - e.pose[i]) * reach[i];
+  }
+  if (moved * q > 0.6) {
+    const g = e.ctx;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, w, h);
+    innerShadowInto(g, M, q, path, passes[0], dpr, w, h);
+    for (let i = 1; i < passes.length; i++) {
+      const t = surface('lightTmp', w, h);
+      innerShadowInto(t, M, q, path, passes[i], dpr, w, h);
+      g.drawImage(t.canvas, 0, 0, w, h, 0, 0, w, h);
+    }
+    e.key = key; e.pose = pose.slice(); e.e = M.e; e.f = M.f;
+  }
+  lc.save();
+  lc.setTransform(1, 0, 0, 1, M.e - e.e, M.f - e.f);
+  lc.globalCompositeOperation = 'source-atop';
+  lc.imageSmoothingEnabled = true;
+  lc.drawImage(e.canvas, 0, 0, w, h, 0, 0, w / q, h / q);
+  lc.restore();
+}
+
+// --- Plush -------------------------------------------------------------------
+//
+// The fur is baked once per look into a "skin" in the body's own coordinates and
+// then mapped onto the front of the body every frame with the head's turn, so
+// the pile stays put on the surface instead of sliding under it. The skin is:
+//   · a combed flow field: hair grows out from a crown and falls with gravity,
+//     with a slow noise twisting it into clumps;
+//   · each strand as a dark root (the shadow down inside the pile) and a pale
+//     tip whose brightness follows a Kajiya-Kay fibre term, so strands that lie
+//     across the light catch it and the nap shows as soft bands of sheen;
+//   · low-frequency mottling (the pile pressed one way and another) and fine
+//     grain for the fibre ends.
+
+function valueNoise(rand, n) {
+  const g = new Float32Array((n + 1) * (n + 1));
+  for (let i = 0; i < g.length; i++) g[i] = rand() * 2 - 1;
+  return (x, y) => {
+    // x, y in 0..1 over the lattice.
+    const fx = clamp(x, 0, 1) * n, fy = clamp(y, 0, 1) * n;
+    const ix = Math.min(n - 1, fx | 0), iy = Math.min(n - 1, fy | 0);
+    const tx = smoothstep(fx - ix), ty = smoothstep(fy - iy);
+    const r0 = iy * (n + 1), r1 = r0 + n + 1;
+    const a = g[r0 + ix] + (g[r0 + ix + 1] - g[r0 + ix]) * tx;
+    const b = g[r1 + ix] + (g[r1 + ix + 1] - g[r1 + ix]) * tx;
+    return a + (b - a) * ty;
+  };
+}
+
+/** How far past the outline (in body units) the skin reaches. */
+const SKIN_EXT = 1.25;
+let shapeIds = 0;
+const skins = new Map();
+
+function furSkin(shape, look, la, px) {
+  const fl = look.furLength ?? 1, fd = look.furDensity ?? 1.6, fc = look.furCurl ?? 0.7, fg = look.furGravity ?? 0.9;
+  // Bake at a resolution bucket so a resize doesn't re-bake every pixel step.
+  const P = Math.min(300, Math.max(24, Math.ceil(px / 16) * 16));
+  const id = shape._id ??= ++shapeIds;
+  const key = `${id}|${look.color}|${fl}|${fd}|${fc}|${fg}|${Math.round(la * 100)}|${P}`;
+  let skin = skins.get(key);
+  if (skin) { skins.delete(key); skins.set(key, skin); return skin; }
+
+  const S = Math.ceil(SKIN_EXT * 2 * P);
+  const canvas = makeCanvas(S, S);
+  const g = canvas.getContext('2d');
+  const toPx = (v) => (v + SKIN_EXT) * P;
+  const rand = mulberry32(0.6180339);
+  const base = look.color;
+  const lx = Math.sin(la), ly = -Math.cos(la);
+
+  // Mottling.
+  const big = valueNoise(rand, 5), mid = valueNoise(rand, 11);
+  const m = Math.max(16, Math.round(S / 6));
+  const mc = makeCanvas(m, m), mg = mc.getContext('2d');
+  const img = mg.createImageData(m, m);
+  const [dr, dg, db] = parseColor(shade(base, -0.4, 4, 1.1)), [hr, hg, hb] = parseColor(shade(base, 0.3, 0, 0.85));
+  for (let y = 0; y < m; y++) for (let x = 0; x < m; x++) {
+    const v = big(x / m, y / m) * 0.65 + mid(x / m, y / m) * 0.35;
+    const o = (y * m + x) * 4;
+    const lit = v > 0;
+    img.data[o] = lit ? hr : dr; img.data[o + 1] = lit ? hg : dg; img.data[o + 2] = lit ? hb : db;
+    img.data[o + 3] = Math.round(Math.min(1, Math.abs(v) * (lit ? 0.22 : 0.34)) * 255);
+  }
+  mg.putImageData(img, 0, 0);
+  g.imageSmoothingEnabled = true;
+  g.drawImage(mc, 0, 0, m, m, 0, 0, S, S);
+
+  // Strands.
+  const clumpA = valueNoise(rand, 7), clumpB = valueNoise(rand, 17);
+  const crownY = shape.bounds.minY + (shape.bounds.maxY - shape.bounds.minY) * 0.28;
+  const L3 = Math.hypot(lx, ly, 0.9);
+  const Lx = lx / L3, Ly = ly / L3, Lz = 0.9 / L3;
+  const BUCKETS = 5;
+  const roots = Array.from({ length: BUCKETS }, () => new Path2D());
+  const tips = Array.from({ length: BUCKETS }, () => new Path2D());
+  const { minX, maxX, minY, maxY } = shape.bounds;
+  const area = (maxX - minX + 0.3) * (maxY - minY + 0.3);
+  const n = Math.round(clamp(area * 4200 * (fd / 1.6) / Math.max(0.6, fl), 1200, 22000));
+  for (let i = 0; i < n; i++) {
+    const x = minX - 0.15 + rand() * (maxX - minX + 0.3);
+    const y = minY - 0.15 + rand() * (maxY - minY + 0.3);
+    const u = (x + SKIN_EXT) / (2 * SKIN_EXT), v = (y + SKIN_EXT) / (2 * SKIN_EXT);
+    const c1 = clumpA(u, v), c2 = clumpB(u, v);
+    // Tufts: strands thin out in the partings between clumps.
+    if (rand() > 0.62 + 0.38 * c1 * c1 + 0.2 * c2) continue;
+    let dx = x, dy = y - crownY;
+    const d = Math.hypot(dx, dy) || 1;
+    dx = (dx / d) * 0.6; dy = (dy / d) * 0.6 + fg * 0.75;
+    const ang = Math.atan2(dy, dx) + (c1 * 1.1 + c2 * 0.5) * fc + (rand() - 0.5) * 0.35;
+    const tx = Math.cos(ang), ty = Math.sin(ang);
+    const len = (0.035 + rand() * 0.045) * fl * (0.85 + 0.3 * c1);
+    const bend = (rand() - 0.5) * fc * len * 0.9;
+    // Kajiya-Kay: a fibre is brightest when it lies across the light.
+    const tz = -0.35, tl = Math.hypot(tx, ty, tz);
+    const TL = (tx * Lx + ty * Ly + tz * Lz) / tl;
+    const kk = Math.sqrt(Math.max(0, 1 - TL * TL));
+    const b = clamp(Math.floor((kk * 0.75 + rand() * 0.35) * BUCKETS), 0, BUCKETS - 1);
+    const X = toPx(x), Y = toPx(y), l = len * P, bx = -ty * bend * P, by = tx * bend * P;
+    const rp = roots[clamp(Math.floor(rand() * BUCKETS), 0, BUCKETS - 1)];
+    rp.moveTo(X - tx * l * 0.15, Y - ty * l * 0.15);
+    rp.quadraticCurveTo(X + tx * l * 0.25 + bx * 0.5, Y + ty * l * 0.25 + by * 0.5, X + tx * l * 0.55, Y + ty * l * 0.55);
+    const tp = tips[b];
+    tp.moveTo(X + tx * l * 0.2, Y + ty * l * 0.2);
+    tp.quadraticCurveTo(X + tx * l * 0.6 + bx, Y + ty * l * 0.6 + by, X + tx * l, Y + ty * l);
+  }
+  const darkC = shade(base, -0.42, 6, 1.15), tipC = shade(base, 0.38, -4, 0.8);
+  g.lineCap = 'round';
+  g.lineWidth = Math.max(0.6, P * 0.012);
+  roots.forEach((p, i) => { g.strokeStyle = rgba(darkC, 0.08 + i * 0.03); g.stroke(p); });
+  g.lineWidth = Math.max(0.45, P * 0.0075);
+  tips.forEach((p, i) => { g.strokeStyle = rgba(tipC, 0.04 + i * 0.055); g.stroke(p); });
+
+  // Grain.
+  const grain = [new Path2D(), new Path2D()];
+  const dots = Math.round(S * S * 0.012);
+  const dot = Math.max(1, P / 80);
+  for (let i = 0; i < dots; i++) grain[i & 1].rect(rand() * S, rand() * S, dot, dot);
+  g.fillStyle = rgba(darkC, 0.16); g.fill(grain[0]);
+  g.fillStyle = rgba(tipC, 0.16); g.fill(grain[1]);
+
+  skin = { canvas, P, S };
+  skins.set(key, skin);
+  if (skins.size > 40) skins.delete(skins.keys().next().value);
+  return skin;
+}
+
+// Silhouette fringe: fine strands standing off the outline, some in pairs
+// that fan out from a shared root.
 const strandCache = new WeakMap();
 function strands(shape, count) {
   let byCount = strandCache.get(shape);
@@ -72,57 +271,32 @@ function strands(shape, count) {
   const rand = mulberry32(0.1337);
   const n = shape.points.length;
   const out = [];
-  for (let i = 0; i < count; i++) {
+  while (out.length < count) {
     const idx = rand() * n;
     const i0 = Math.floor(idx) % n, i1 = (i0 + 1) % n, t = idx - Math.floor(idx);
     const [ax, ay] = shape.points[i0], [bx, by] = shape.points[i1];
     const [nx0, ny0] = shape.normals[i0], [nx1, ny1] = shape.normals[i1];
-    out.push({
-      x: ax + (bx - ax) * t, y: ay + (by - ay) * t,
-      nx: nx0 + (nx1 - nx0) * t, ny: ny0 + (ny1 - ny0) * t,
-      u: (rand() * 2 - 1) * 0.98,
-      len: 0.5 + rand() * 0.6,
-      jitter: (rand() - 0.5) * 0.9,
-      bend: rand() - 0.5,
-      tone: rand(),
-    });
+    const u = (rand() * 2 - 1) * 0.98;
+    const per = 1 + Math.floor(rand() * 2.2);
+    const len = 0.5 + rand() * 0.6, tone = rand(), bend = rand() - 0.5;
+    for (let k = 0; k < per; k++) {
+      const f = per > 1 ? k / (per - 1) - 0.5 : 0;
+      out.push({
+        x: ax + (bx - ax) * t + (rand() - 0.5) * 0.02, y: ay + (by - ay) * t + (rand() - 0.5) * 0.02,
+        nx: nx0 + (nx1 - nx0) * t, ny: ny0 + (ny1 - ny0) * t,
+        u,
+        len: len * (0.75 + rand() * 0.4),
+        jitter: f * 0.5 + (rand() - 0.5) * 0.5,
+        bend: bend + (rand() - 0.5) * 0.3,
+        tone: clamp(tone + (rand() - 0.5) * 0.2, 0, 0.999),
+      });
+    }
   }
   byCount.set(count, out);
   return out;
 }
 
 // --- Helpers -----------------------------------------------------------------
-
-// A shared scratch canvas holding the body's complement (everything but the
-// body), so an inner shadow is the shadow of that image clipped to the body.
-let scratch = null;
-function bodyHole(ctx, path, color) {
-  const { width, height } = ctx.canvas;
-  if (!scratch) scratch = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(width, height) : document.createElement('canvas');
-  if (scratch.width < width || scratch.height < height) { scratch.width = Math.max(scratch.width, width); scratch.height = Math.max(scratch.height, height); }
-  const g = scratch.getContext('2d');
-  g.setTransform(1, 0, 0, 1, 0, 0);
-  g.globalCompositeOperation = 'source-over';
-  g.clearRect(0, 0, width, height);
-  g.fillStyle = color;
-  g.fillRect(0, 0, width, height);
-  g.setTransform(ctx.getTransform());
-  g.globalCompositeOperation = 'destination-out';
-  g.fill(path);
-  return scratch;
-}
-
-function innerShadow(ctx, path, hole, color, blur, ox, oy, dpr) {
-  ctx.save();
-  ctx.clip(path);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.shadowColor = color;
-  ctx.shadowBlur = blur * dpr;
-  ctx.shadowOffsetX = ox * dpr;
-  ctx.shadowOffsetY = oy * dpr;
-  ctx.drawImage(hole, 0, 0);
-  ctx.restore();
-}
 
 function sphere(ctx, x, y, r, color, lx, ly) {
   const g = ctx.createRadialGradient(x + lx * r * 0.45, y + ly * r * 0.45, r * 0.05, x, y, r);
@@ -283,20 +457,37 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }) {
     }
   }
 
-  // The body: the outline stacked through the depth, back to front.
+  // The body: the outline stacked through the depth, back to front. Only as
+  // many slices as the turn needs — one when facing straight on, more as the
+  // front and back pull apart — about 3 device pixels apart.
   const path = shapePath(shape);
   const body = new Path2D();
   const order = c0 * cp >= 0 ? 1 : -1;
-  for (let i = 0; i < LAYERS; i++) {
-    const u = order * (-1 + (2 * i) / (LAYERS - 1));
+  const span = 2 * D * R * dpr * Math.hypot(s, c0 * sp);
+  const slices = span < 0.75 ? 1 : clamp(2 * Math.ceil(span / 6) + 1, 3, 21);
+  for (let i = 0; i < slices; i++) {
+    const u = slices === 1 ? 0 : order * (-1 + (2 * i) / (slices - 1));
     const k = profile(u);
     const z = u * D;
     body.addPath(path, new DOMMatrix([R * k * c, -R * k * s * sp, 0, R * k * cp, R * z * s, R * z * c0 * sp]));
   }
   const darkC = shade(base, -0.3, 6, 1.15);
 
-  ctx.fillStyle = base;
-  ctx.fill(body);
+  // Everything on the body is painted into its own layer with 'source-atop',
+  // which keeps it inside the silhouette without a clip, then the layer is
+  // composited onto the frame in one draw.
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const M = ctx.getTransform();
+  // Only the body's box is cleared and composited, not the whole overscan.
+  const reach = R * dpr * (1.25 + D) * Math.max(pose.sx, pose.sy);
+  const bx0 = clamp(Math.floor(M.e - reach), 0, W), by0 = clamp(Math.floor(M.f - reach), 0, H);
+  const bw = clamp(Math.ceil(M.e + reach), 0, W) - bx0, bh = clamp(Math.ceil(M.f + reach), 0, H) - by0;
+  const lc = surface('body', W, H, bx0, by0, bw, bh);
+  lc.setTransform(M);
+  lc.fillStyle = base;
+  lc.fill(body);
+  lc.globalCompositeOperation = 'source-atop';
+  const cover = () => lc.fillRect(-R * 3, -R * 3, R * 6, R * 6);
 
   // Turn shading: the side that shows as the head turns.
   {
@@ -306,101 +497,128 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }) {
       const lit = sideDir * lx;
       const frontX = R * D * s;
       const edge = frontX + sideDir * R * (Math.abs(c) * 0.55 + 0.3);
-      const g = ctx.createLinearGradient(frontX, 0, edge + sideDir * R * 0.7, 0);
+      const g = lc.createLinearGradient(frontX, 0, edge + sideDir * R * 0.7, 0);
       const col = lit > 0 ? `rgba(255,255,255,${0.16 * lit * reveal})` : rgba(darkC, 0.5 * -lit * reveal + 0.12 * reveal);
       g.addColorStop(0, 'rgba(0,0,0,0)');
       g.addColorStop(0.45, lit > 0 ? 'rgba(255,255,255,0)' : rgba(darkC, 0.08 * reveal));
       g.addColorStop(1, col);
-      ctx.save();
-      ctx.clip(body);
-      ctx.fillStyle = g;
-      ctx.fillRect(-R * 3, -R * 3, R * 6, R * 6);
-      ctx.restore();
+      lc.fillStyle = g;
+      cover();
     }
   }
 
   if (look.shading !== 'flat') {
-    // Fur texture laid over the whole body.
     if (fabric) {
-      const fl = look.furLength ?? 1, fd = look.furDensity ?? 1.6, fc = look.furCurl ?? 0.7;
-      const tile = furTile(fl, fd, fc);
-      const pat = ctx.createPattern(tile, 'repeat');
-      if (pat && pat.setTransform) {
-        const sc = (R / 95) * 0.55;
-        pat.setTransform(new DOMMatrix().translate(R * D * s * 1.4, R * D * sp * c0 * 1.4).scale(sc, sc));
+      // The baked skin rides on the front of the body with the turn. Seen edge
+      // on it would smear, so it gives way to the slices' own shading there.
+      const skin = furSkin(shape, look, la, R * dpr);
+      const zf = D * 0.6;
+      lc.save();
+      lc.transform(R * c, -R * s * sp, 0, R * cp, R * zf * s, R * zf * c0 * sp);
+      const e = SKIN_EXT;
+      for (const [alpha, dz] of [[0.55, -2 * zf], [1, 0]]) {
+        // A second, fainter copy at the back covers the side that shows mid-turn.
+        if (alpha < 1 && Math.abs(s) < 0.15) continue;
+        lc.globalAlpha = alpha * (0.35 + 0.65 * smoothstep(Math.abs(c0) * 1.4 - 0.2));
+        lc.drawImage(skin.canvas, 0, 0, skin.S, skin.S, -e + (dz * s) / c, -e + (dz * sp * (c0 + (s * s) / c)) / cp, 2 * e, 2 * e);
       }
-      ctx.save();
-      ctx.clip(body);
-      ctx.globalAlpha = 0.7;
-      ctx.fillStyle = pat;
-      ctx.fillRect(-R * 3, -R * 3, R * 6, R * 6);
-      ctx.restore();
+      lc.restore();
     }
 
-    const hole = bodyHole(ctx, body, darkC);
-    // Shade side: an inner shadow pushed toward the light.
+    const q = clamp(120 / Math.max(W, H), 0.2, 0.5);
+    const Rpx = R * dpr;
+    const poseSig = [pose.yaw, pose.pitch, pose.roll, pose.sx, pose.sy];
+    const moves = [Rpx * (1 + D), Rpx * (1 + D), Rpx * 2, Rpx, Rpx * 2];
+    const lightKey = `${shape._id ??= ++shapeIds}|${R}|${D}|${dpr}|${la}|${base}|${look.shading}|${shadowK}|${highK}|${rimK}|${look.spread}`;
+    // Shade side (an inner shadow pushed toward the light) and occlusion all
+    // round the edge for the inflated look, in one buffer.
     const blur = R * (fabric ? 0.55 : look.shading === 'smooth' ? 0.7 : 0.45) * (look.spread ?? 1.4) / 1.4;
-    innerShadow(ctx, body, hole, rgba(darkC, clamp(0.55 * shadowK, 0, 1)), blur, lx * R * 0.32, ly * R * 0.32, dpr);
-    // Ambient occlusion all round the edge for the inflated look.
-    innerShadow(ctx, body, hole, rgba(darkC, clamp(0.28 * shadowK, 0, 1)), R * 0.18, 0, 0, dpr);
+    lightLayer(lc, ctx, 'shade', body, [
+      { color: rgba(darkC, clamp(0.62 * shadowK, 0, 1)), blur, ox: lx * R * 0.32, oy: ly * R * 0.32 },
+      { color: rgba(darkC, clamp(0.32 * shadowK, 0, 1)), blur: R * 0.16, ox: 0, oy: 0 },
+    ], dpr, q, lightKey, poseSig, moves);
 
     // Lit side.
-    ctx.save();
-    ctx.clip(body);
     const hx = lx * R * 0.42 + R * D * s * 0.8, hy = ly * R * 0.42;
     const spread = look.spread ?? 1.4;
-    const g = ctx.createRadialGradient(hx, hy, 0, hx, hy, R * 0.95 * spread);
+    const g = lc.createRadialGradient(hx, hy, 0, hx, hy, R * 0.95 * spread);
     const hiA = (fabric ? 0.2 : look.shading === 'plastic' ? 0.3 : 0.26) * highK;
     g.addColorStop(0, `rgba(255,255,255,${clamp(hiA)})`);
     g.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(-R * 3, -R * 3, R * 6, R * 6);
-    ctx.restore();
+    lc.fillStyle = g;
+    cover();
 
-    // Back light / Fresnel rim on the far side from the key.
+    // Back light / Fresnel rim on the far side from the key. Velvet and plush
+    // scatter most at grazing angles, so the fabric rim is a soft sheen.
     if (rimK > 0 && look.shading !== 'smooth') {
-      const rimCol = look.shading === 'plastic' ? 'rgba(255,255,255,0.75)' : rgba(shade(base, 0.35), 0.9);
-      innerShadow(ctx, body, hole, rimCol, R * (look.shading === 'crisp' ? 0.02 : 0.08) * (0.6 + rimK), -lx * R * 0.05 * (0.5 + rimK), -ly * R * 0.05 * (0.5 + rimK), dpr);
+      const rimCol = look.shading === 'plastic' ? 'rgba(255,255,255,0.75)' : rgba(shade(base, fabric ? 0.32 : 0.35, 0, fabric ? 0.75 : 1), fabric ? 0.75 : 0.9);
+      lightLayer(lc, ctx, 'rim', body, [{
+        color: rimCol,
+        blur: R * (look.shading === 'crisp' ? 0.02 : 0.08) * (0.6 + rimK),
+        ox: -lx * R * 0.05 * (0.5 + rimK), oy: -ly * R * 0.05 * (0.5 + rimK),
+      }], dpr, Math.min(1, q * 1.5), lightKey, poseSig, moves);
     }
 
     if (look.shading === 'plastic') {
       // Hot spot and a window reflection.
-      ctx.save();
-      ctx.clip(body);
+      lc.save();
       const px = lx * R * 0.48 + R * D * s * 0.9, py = ly * R * 0.5 + R * D * sp;
-      const hs = ctx.createRadialGradient(px, py, 0, px, py, R * 0.22 * spread);
+      const hs = lc.createRadialGradient(px, py, 0, px, py, R * 0.22 * spread);
       hs.addColorStop(0, `rgba(255,255,255,${clamp(0.85 * highK / 1.3)})`);
       hs.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = hs;
-      ctx.fillRect(-R * 3, -R * 3, R * 6, R * 6);
-      ctx.translate(px, py);
-      ctx.rotate(la + Math.PI / 2);
-      ctx.fillStyle = `rgba(255,255,255,${clamp(0.55 * highK / 1.3)})`;
-      roundRect(ctx, -R * 0.13, -R * 0.045, R * 0.26, R * 0.09, R * 0.045);
-      ctx.fill();
-      ctx.restore();
-    }
-    if (look.shading === 'crisp') {
-      ctx.strokeStyle = rgba(darkC, 0.55);
-      ctx.lineWidth = Math.max(1, R * 0.025);
-      ctx.stroke(body);
+      lc.fillStyle = hs;
+      cover();
+      lc.translate(px, py);
+      lc.rotate(la + Math.PI / 2);
+      lc.fillStyle = `rgba(255,255,255,${clamp(0.55 * highK / 1.3)})`;
+      roundRect(lc, -R * 0.13, -R * 0.045, R * 0.26, R * 0.09, R * 0.045);
+      lc.fill();
+      lc.restore();
     }
   }
 
-  // Fur halo at the silhouette.
+  // Face and glasses ride on the front of the body.
+  const faceA = smoothstep((facing - 0.18) / 0.3);
+  const fs = shape.faceScale * (look.faceScale ?? 1);
+  if (faceA > 0) {
+    lc.save();
+    lc.globalAlpha = faceA;
+    const fx = pose.lookX * 0.09, fy = shape.faceY + pose.lookY * 0.07;
+    const [X, Y] = proj(fx, fy, Math.min(1, D * 1.4));
+    lc.transform(R * c0, -R * s * sp, 0, R * cp, X, Y);
+    drawFace(lc, look, pose, fs, R);
+    if (look.glasses && look.glasses !== 'none') drawGlasses(lc, look.glasses, acc, fs);
+    lc.restore();
+  }
+
+  if (look.shading === 'crisp') {
+    // Behind the body, so only the silhouette's outline shows, not every slice.
+    lc.globalCompositeOperation = 'destination-over';
+    lc.strokeStyle = rgba(darkC, 0.55);
+    lc.lineWidth = Math.max(2, R * 0.05);
+    lc.stroke(body);
+  }
+  lc.globalCompositeOperation = 'source-over';
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (bw > 0 && bh > 0) ctx.drawImage(lc.canvas, bx0, by0, bw, bh, bx0, by0, bw, bh);
+  ctx.restore();
+
+  // Fur halo at the silhouette: tufts lit from the key side.
   if (fabric) {
     const fl = look.furLength ?? 1;
     const fuzz = look.furFuzz ?? 0.9;
     const grav = look.furGravity ?? 0.9;
     const curl = look.furCurl ?? 0.7;
-    const list = strands(shape, Math.round(380 * (look.furDensity ?? 1.6) / 1.6 * (0.4 + fuzz)));
-    const paths = [new Path2D(), new Path2D(), new Path2D()];
+    const list = strands(shape, Math.round(900 * (look.furDensity ?? 1.6) / 1.6 * (0.4 + fuzz)));
+    const TONES = 3;
+    const paths = Array.from({ length: TONES }, () => new Path2D());
     const swayT = time * 2.2;
     for (const st of list) {
       const w = Math.sqrt(1 - st.u * st.u);
       const k = profile(st.u);
       // Normal of the cushion at that point, then turned with the head.
-      let Nx = st.nx * w, Ny = st.ny * w, Nz = st.u;
+      const Nx = st.nx * w, Ny = st.ny * w, Nz = st.u;
       const nx1 = Nx * c0 + Nz * s, nz1 = -Nx * s + Nz * c0;
       const ny1 = Ny * cp + nz1 * sp, nzv = nz1 * cp - Ny * sp;
       const a = Math.abs(nzv);
@@ -409,45 +627,29 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }) {
       let dx = nx1 + st.jitter * 0.5, dy = ny1 + grav * 0.45 + Math.sin(swayT + st.tone * 6) * 0.04;
       const l = Math.hypot(dx, dy) || 1;
       dx /= l; dy /= l;
-      const len = R * 0.055 * fl * st.len * (0.6 + fuzz * 0.6) * (1 - a * 1.2);
+      const len = R * 0.05 * fl * st.len * (0.6 + fuzz * 0.6) * (1 - a * 1.2);
       const bx = -dy * st.bend * curl * len * 0.8, by = dx * st.bend * curl * len * 0.8;
-      const p = paths[st.tone < 0.45 ? 0 : st.tone < 0.8 ? 1 : 2];
+      const lit = clamp(0.5 + 0.5 * (nx1 * lx + ny1 * ly) + (st.tone - 0.5) * 0.5, 0, 0.999);
+      const p = paths[Math.floor(lit * TONES)];
+      // Short enough that a straight stroke with a bent tip reads as a curl.
       p.moveTo(X - dx * len * 0.5, Y - dy * len * 0.5);
-      p.quadraticCurveTo(X + dx * len * 0.3 + bx, Y + dy * len * 0.3 + by, X + dx * len, Y + dy * len);
+      p.lineTo(X + dx * len + bx, Y + dy * len + by);
     }
-    ctx.lineCap = 'round';
-    ctx.lineWidth = Math.max(0.6, R * 0.014);
-    ctx.strokeStyle = shade(base, -0.06, 0, 0.85);
-    ctx.stroke(paths[0]);
-    ctx.strokeStyle = shade(base, 0.04, 0, 0.85);
-    ctx.stroke(paths[1]);
+    ctx.lineCap = 'butt';
+    // Tones match the body where each strand grows: shaded, mid and lit.
     ctx.lineWidth = Math.max(0.5, R * 0.01);
-    ctx.strokeStyle = shade(base, 0.2, 0, 0.8);
-    ctx.stroke(paths[2]);
+    const tones = [rgba(shade(base, -0.16, 3, 0.9), 0.9), rgba(shade(base, -0.03, 0, 0.9), 0.85), rgba(shade(base, 0.12, 0, 0.8), 0.8)];
+    paths.forEach((p, i) => { ctx.strokeStyle = tones[i]; ctx.stroke(p); });
   }
 
-  // Face, glasses and bow tie ride on the front of the body.
-  const faceA = smoothstep((facing - 0.18) / 0.3);
-  const fs = shape.faceScale * (look.faceScale ?? 1);
-  if (faceA > 0) {
+  if (faceA > 0 && look.bowTie) {
+    const by = Math.min(shape.faceY + 0.5 * fs, shape.bounds.maxY - 0.2);
+    const [bX, bY] = proj(0, by, Math.min(1, D * 1.2));
     ctx.save();
-    ctx.clip(body);
     ctx.globalAlpha = faceA;
-    const fx = pose.lookX * 0.09, fy = shape.faceY + pose.lookY * 0.07;
-    const [X, Y] = proj(fx, fy, Math.min(1, D * 1.4));
-    ctx.transform(R * c0, -R * s * sp, 0, R * cp, X, Y);
-    drawFace(ctx, look, pose, fs, R);
-    if (look.glasses && look.glasses !== 'none') drawGlasses(ctx, look.glasses, acc, fs);
+    ctx.transform(R * c0, -R * s * sp, 0, R * cp, bX, bY);
+    drawBowTie(ctx, acc, fabric);
     ctx.restore();
-    if (look.bowTie) {
-      const by = Math.min(shape.faceY + 0.5 * fs, shape.bounds.maxY - 0.2);
-      const [bX, bY] = proj(0, by, Math.min(1, D * 1.2));
-      ctx.save();
-      ctx.globalAlpha = faceA;
-      ctx.transform(R * c0, -R * s * sp, 0, R * cp, bX, bY);
-      drawBowTie(ctx, acc, fabric);
-      ctx.restore();
-    }
   }
 
   sideParts.filter((p) => p.z >= 0).forEach((p) => p.draw());

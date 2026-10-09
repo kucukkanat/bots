@@ -30,6 +30,8 @@ export const SHADINGS = ['fabric', 'plastic', 'smooth', 'crisp', 'flat'];
 export const HATS = ['none', 'beanie', 'party', 'crown', 'beret', 'tophat'];
 export const GLASSES = ['none', 'round', 'square', 'shades'];
 
+const FACE_KEYS = ['lookX', 'lookY', 'eyeOpen', 'happy', 'smile', 'mouthOpen'];
+
 const STATE_WORDS = { default: 'idle', working: 'working', sleeping: 'sleeping' };
 
 function pageTheme() {
@@ -59,10 +61,21 @@ export function resolveLook(opts) {
 
 const live = new Set();
 let raf = 0, last = 0;
+// Frame budget. Every avatar's simulation runs every frame, but when the page
+// can't keep up (many avatars, a slow GPU) they take turns drawing: with a
+// stride of 2 each one redraws every other frame, so the page holds its frame
+// rate and every avatar still moves in real time, just in fewer steps.
+let stride = 1, turn = 0, interval = 1000 / 60, calm = 0;
 function frame(now) {
-  const dt = last ? (now - last) / 1000 : 1 / 60;
+  const ms = last ? now - last : 1000 / 60;
+  const dt = ms / 1000;
   last = now;
-  for (const bot of live) bot._tick(dt);
+  interval += (Math.min(ms, 100) - interval) * 0.1;
+  if (interval > 24 && stride < 4) { stride++; interval = 1000 / 60; calm = 0; }
+  else if (stride > 1 && interval < 18) { if ((calm += ms) > 3000) { stride--; calm = 0; } }
+  else calm = 0;
+  let i = turn++;
+  for (const bot of live) bot._tick(dt, i++ % stride === 0);
   raf = live.size ? requestAnimationFrame(frame) : 0;
   if (!raf) last = 0;
 }
@@ -164,7 +177,7 @@ export class BotAvatar {
     else stopLoop(this);
   }
 
-  _tick(dt) {
+  _tick(dt, drawTurn = true) {
     if (this.options.interactive && pointer) {
       const r = this.canvas.getBoundingClientRect();
       const R = this.options.size * BODY;
@@ -174,7 +187,23 @@ export class BotAvatar {
       this.sim.setPointer(d < 5 && d > 0.05 ? { x: Math.max(-1, Math.min(1, dx / 2.5)), y: Math.max(-1, Math.min(1, dy / 2.5)) } : null);
     } else this.sim.setPointer(null);
     this.sim.update(dt);
-    this.draw();
+    if (drawTurn && this._changed()) this.draw();
+  }
+
+  /**
+   * Whether the pose has moved far enough since the last drawn frame to show:
+   * a quarter of a device pixel anywhere on the body, or any change of face.
+   * A resting bot breathes in sub-pixel steps, so most of its frames are free.
+   */
+  _changed() {
+    const p = this.sim.pose, q = this._drawn;
+    if (!q || p.sleep > 0.05) return true;
+    const px = this.options.size * BODY * this.dpr;
+    const geo = (Math.abs(p.yaw - q.yaw) + Math.abs(p.pitch - q.pitch)) * 1.6 + Math.abs(p.roll - q.roll) * 2
+      + Math.abs(p.x - q.x) + Math.abs(p.y - q.y) + Math.abs(p.sx - q.sx) + Math.abs(p.sy - q.sy) * 2;
+    if (geo * px > 0.25) return true;
+    for (const k of FACE_KEYS) if (Math.abs(p[k] - q[k]) > 0.01) return true;
+    return false;
   }
 
   /** The pose drawn right now. */
@@ -187,6 +216,7 @@ export class BotAvatar {
   }
 
   draw() {
+    this._drawn = this.pose;
     drawBot(this.ctx, { size: this.options.size, dpr: this.dpr, pose: this.pose, look: this.look, time: this.sim.time });
   }
 

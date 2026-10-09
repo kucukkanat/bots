@@ -87,6 +87,19 @@ import { BotAvatar } from '@hackdonalds/bots/react';
 
 `/playground/` lets you design a bot (shape, custom outline, colour, face, material, fur, things to wear, motion), turn it round by dragging, copy the code for HTML / JS / React, share a link, download a PNG, save a crew in your browser, and **publish to GitHub Pages**: it downloads a standalone `index.html` with your bot or crew, ready to upload to any repository with Pages turned on.
 
+## How it renders
+
+Every frame is plain 2D canvas, built to stay cheap with many avatars on a page:
+
+- **Adaptive depth.** The body is its outline stacked through its depth, but only with as many slices as the turn needs: one when facing you, more (about 3 device pixels apart) as front and back pull apart.
+- **Body layer, no clips.** Everything on the body (turn shading, fur, light, face) is painted into one shared offscreen layer with `source-atop`, then composited in a single draw of just the body's box.
+- **Deferred, reused light.** Inner shadow, occlusion and rim are blurred in a small buffer (≈120 px) and stretched back over the crisp silhouette. Each avatar keeps its buffers between frames: a hop only shifts them, and they're re-lit only once the outline has changed by about a buffer pixel.
+- **Baked plush.** The fur is baked once per look into a skin in the body's own coordinates and mapped onto the front of the body with the turn, so the pile stays on the surface. It's a combed flow field (hair grows from a crown and falls with gravity, twisted into clumps by noise), each strand a dark root and a pale tip lit with a Kajiya–Kay fibre term so the nap shows soft bands of sheen, plus mottling and grain. A fine fringe of strands, toned by the light, softens the silhouette.
+- **Only draw what changed.** A frame is skipped when the pose has moved less than a quarter of a device pixel, so a resting avatar breathing in sub-pixel steps is mostly free. Off-screen and reduced-motion avatars don't animate.
+- **Frame budget.** All avatars share one animation loop. When the page can't keep up, they take turns redrawing while their simulations keep real time, so the page keeps its frame rate.
+
+`/bench/grid.html?n=30&size=96` (with `npm start` running) renders a grid of avatars and reports the frame rate.
+
 ## Develop
 
 ```bash
