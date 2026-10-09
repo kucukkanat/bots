@@ -34,7 +34,8 @@ jobs:
       - name: Assemble site
         run: |
           mkdir _site
-          cp -r index.html assets playground src LICENSE _site/
+          cp -r index.html assets playground src docs c LICENSE _site/
+          rm -rf _site/docs/src _site/docs/build.mjs _site/docs/screenshots.mjs
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
         with:

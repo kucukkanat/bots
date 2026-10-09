@@ -120,7 +120,8 @@ function render() {
   document.title = n ? `${title} · bots` : 'Crew pages · bots';
   if (!n) { showExample(); return; }
 
-  const size = n === 1 ? 200 : n <= 4 ? 128 : 104;
+  const size = n === 1 ? 200 : n <= 4 ? 128 : n <= 8 ? 104 : 88;
+  list.classList.toggle('many', n > 8);
   crew.members.forEach((m, i) => {
     const fig = document.createElement('figure');
     fig.className = 'member';
@@ -132,10 +133,13 @@ function render() {
     const kind = document.createElement('span');
     kind.className = 'kind';
     kind.textContent = presets[m.opts.type]?.label || m.opts.type || '';
+    kind.hidden = kind.textContent === m.name;
     const acts = document.createElement('div');
     acts.className = 'acts';
-    const open = Object.assign(document.createElement('a'), { href: studioLink(m), textContent: 'Open in studio' });
-    const dna = Object.assign(document.createElement('button'), { type: 'button', textContent: 'Copy DNA' });
+    const open = Object.assign(document.createElement('a'), { href: studioLink(m), textContent: 'Edit', title: 'Edit in the studio' });
+    open.setAttribute('aria-label', `Edit ${m.name} in the studio`);
+    const dna = Object.assign(document.createElement('button'), { type: 'button', textContent: 'Copy DNA', title: 'Copy Bot DNA' });
+    dna.setAttribute('aria-label', `Copy ${m.name}'s DNA`);
     dna.addEventListener('click', () => copy(m.dna, `${m.name}'s DNA copied`));
     acts.append(open, dna);
     fig.append(slot, cap, kind, acts);
