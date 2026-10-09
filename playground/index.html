@@ -3,20 +3,34 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Bot Playground</title>
-  <meta name="description" content="Design your own animated bot avatar, save a crew, and publish it to GitHub Pages." />
+  <title>Bot Studio</title>
+  <meta name="description" content="Design your own animated bot avatar, try it as an agent, export it, save a crew and publish it to GitHub Pages." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="modulepreload" href="../src/index.js" />
   <link rel="stylesheet" href="../assets/site.css" />
   <link rel="stylesheet" href="playground.css" />
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
 </head>
-<body>
+<body class="studio-page">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></symbol>
+      <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5" /><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" /></symbol>
+      <symbol id="i-dice" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4" /><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none" /><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none" /><circle cx="15.5" cy="8.5" r="1.2" fill="currentColor" stroke="none" /><circle cx="8.5" cy="15.5" r="1.2" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" /></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" /><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" /></symbol>
+      <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" /></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></symbol>
+    </defs>
+  </svg>
+
   <header class="top">
     <div class="wrap wide">
       <a class="brand" href="../"><bot-avatar type="clover" size="32" interactive="false"></bot-avatar> bots</a>
-      <span class="crumb">Playground</span>
+      <span class="crumb">Studio</span>
       <nav class="nav">
         <a class="hide-sm" href="../#usage">Docs</a>
         <a class="hide-sm" href="https://github.com/kucukkanat/bots">GitHub</a>
@@ -25,75 +39,100 @@
     </div>
   </header>
 
-  <main class="wrap wide pg">
-    <section class="stage-col">
-      <div class="stage" id="stage" data-bg="light">
-        <div class="stage-bot" id="stage-bot"></div>
-        <div class="stage-hint" id="hint">Drag to turn · click to poke</div>
-        <div class="stage-bg seg" id="bg-seg" role="group" aria-label="Backdrop">
-          <button data-v="light" aria-pressed="true" title="Light">☀</button>
-          <button data-v="dark" aria-pressed="false" title="Dark">☾</button>
-          <button data-v="grid" aria-pressed="false" title="Grid">▦</button>
-          <button data-v="sunset" aria-pressed="false" title="Gradient">◒</button>
+  <main class="studio" id="studio">
+    <!-- Left: starting points, shapes and the saved crew. On narrow screens this
+         moves into the inspector as its first tab. -->
+    <aside class="library pane" id="library" aria-label="Library">
+      <section class="lib-sec">
+        <h2 class="sec-title">Starters</h2>
+        <div class="thumbs looks" id="looks"></div>
+      </section>
+      <section class="lib-sec">
+        <h2 class="sec-title">Shapes</h2>
+        <div class="thumbs shapes" id="shapes"></div>
+      </section>
+      <section class="lib-sec">
+        <h2 class="sec-title">Finish <span class="sec-note">on this shape</span></h2>
+        <div class="thumbs finishes" id="finishes"></div>
+      </section>
+      <section class="lib-sec crew-sec">
+        <div class="sec-head">
+          <h2 class="sec-title">Your crew <span class="sec-note" id="crew-count"></span></h2>
+          <button class="ibtn" type="button" id="crew-state" title="Change every crew member's state">All working</button>
         </div>
-      </div>
-      <div class="stage-bar">
-        <input id="name" class="name-input" placeholder="Name your bot" maxlength="40" aria-label="Bot name" />
-        <div class="seg" id="state-seg" role="group" aria-label="State">
-          <button data-v="default" aria-pressed="true">Idle</button>
-          <button data-v="working" aria-pressed="false">Working</button>
-          <button data-v="sleeping" aria-pressed="false">Sleeping</button>
-          <button data-v="listening" aria-pressed="false">Listening</button>
-          <button data-v="thinking" aria-pressed="false">Thinking</button>
-          <button data-v="speaking" aria-pressed="false">Speaking</button>
-          <button data-v="error" aria-pressed="false">Error</button>
-          <button data-v="success" aria-pressed="false">Success</button>
+        <p class="note" id="crew-empty">Bots you save live here, in this browser. Save a few, then publish them as a page of your own.</p>
+        <div class="crew" id="crew"></div>
+        <div class="crew-actions">
+          <button class="sbtn" type="button" id="save"><svg class="ic"><use href="#i-plus" /></svg><span>Save to crew</span></button>
+          <button class="sbtn primary" type="button" id="publish">Publish…</button>
         </div>
-      </div>
-      <div class="stage-actions">
-        <button class="btn small" id="random">🎲 Randomize</button>
-        <button class="btn small" id="reset">Reset</button>
-        <button class="btn small" id="save">＋ Save to crew</button>
-        <button class="btn small" id="share">🔗 Share link</button>
-        <button class="btn small" id="png">⬇ PNG</button>
-      </div>
+      </section>
+    </aside>
 
-      <div class="panel code-panel">
-        <div class="panel-head">
-          <h3>Use it</h3>
-          <div class="seg" id="code-seg" role="group" aria-label="Code format">
-            <button data-v="html" aria-pressed="true">HTML</button>
-            <button data-v="js" aria-pressed="false">JS</button>
-            <button data-v="react" aria-pressed="false">React</button>
+    <!-- Centre: the stage. -->
+    <section class="stage-pane" id="stage-pane" aria-label="Preview">
+      <div class="toolbar" role="toolbar" aria-label="Bot actions">
+        <input id="name" class="name-input" placeholder="Name your bot" maxlength="40" aria-label="Bot name" autocomplete="off" />
+        <div class="tool-group">
+          <button class="ibtn" type="button" id="undo" aria-label="Undo" title="Undo (Ctrl+Z)" disabled><svg class="ic"><use href="#i-undo" /></svg></button>
+          <button class="ibtn" type="button" id="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled><svg class="ic"><use href="#i-redo" /></svg></button>
+        </div>
+        <div class="tool-group">
+          <button class="ibtn" type="button" id="random" aria-label="Randomize" title="Randomize"><svg class="ic"><use href="#i-dice" /></svg><span class="lbl-wide">Randomize</span></button>
+          <button class="ibtn" type="button" id="save-top" aria-label="Save to crew" title="Save to crew"><svg class="ic"><use href="#i-plus" /></svg><span class="lbl-wide">Save</span></button>
+          <button class="ibtn" type="button" id="share" aria-label="Copy share link" title="Copy share link"><svg class="ic"><use href="#i-link" /></svg><span class="lbl-wide">Share</span></button>
+          <div class="menu-wrap">
+            <button class="ibtn accent" type="button" id="export-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="export-menu"><svg class="ic"><use href="#i-down" /></svg><span class="lbl-mid">Export</span></button>
+            <div class="menu" id="export-menu" role="menu" aria-label="Export" hidden>
+              <button role="menuitem" type="button" data-fmt="png">PNG <small>still, 4×</small></button>
+              <button role="menuitem" type="button" data-fmt="gif">GIF <small>animated</small></button>
+              <button role="menuitem" type="button" data-fmt="apng">APNG <small>animated, full colour</small></button>
+              <button role="menuitem" type="button" data-fmt="webm">WebM <small>video</small></button>
+              <button role="menuitem" type="button" data-fmt="sprite">Sprite sheet <small>PNG grid</small></button>
+              <button role="menuitem" type="button" data-fmt="sticker" data-needs="stickers">Sticker <small>PNG with outline</small></button>
+              <button role="menuitem" type="button" data-fmt="crew-stickers" data-needs="stickers">Crew sticker pack <small>.zip</small></button>
+            </div>
           </div>
         </div>
-        <pre class="code" id="code"></pre>
-        <button class="btn small copy" id="copy">Copy</button>
+      </div>
+
+      <div class="stage" id="stage" data-bg="light">
+        <div class="stage-bot" id="stage-bot"></div>
+        <div class="friend" id="friend" hidden></div>
+        <div class="caption" id="caption" aria-live="polite" hidden></div>
+        <div class="stage-hint" id="hint">Drag to turn · click to poke</div>
+        <div class="stage-bg" id="bg-seg" role="group" aria-label="Backdrop">
+          <button type="button" data-v="light" aria-pressed="true" title="Light backdrop" aria-label="Light backdrop"><i class="dot"></i></button>
+          <button type="button" data-v="dark" aria-pressed="false" title="Dark backdrop" aria-label="Dark backdrop"><i class="dot"></i></button>
+          <button type="button" data-v="grid" aria-pressed="false" title="Grid backdrop" aria-label="Grid backdrop"><i class="dot"></i></button>
+          <button type="button" data-v="sunset" aria-pressed="false" title="Gradient backdrop" aria-label="Gradient backdrop"><i class="dot"></i></button>
+        </div>
+      </div>
+
+      <div class="statebar seg-strip" id="state-seg" role="group" aria-label="State">
+        <button type="button" data-v="default" aria-pressed="true">Idle</button>
+        <button type="button" data-v="working" aria-pressed="false">Working</button>
+        <button type="button" data-v="thinking" aria-pressed="false">Thinking</button>
+        <button type="button" data-v="listening" aria-pressed="false">Listening</button>
+        <button type="button" data-v="speaking" aria-pressed="false">Speaking</button>
+        <button type="button" data-v="sleeping" aria-pressed="false">Sleeping</button>
+        <button type="button" data-v="success" aria-pressed="false">Success</button>
+        <button type="button" data-v="error" aria-pressed="false">Error</button>
       </div>
     </section>
 
-    <section class="controls-col" id="controls" aria-label="Bot settings"></section>
+    <!-- Right: the inspector. Panels are filled by app.js from a small schema. -->
+    <section class="inspector pane" id="inspector" aria-label="Settings">
+      <div class="tabs-strip" id="tabs" role="tablist" aria-label="Settings"></div>
+      <div class="panels" id="panels"></div>
+    </section>
   </main>
 
-  <section class="wrap wide crew-wrap">
-    <div class="panel">
-      <div class="panel-head">
-        <h3>Your crew <span class="count" id="crew-count"></span></h3>
-        <div class="crew-actions">
-          <button class="btn small" id="crew-state">All working</button>
-          <button class="btn small primary" id="publish">Publish to GitHub Pages</button>
-        </div>
-      </div>
-      <p class="muted" id="crew-empty">Bots you save live here, in this browser. Save a few, then publish them as a page of your own.</p>
-      <div class="crew" id="crew"></div>
-    </div>
-  </section>
-
-  <dialog id="publish-dialog" class="dialog">
+  <dialog id="publish-dialog" class="dialog" aria-labelledby="publish-h">
     <form method="dialog">
-      <h3>Publish to GitHub Pages</h3>
-      <p class="muted">Download a ready-to-host <code>index.html</code> with your bot (or your whole crew). It loads the library from a CDN, so it's the only file you need.</p>
-      <div class="seg" id="publish-seg" role="group" aria-label="What to publish">
+      <h3 id="publish-h">Publish to GitHub Pages</h3>
+      <p class="note">Download a ready-to-host <code>index.html</code> with your bot (or your whole crew). It loads the library from a CDN, so it's the only file you need.</p>
+      <div class="seg-strip" id="publish-seg" role="group" aria-label="What to publish">
         <button type="button" data-v="bot" aria-pressed="true">This bot</button>
         <button type="button" data-v="crew" aria-pressed="false">Whole crew</button>
       </div>
@@ -105,9 +144,9 @@
         <li>In a minute your bots are live at <code>https://&lt;you&gt;.github.io/my-bots/</code>.</li>
       </ol>
       <div class="dialog-actions">
-        <button class="btn small" value="cancel">Close</button>
-        <button class="btn small" type="button" id="publish-preview">Preview</button>
-        <button class="btn small primary" type="button" id="publish-download">Download index.html</button>
+        <button class="sbtn" value="cancel">Close</button>
+        <button class="sbtn" type="button" id="publish-preview">Preview</button>
+        <button class="sbtn primary" type="button" id="publish-download">Download index.html</button>
       </div>
     </form>
   </dialog>
