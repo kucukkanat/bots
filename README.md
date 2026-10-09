@@ -4,7 +4,7 @@
 
 Animated bot avatars for AI agents. Eighteen plush 3D shapes with living faces that look around, hop while they work and doze off between tasks — plus hats, glasses, headphones and bow ties. Drawn with WebGL in worker threads, with a plain 2D canvas fallback wherever either is missing: no build step, no dependencies.
 
-**[Live site](https://kucukkanat.github.io/bots/) · [Docs](https://kucukkanat.github.io/bots/docs/) · [Studio](https://kucukkanat.github.io/bots/playground/)**
+**[Live site](https://kucukkanat.github.io/bots/) · [Docs](https://kucukkanat.github.io/bots/docs/) · [Studio](https://kucukkanat.github.io/bots/playground/)** — installable as an app, and works offline after the first visit.
 
 <p align="center"><img src="docs/landing.png" alt="The bots landing page" width="100%" /></p>
 
