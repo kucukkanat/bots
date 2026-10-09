@@ -87,13 +87,19 @@ createBot('#agent', { type: 'cat', face: 'mouth', hat: 'party', bowTie: true, ac
 <p>Expression channels: `brow`, `browTilt`, `eyeWide`, `squint`, `smile` (−1 frown … 1), `mouthOpen`, `happy`, `dizzy`, `blushPulse`.</p>
 
 <h2>Things to wear</h2>
+<p>The quick way is one <code>wear</code> list, like dressing the bot: one hat, one pair of glasses, one thing round the neck, plus any extras.</p>
+```html
+<bot-avatar wear="party-hat round-glasses bow-tie"></bot-avatar>
+<bot-avatar wear="beanie bandana headphones cat-ears badge:AI" accessory-color="#5b5bf7"></bot-avatar>
+```
+<p>Names: <code>party-hat</code>, <code>top-hat</code>, <code>witch-hat</code> or any hat name (<code>beanie</code>, <code>crown</code>, a pack's <code>santa</code>…); <code>round-glasses</code>, <code>square-glasses</code>, <code>shades</code>; <code>bow-tie</code> or <code>bandana</code>; <code>headphones</code>; <code>cat-ears</code>, <code>bunny-ears</code>, <code>bear-ears</code>, <code>round-ears</code>; <code>antenna</code>, <code>antennae</code>; <code>badge:XYZ</code>. In JavaScript, <code>wear</code> also takes an array. The options below set the same things one by one, and win over the list.</p>
 ::table Option | Values | Default
 `hat` | `none`, `beanie`, `party`, `crown`, `beret`, `tophat`, `cap`, `witch`, `halo`, `bow`, or from a pack or your own | `none`
 `glasses` | `none`, `round`, `square`, `shades` | `none`
 `headphones`, `bowTie` | boolean | `false`
-`accessoryColor` | colour of hats, headphones and the bow tie | soft black
-`scarf`, `scarfColor` | boolean, colour | `false`
-`badge`, `badgeColor` | up to 3 characters on the body | —
+`accessoryColor` | one colour for everything worn: hats, headphones, bow tie, bandana and badge | each its own
+`scarf`, `scarfColor` | boolean; a colour of its own (else `accessoryColor`, else red) | `false`
+`badge`, `badgeColor` | up to 3 characters on the body; a colour of its own (else `accessoryColor`, else white) | —
 `ears` | `none`, `cat`, `bunny`, `bear`, `round` | `none`
 `antennae` | `auto`, `none`, `one`, `two` | `auto`
 `accessories` | images pinned to the body: `[{ src, x, y, size, rotate, layer }]` | —
@@ -143,7 +149,7 @@ createBot('#agent', {
 `material` | `shading`, `roundness`, `gloss`, `depth`
 `face` | `features` (`eyes`/`mouth`), `eyes: { style, size, gap, shine, iris }`, `brows`, `mouth`, `freckles`, `x`, `y`, `scale`, `blush`, `blushColor`, `ink`, `expression`
 `motion` | `speed`, `turn`, `blinkRate`, `glanceRate`, `breathing`, `jiggle`, `whirl`, `whirlColor`, `jump: { every, height, time, spin, squash, stretch, lean }`
-`wear` | `hat`, `glasses`, `headphones`, `bowTie`, `color`, `scarf`, `scarfColor`, `badge`, `badgeColor`, `ears`, `antennae`, `accessories`
+`wear` | a list (`'party-hat round-glasses bow-tie'`, or an array), or an object of `hat`, `glasses`, `headphones`, `bowTie`, `color`, `scarf`, `scarfColor`, `badge`, `badgeColor`, `ears`, `antennae`, `accessories`
 ::end
 
 <h2>DNA and identity</h2>

@@ -403,3 +403,9 @@ textarea.path { font-family: "JetBrains Mono", ui-monospace, monospace; font-siz
 @media (prefers-reduced-motion: reduce) {
   .thumb, .sbtn, .stage, .toast { transition: none; }
 }
+
+/* Wardrobe: picture tiles per slot */
+.thumbs.wear-grid { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; }
+.thumbs.wear-grid .thumb { font-size: 10.5px; border-radius: 12px; }
+.thumbs.wear-grid .thumb img { width: 44px; height: 44px; }
+.wear-sub { margin: 10px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--st-muted, #6b6875); }

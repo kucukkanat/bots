@@ -589,7 +589,7 @@ export function createBot(target, options) {
 
 export { STATES };
 export { registerShape, registerHat, registerState } from './plugins.js';
-export { STYLES, EXPRESSIONS, encodeDNA, decodeDNA, lookFromId, normalizeOptions } from './options.js';
+export { STYLES, EXPRESSIONS, encodeDNA, decodeDNA, lookFromId, normalizeOptions, parseWear } from './options.js';
 export { settings as renderSettings, stats as renderStats } from './pool.js';
 
 // Lazily loaded features: one line each, nothing fetched until used.

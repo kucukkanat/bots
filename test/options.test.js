@@ -107,3 +107,17 @@ test('APNG: signature, frame count and chunks', async () => {
   const i = text.indexOf('acTL');
   assert.equal(b[i + 7], 3);
 });
+
+test('wear: a list of things by name', async () => {
+  const { parseWear, normalizeOptions } = await import('../src/options.js');
+  assert.deepEqual(parseWear('party-hat round-glasses bow-tie'), { hat: 'party', glasses: 'round', bowTie: true, scarf: false });
+  assert.deepEqual(parseWear(['beanie', 'bandana', 'cat-ears', 'badge:OK']), { hat: 'beanie', scarf: true, bowTie: false, ears: 'cat', badge: 'OK' });
+  // One thing round the neck: the later one wins.
+  assert.deepEqual(parseWear('bow-tie bandana'), { bowTie: false, scarf: true });
+  assert.equal(parseWear('santa').hat, 'santa');
+  assert.deepEqual(parseWear('none'), {});
+  const o = normalizeOptions({ glasses: 'square', wear: 'top-hat shades' });
+  assert.equal(o.hat, 'tophat');
+  assert.equal(o.glasses, 'square', 'a flat option still wins');
+  assert.equal(normalizeOptions({ wear: { hat: 'crown' } }).hat, 'crown', 'the grouped object still works');
+});

@@ -45,7 +45,8 @@ function readOptions(el) {
   }
   for (const a of JSONS) if (el.hasAttribute(a)) {
     let v;
-    try { v = JSON.parse(el.getAttribute(a)); } catch { continue; }
+    // `wear` also takes a plain list: wear="party-hat round-glasses bow-tie".
+    try { v = JSON.parse(el.getAttribute(a)); } catch { if (a === 'wear') v = el.getAttribute(a); else continue; }
     // `face` is the eyes/mouth switch, so the grouped face object is face-options.
     if (a === 'face-options') o.face = { ...v, ...(o.face ? { features: o.face } : {}) };
     else o[camel(a)] = v;

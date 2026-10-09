@@ -94,6 +94,8 @@ An action, so it works in Svelte 4 and 5 with no compile step. The avatar's even
 
 ## Options
 
+Dress it with one list: `wear="party-hat round-glasses bow-tie"` (one hat, one pair of glasses, one thing round the neck, plus `headphones`, `cat-ears`, `antenna`, `badge:AI`…), coloured by `accessory-color`. The options below set the same things one by one.
+
 | Option | Values | Default |
 | --- | --- | --- |
 | `type` | clover, flower, triangle, square, blob, ghost, circle, drop, star, droid, mech, alien, hexagon, cat, cloud, pill, pebble, puddle | `clover` |
@@ -152,7 +154,7 @@ In HTML, groups take JSON: `<bot-avatar fur='{"pattern":"spots"}'>` (the face gr
 | `material` | `shading`, `roundness` (1 a pillow, 0 a slab), `gloss`, `depth` |
 | `face` | `features` (`eyes`/`mouth`), `eyes: { style, size, gap, shine, iris }`, `brows` (`auto`, `none`, `soft`, `thick`, `line`), `mouth` (`smile`, `cat`, `line`, `o`, `teeth`, `tongue`), `freckles`, `x`, `y`, `scale`, `blush`, `blushColor`, `ink`, `expression` |
 | `motion` | `speed`, `turn`, `blinkRate`, `glanceRate`, `breathing`, `jiggle`, `whirl`, `whirlColor`, `jump: { every, height, time, spin, squash, stretch, lean }` |
-| `wear` | `hat` (`beanie`, `party`, `crown`, `beret`, `tophat`, `cap`, `witch`, `halo`, `bow`, or your own), `glasses`, `headphones`, `bowTie`, `color`, `scarf`, `scarfColor`, `badge` (up to 3 characters), `badgeColor`, `ears` (`cat`, `bunny`, `bear`, `round`), `antennae` (`auto`, `none`, `one`, `two`), `accessories` |
+| `wear` | a list (`'party-hat round-glasses bow-tie'`, or an array), or `hat` (`beanie`, `party`, `crown`, `beret`, `tophat`, `cap`, `witch`, `halo`, `bow`, or your own), `glasses`, `headphones`, `bowTie`, `color`, `scarf`, `scarfColor`, `badge` (up to 3 characters), `badgeColor`, `ears` (`cat`, `bunny`, `bear`, `round`), `antennae` (`auto`, `none`, `one`, `two`), `accessories` |
 
 Eye styles: `round`, `oval`, `wide`, `dot`, `sleepy`, `happy`, `line`, `star`, `heart`.
 

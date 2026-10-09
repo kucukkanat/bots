@@ -594,46 +594,133 @@ async function ensureHat(name) {
 }
 
 const hatLabel = (n) => (n === 'tophat' ? 'Top hat' : n === 'none' ? 'None' : title(n));
-const hatGrid = h('div', { class: 'chips hat-grid', role: 'group', 'aria-label': 'Hat' });
-let hatPackShown = 'builtin';
-function renderHats(list) {
-  hatGrid.replaceChildren(...list.map((x) => h('button', {
-    type: 'button', class: 'chip', 'data-v': x.name, 'aria-pressed': String(opts.hat === x.name),
-    onclick: () => update({ hat: x.name }),
-  }, x.label || hatLabel(x.name))));
-}
-syncs.push(() => hatGrid.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String((opts.hat || 'none') === b.dataset.v))));
-const packTabs = h('div', { class: 'seg-strip mini', role: 'group', 'aria-label': 'Hat collection' },
-  h('button', { type: 'button', 'data-v': 'builtin', 'aria-pressed': 'true' }, 'Classic'),
-  ...PACKS.map((p) => h('button', { type: 'button', 'data-v': p.id, 'aria-pressed': 'false' }, p.label)));
-const setPackTab = segmented(packTabs, async (id) => {
-  hatPackShown = id;
-  if (id === 'builtin') { renderHats(HATS.map((name) => ({ name }))); return; }
-  hatGrid.replaceChildren(h('span', { class: 'note' }, 'Loading…'));
-  try {
-    const pack = await loadPack(id);
-    if (hatPackShown !== id) return;
-    renderHats([{ name: 'none' }, ...pack.hats]);
-  } catch {
-    if (hatPackShown !== id) return;
-    hatGrid.replaceChildren(h('span', { class: 'note' }, 'This pack isn’t in this build of the library yet.'));
-    packTabs.querySelector(`[data-v="${id}"]`).hidden = true;
-  }
-});
-renderHats(HATS.map((name) => ({ name })));
 
-tabPanel('wear', () => [
-  grp('Hat', h('div', { class: 'hat-picker' }, packTabs, hatGrid)),
-  grp('Things to wear',
-    seg('glasses', 'Glasses', GLASSES, ['None', 'Round', 'Square', 'Shades']),
-    toggles(toggle('headphones', 'Headphones'), toggle('bowTie', 'Bow tie'), toggle('scarf', 'Bandana')),
-    colors('accessoryColor', 'Colour', ['#F4EFE6', '#E85D4A', '#5B5BF7', '#2FCB7A', '#F2C14E', '#FF8FC8'], { auto: 'Soft black' }),
-    colors('scarfColor', 'Bandana', ['#D94F4F', '#3B82F6', '#22C55E', '#F2C14E', '#111111'], { auto: 'Red' })),
-  grp('Extras',
-    select('ears', 'Ears', EAR_STYLES, EAR_STYLES.map(title)),
-    select('antennae', 'Antennae', ['auto', 'none', 'one', 'two'], ["Shape's own", 'None', 'One', 'Two']),
-    text('badge', 'Badge', 'e.g. AI'),
-    colors('badgeColor', 'Badge colour', ['#FFFFFF', '#FFD34D', '#5B5BF7', '#E85D4A'], { auto: 'White' }))]);
+// The wardrobe: an outfit row, then four slots of picture tiles (the bot,
+// in its own shape and colour, wearing each thing). Tap to wear, tap again
+// to take it off. Head, Eyes and Neck hold one thing each; Extras mix.
+const WEAR_KEYS = ['hat', 'glasses', 'headphones', 'bowTie', 'scarf', 'ears', 'antennae', 'badge'];
+const OUTFITS = [
+  { name: 'Party', o: { hat: 'party', bowTie: true } },
+  { name: 'Cozy', o: { hat: 'beanie', scarf: true } },
+  { name: 'Spooky', o: { hat: 'witch', ears: 'cat' } },
+  { name: 'Nerd', o: { glasses: 'round', bowTie: true } },
+  { name: 'DJ', o: { headphones: true, glasses: 'shades' } },
+  { name: 'Royal', o: { hat: 'crown', scarf: true } },
+];
+const cleared = () => Object.fromEntries(WEAR_KEYS.map((k) => [k, undefined]));
+const neckOf = (o) => (o.bowTie ? 'bowTie' : o.scarf ? 'scarf' : 'none');
+/** Each tile: what it puts on, whether it's on now, and what tapping does. */
+const SLOTS = {
+  head: () => [{ v: 'none', label: 'None' }, ...HATS.filter((n) => n !== 'none').map((v) => ({ v, label: hatLabel(v) }))].map(({ v, label }) => ({
+    key: `hat:${v}`, label, wear: { hat: v === 'none' ? undefined : v },
+    on: () => (opts.hat || 'none') === v, tap: () => update({ hat: v === 'none' || opts.hat === v ? undefined : v }),
+  })),
+  eyes: () => GLASSES.map((v) => ({
+    key: `glasses:${v}`, label: v === 'none' ? 'None' : title(v), wear: { glasses: v, thumbZoom: 2.8, thumbDy: -0.07 },
+    on: () => (opts.glasses || 'none') === v, tap: () => update({ glasses: v === 'none' || opts.glasses === v ? undefined : v }),
+  })),
+  neck: () => [['none', 'None'], ['bowTie', 'Bow tie'], ['scarf', 'Bandana']].map(([v, label]) => ({
+    key: `neck:${v}`, label, wear: { bowTie: v === 'bowTie', scarf: v === 'scarf', thumbZoom: 2.1, thumbDy: 0.3 },
+    on: () => neckOf(opts) === v, tap: () => { const off = neckOf(opts) === v; update({ bowTie: (!off && v === 'bowTie') || undefined, scarf: (!off && v === 'scarf') || undefined }); },
+  })),
+  extras: () => [
+    ...EAR_STYLES.filter((v) => v !== 'none').map((v) => ({
+      key: `ears:${v}`, label: `${title(v)} ears`, wear: { ears: v },
+      on: () => opts.ears === v, tap: () => update({ ears: opts.ears === v ? undefined : v }),
+    })),
+    { key: 'headphones', label: 'Headphones', wear: { headphones: true }, on: () => !!opts.headphones, tap: () => update({ headphones: opts.headphones ? undefined : true }) },
+    ...[['one', 'Antenna'], ['two', 'Antennae']].map(([v, label]) => ({
+      key: `antennae:${v}`, label, wear: { antennae: v },
+      on: () => opts.antennae === v, tap: () => update({ antennae: opts.antennae === v ? undefined : v }),
+    })),
+    { key: 'badge', label: 'Badge', wear: { badge: opts.badge || 'AI' }, on: () => !!opts.badge, tap: () => update({ badge: opts.badge ? undefined : 'AI' }) },
+  ],
+};
+
+const wearTiles = []; // { b, img, item }
+function slotGrid(items) {
+  const grid = h('div', { class: 'thumbs wear-grid' });
+  for (const item of items) {
+    const [b, img] = thumbBtn(item.label, () => item.tap());
+    grid.append(b);
+    wearTiles.push({ b, img, item });
+  }
+  return grid;
+}
+// Pack hats join the Head slot in their own labelled rows, loaded when the tab first opens.
+function packRows() {
+  const box = h('div', {});
+  for (const p of PACKS) {
+    const slot = h('div', {}); // keeps the packs in order, whichever loads first
+    box.append(slot);
+    loadPack(p.id).then((pack) => {
+      if (!pack.hats.length) return;
+      slot.append(h('div', { class: 'wear-sub' }, p.label), slotGrid(pack.hats.map((x) => ({
+        key: `hat:${x.name}`, label: x.label || hatLabel(x.name), wear: { hat: x.name },
+        on: () => opts.hat === x.name, tap: () => update({ hat: opts.hat === x.name ? undefined : x.name }),
+      }))));
+      refreshWear(true);
+    }).catch(() => { /* pack not in this build */ });
+  }
+  return box;
+}
+// Tiles are drawn on the current shape and colours, in idle time.
+let wearBase = '', wearTimer = 0;
+function refreshWear(force) {
+  if (!wearTiles.length) return;
+  const base = { type: opts.type, color: opts.color, brightness: opts.brightness, saturation: opts.saturation, path: opts.path, face: opts.face,
+    accessoryColor: opts.accessoryColor };
+  const key = JSON.stringify(base);
+  if (key === wearBase && !force) return;
+  wearBase = key;
+  clearTimeout(wearTimer);
+  wearTimer = setTimeout(() => {
+    for (const { img, item } of wearTiles) thumbInto(img, `wear:${item.key}:${key}`, { ...base, ...item.wear }, false);
+  }, 250);
+}
+syncs.push(() => {
+  for (const { b, item } of wearTiles) b.setAttribute('aria-pressed', String(item.on()));
+  refreshWear();
+});
+
+/** One colour for everything worn; 'auto' gives each its own default. */
+function wearColors() {
+  const swatches = ['#2B2833', '#F4EFE6', '#E85D4A', '#5B5BF7', '#2FCB7A', '#F2C14E', '#FF8FC8'];
+  // The bandana and badge follow accessoryColor unless given their own.
+  const set = (c) => update({ accessoryColor: c, scarfColor: undefined, badgeColor: undefined }, { coalesce: 'wearColor' });
+  const lid = nextId('lbl');
+  const autoBtn = h('button', { type: 'button', class: 'swatch auto', title: 'Each its own', 'aria-label': 'Each its own colour', onclick: () => set(undefined) });
+  const btns = swatches.map((c) => h('button', { type: 'button', class: 'swatch', style: `background:${c}`, title: c, 'aria-label': c, onclick: () => set(c) }));
+  const picker = h('input', { type: 'color', class: 'picker', 'aria-label': 'Custom colour', title: 'Custom colour' });
+  picker.addEventListener('input', () => set(picker.value));
+  syncs.push(() => {
+    const v = opts.accessoryColor;
+    autoBtn.setAttribute('aria-pressed', String(v === undefined));
+    btns.forEach((b, i) => b.setAttribute('aria-pressed', String(!!v && swatches[i].toLowerCase() === v.toLowerCase())));
+    picker.classList.toggle('on', !!v && !swatches.some((x) => x.toLowerCase() === v.toLowerCase()));
+    if (v && /^#[0-9a-f]{6}$/i.test(v)) picker.value = v;
+  });
+  return row('Colour', h('div', { class: 'swatches', role: 'group', 'aria-labelledby': lid }, autoBtn, ...btns, picker));
+}
+
+const sameOutfit = (o) => WEAR_KEYS.every((k) => (opts[k] || undefined) === (o[k] || undefined));
+tabPanel('wear', () => {
+  const outfitBtns = OUTFITS.map((x) => h('button', { type: 'button', class: 'chip', onclick: () => { update({ ...cleared(), ...x.o, badge: opts.badge }); bot.react?.('happy'); } }, x.name));
+  const clearBtn = h('button', { type: 'button', class: 'chip', onclick: () => update(cleared()) }, 'Nothing');
+  syncs.push(() => OUTFITS.forEach((x, i) => outfitBtns[i].setAttribute('aria-pressed', String(sameOutfit({ ...x.o, badge: opts.badge })))));
+  const badgeText = text('badge', 'Badge text', 'e.g. AI');
+  syncs.push(() => { badgeText.hidden = !opts.badge; });
+  const panel = [
+    grp('Outfits', h('div', { class: 'chips' }, ...outfitBtns, clearBtn)),
+    grp('Head', slotGrid(SLOTS.head()), packRows()),
+    grp('Eyes', slotGrid(SLOTS.eyes())),
+    grp('Neck', slotGrid(SLOTS.neck())),
+    grp('Extras', slotGrid(SLOTS.extras()), badgeText),
+    grp('', wearColors()),
+  ];
+  queueMicrotask(() => refreshWear(true));
+  return panel;
+});
 
 // --- Material & light ----------------------------------------------------------------
 
@@ -861,16 +948,18 @@ let thumbSaveTimer = 0;
 const saveThumbs = () => { clearTimeout(thumbSaveTimer); thumbSaveTimer = setTimeout(() => store.set(THUMB_KEY, JSON.stringify(thumbStore)), 1000); };
 const memThumbs = new Map();
 
-function renderThumb(o, size = 48) {
+function renderThumb({ thumbZoom = 1, thumbDy = 0, ...o }, size = 48) {
   const scale = Math.min(2, Math.max(1, devicePixelRatio || 1));
-  const look = resolveLook({ ...o, size, theme: 'light', floorShadow: false });
-  const total = size * OVERSCAN, box = size * 1.25;
+  // A zoomed tile draws the bot bigger and crops round a point `thumbDy` (of the box) off centre.
+  const big = size * thumbZoom;
+  const look = resolveLook({ ...o, size: big, theme: 'light', floorShadow: false });
+  const total = big * OVERSCAN, box = size * 1.25;
   const tmp = document.createElement('canvas');
   tmp.width = tmp.height = Math.round(total * scale);
-  renderMod.drawBot(tmp.getContext('2d'), { size, dpr: scale, pose: { ...restPose('default'), yaw: 0.28, lookX: 0.15 }, look, time: 0 });
+  renderMod.drawBot(tmp.getContext('2d'), { size: big, dpr: scale, pose: { ...restPose('default'), yaw: 0.28, lookX: 0.15 }, look, time: 0 });
   const c = document.createElement('canvas');
   c.width = c.height = Math.round(box * scale);
-  c.getContext('2d').drawImage(tmp, -((total - box) / 2) * scale, -((total - box) / 2) * scale);
+  c.getContext('2d').drawImage(tmp, -((total - box) / 2) * scale, -((total - box) / 2 + thumbDy * box) * scale);
   const webp = c.toDataURL('image/webp', 0.86);
   return webp.startsWith('data:image/webp') ? webp : c.toDataURL('image/png');
 }

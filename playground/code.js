@@ -16,6 +16,24 @@ export function attrs(ch, size) {
   return parts;
 }
 
+// The things worn, as one `wear` list where they can be ('party-hat round-glasses bow-tie').
+const HAT_ITEM = { party: 'party-hat', tophat: 'top-hat', witch: 'witch-hat' };
+const GLASSES_ITEM = { round: 'round-glasses', square: 'square-glasses', shades: 'shades' };
+export function foldWear(ch) {
+  const out = { ...ch }, items = [];
+  const take = (k, item) => { if (item) { items.push(item); delete out[k]; } };
+  if (ch.hat && ch.hat !== 'none') take('hat', HAT_ITEM[ch.hat] || ch.hat);
+  if (ch.glasses && ch.glasses !== 'none') take('glasses', GLASSES_ITEM[ch.glasses]);
+  if (ch.bowTie === true) take('bowTie', 'bow-tie');
+  if (ch.scarf === true) take('scarf', 'bandana');
+  if (ch.headphones === true) take('headphones', 'headphones');
+  if (ch.ears && ch.ears !== 'none') take('ears', `${ch.ears}-ears`);
+  if (ch.antennae === 'one' || ch.antennae === 'two') take('antennae', ch.antennae === 'one' ? 'antenna' : 'antennae');
+  if (typeof ch.badge === 'string' && /^[^\s,]+$/.test(ch.badge)) take('badge', `badge:${ch.badge}`);
+  if (items.length) out.wear = items.join(' ');
+  return out;
+}
+
 const packUrl = (lib, id) => lib.replace(/index\.js$/, `packs/${id}.js`);
 /** Lay attributes out on one line, or one per line once they get long. */
 const tag = (name, parts, indent = '') => {
@@ -30,6 +48,7 @@ const jsValue = (v) => (typeof v === 'string' ? `'${v.replace(/\\/g, '\\\\').rep
  * `packs` are hat packs to import alongside the library.
  */
 export function snippet(kind, ch, { lib, packs = [], size = 96 }) {
+  ch = foldWear(ch);
   const all = { ...ch, size };
   if (kind === 'html') {
     const extra = packs.map((p) => `<script type="module" src="${packUrl(lib, p)}"></script>\n`).join('');
@@ -59,7 +78,7 @@ export function snippet(kind, ch, { lib, packs = [], size = 96 }) {
 export function pageHtml({ members, title, lib, home, packs = [] }) {
   title = title || (members.length > 1 ? 'My bots' : members[0].name);
   const size = members.length > 1 ? 128 : 220;
-  const figures = members.map((m) => `      <figure>\n        <bot-avatar ${attrs(m.opts, size).join(' ')}></bot-avatar>\n        <figcaption>${esc(m.name)}</figcaption>\n      </figure>`).join('\n');
+  const figures = members.map((m) => `      <figure>\n        <bot-avatar ${attrs(foldWear(m.opts), size).join(' ')}></bot-avatar>\n        <figcaption>${esc(m.name)}</figcaption>\n      </figure>`).join('\n');
   const extra = packs.map((p) => `\n  <script type="module" src="${packUrl(lib, p)}"></script>`).join('');
   return `<!doctype html>
 <html lang="en">
