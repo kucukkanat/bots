@@ -1,0 +1,86 @@
+{
+  "name": "@kucukkanat/bots",
+  "version": "1.1.0",
+  "description": "Plush animated avatars for AI agents: eighteen 3D shapes with living faces, agent states, lip-sync from text, moods and hats. WebGL with a 2D fallback, in worker threads, no dependencies. Web component, JS API, React, Vue and Svelte.",
+  "type": "module",
+  "main": "./dist/bots.js",
+  "module": "./dist/bots.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/bots.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "default": "./dist/react.js"
+    },
+    "./vue": {
+      "types": "./dist/vue.d.ts",
+      "default": "./dist/vue.js"
+    },
+    "./svelte": {
+      "types": "./dist/svelte.d.ts",
+      "default": "./dist/svelte.js"
+    },
+    "./export": {
+      "types": "./dist/export.d.ts",
+      "default": "./dist/export.js"
+    },
+    "./render": {
+      "types": "./dist/render.d.ts",
+      "default": "./dist/render.js"
+    },
+    "./packs/*": "./dist/packs/*.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": [
+    "./src/index.js",
+    "./src/packs/*.js",
+    "./dist/bots.js",
+    "./dist/chunk-*.js",
+    "./dist/packs/*.js"
+  ],
+  "peerDependencies": {
+    "react": ">=17",
+    "vue": ">=3",
+    "svelte": ">=4"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    },
+    "svelte": {
+      "optional": true
+    }
+  },
+  "keywords": [
+    "avatar",
+    "bot",
+    "agent",
+    "ai",
+    "animation",
+    "canvas",
+    "web-component",
+    "react",
+    "vue",
+    "svelte",
+    "mascot"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kucukkanat/bots.git"
+  },
+  "homepage": "https://kucukkanat.github.io/bots/",
+  "bugs": {
+    "url": "https://github.com/kucukkanat/bots/issues"
+  }
+}

@@ -1,0 +1,2 @@
+var t=1.5,o=.4,e=.04,n=["none","two-tone","gradient","tips","spots","stripes","belly","patches"],p=["round","oval","wide","dot","sleepy","happy","line","star","heart"],r=["smile","cat","line","o","teeth","tongue"],s=["auto","none","soft","thick","line"],c=["none","cat","bunny","bear","round"],a=["none","beanie","party","crown","beret","tophat","cap","witch","halo","bow"];export{t as a,o as b,e as c,n as d,p as e,r as f,s as g,c as h,a as i};
+//# sourceMappingURL=chunk-ZUVR2KZU.js.map
