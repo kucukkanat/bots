@@ -63,7 +63,7 @@ const NUMERIC = {
 const BOOLS = { headphones: false, bowTie: false, blush: false, eyeShine: true, interactive: true, paused: false, freckles: false, scarf: false };
 const STRS = {
   type: 'clover', state: 'default', face: 'eyes', shading: 'fabric', hat: 'none', glasses: 'none', color: undefined, ink: undefined, accessoryColor: undefined, path: undefined, label: undefined,
-  style: undefined, furPattern: 'none', furColor2: undefined, lightColor: undefined, fillColor: undefined, rimColor: undefined,
+  preset: undefined, furPattern: 'none', furColor2: undefined, lightColor: undefined, fillColor: undefined, rimColor: undefined,
   eyeStyle: 'round', irisColor: undefined, brows: 'auto', mouthStyle: 'smile', expression: 'neutral', whirlColor: undefined,
   scarfColor: undefined, badge: undefined, badgeColor: undefined, ears: 'none', antennae: 'auto',
 };
@@ -264,7 +264,7 @@ try { advToggle.checked = !!localStorage.getItem('bots.adv'); } catch {}
 controls.classList.toggle('show-adv', advToggle.checked);
 controls.append(h('div', { class: 'adv-bar' },
   h('label', { class: 'toggle' }, advToggle, 'Advanced controls'),
-  select('style', 'Style', ['', ...Object.keys(STYLES)], ['Custom', ...Object.keys(STYLES).map(title)])));
+  select('preset', 'Preset', ['', ...Object.keys(STYLES)], ['Custom', ...Object.keys(STYLES).map(title)])));
 
 group('Shape', true, shapeGrid, h('div', {}, h('span', { class: 'lbl muted', style: 'font-size:13px' }, 'Custom outline'), pathArea, chips));
 group('Colour', true,

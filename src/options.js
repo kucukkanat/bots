@@ -5,7 +5,8 @@
 // all resolve to plain flat options before anything is drawn, so none of them
 // costs a thing per frame.
 //
-// Precedence, lowest first: defaults < identity < dna < style < what you set.
+// Precedence, lowest first: defaults < identity < dna < preset < what you set.
+// (The option is `preset`, not `style`: `style` is HTML's and React's own.)
 
 import { mulberry32 } from './engine.js';
 import { presets } from './shapes.js';
@@ -99,7 +100,7 @@ const DNA_KEYS = [
   'eyeShine', 'irisColor', 'brows', 'mouthStyle', 'freckles', 'faceX', 'faceY', 'faceScale', 'expression', 'speed',
   'turn', 'blinkRate', 'glanceRate', 'breathing', 'jiggle', 'whirl', 'whirlColor', 'jumpEvery', 'jumpHeight', 'jumpTime',
   'jumpSpin', 'jumpSquash', 'jumpStretch', 'jumpLean', 'scarf', 'scarfColor', 'badge', 'badgeColor', 'ears', 'antennae',
-  'path', 'style', 'label',
+  'path', 'preset', 'label',
 ];
 const b64 = {
   enc: (s) => {
@@ -182,7 +183,7 @@ export function lookFromId(id) {
 
 /**
  * Flat options from anything the user gave: flat keys, grouped objects,
- * `style`, `dna` and `identity`.
+ * `preset`, `dna` and `identity`.
  */
 export function normalizeOptions(opts = {}) {
   const flat = {};
@@ -193,6 +194,6 @@ export function normalizeOptions(opts = {}) {
   for (const k of Object.keys(flat)) if (flat[k] === undefined) delete flat[k];
   const fromId = flat.identity ? lookFromId(flat.identity) : {};
   const fromDna = flat.dna ? decodeDNA(flat.dna) : {};
-  const style = STYLES[flat.style ?? fromDna.style] || {};
-  return { ...fromId, ...fromDna, ...style, ...flat };
+  const preset = STYLES[flat.preset ?? fromDna.preset] || {};
+  return { ...fromId, ...fromDna, ...preset, ...flat };
 }

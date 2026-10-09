@@ -14,7 +14,7 @@ const NUMBERS = ['size', 'brightness', 'saturation', 'depth', 'light', 'shadow',
   'blink-rate', 'glance-rate', 'breathing', 'jiggle', 'whirl'];
 const BOOLEANS = ['headphones', 'bow-tie', 'blush', 'eye-shine', 'paused', 'interactive', 'freckles', 'scarf'];
 const STRINGS = ['type', 'state', 'face', 'color', 'ink', 'shading', 'hat', 'glasses', 'accessory-color', 'path', 'label', 'theme',
-  'blush-color', 'renderer', 'quality', 'style', 'dna', 'identity', 'fur-pattern', 'fur-color2', 'light-color', 'fill-color',
+  'blush-color', 'renderer', 'quality', 'preset', 'dna', 'identity', 'fur-pattern', 'fur-color2', 'light-color', 'fill-color',
   'rim-color', 'eye-style', 'iris-color', 'brows', 'mouth-style', 'expression', 'whirl-color', 'scarf-color', 'badge',
   'badge-color', 'ears', 'antennae'];
 const JSONS = ['fur', 'material', 'face-options', 'motion', 'wear', 'accessories'];
@@ -79,7 +79,12 @@ export class BotAvatarElement extends Base {
     // Attributes removed fall back to the defaults.
     const o = { ...Object.fromEntries(ATTRS.map((a) => [camel(a), undefined])), faceOptions: undefined, ...DEFAULTS, ...readCssVars(this, readOptions(this)) };
     delete o.faceOptions;
-    this.style.width = this.style.height = `${o.size ?? 64}px`;
+    // Nothing changed (several attributes set in a row, or a re-read): no work.
+    const key = JSON.stringify(o);
+    if (key === this._last) return;
+    this._last = key;
+    const px = `${o.size ?? 64}px`;
+    if (this.style.width !== px) this.style.width = this.style.height = px;
     this.bot.set(o);
   }
   /** Re-read CSS custom properties (after a theme or class change). */

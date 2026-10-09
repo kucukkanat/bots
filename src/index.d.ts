@@ -23,7 +23,7 @@ export interface BotPose {
 export interface BotOptions {
   type?: BotType | (string & {});
   /** A named look that sets many options at once. */
-  style?: BotStyle;
+  preset?: BotStyle;
   /** A Bot DNA code (from `bot.dna`). */
   dna?: string;
   /** Any string: the same id always gets the same look. */

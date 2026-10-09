@@ -87,14 +87,14 @@ import { BotAvatar } from '@hackdonalds/bots/react';
 
 Everything below is optional: leave it out and the avatar looks, moves and costs exactly what it did. Most of it is resolved once, before drawing (presets, Bot DNA, ids, colours, fur patterns are baked into the fur texture), so turning it on costs nothing per frame; the rest (brows, trails, audio) costs only while it's showing.
 
-### Grouped options and styles
+### Grouped options and presets
 
 Flat options and grouped objects are interchangeable; groups are easier to read and write:
 
 ```js
 createBot('#agent', {
   type: 'cat',
-  style: 'teddy',                       // plush, teddy, velvet, mohair, felt, vinyl, clay, sticker, paper
+  preset: 'teddy',                      // plush, teddy, velvet, mohair, felt, vinyl, clay, sticker, paper
   fur: { length: 1.6, clumps: 0.6, pattern: 'stripes', color: '#8b5a2b', scale: 1.2 },
   light: { angle: 290, color: '#ffe7b3', fill: '#4c6fff', fillStrength: 0.4, rimColor: '#7ad7ff' },
   material: { roundness: 0.8, gloss: 0.4 },

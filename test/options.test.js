@@ -23,8 +23,8 @@ test('flat options pass through untouched', () => {
   assert.deepEqual(normalizeOptions({ type: 'cat', light: 200, face: 'eyes' }), { type: 'cat', light: 200, face: 'eyes' });
 });
 
-test('styles sit under what you set', () => {
-  const o = normalizeOptions({ style: 'teddy', furLength: 0.5 });
+test('presets sit under what you set', () => {
+  const o = normalizeOptions({ preset: 'teddy', furLength: 0.5 });
   assert.equal(o.furLength, 0.5);
   assert.equal(o.furCurl, STYLES.teddy.furCurl);
 });
