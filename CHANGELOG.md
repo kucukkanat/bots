@@ -7,6 +7,11 @@ All notable changes to `@kucukkanat/bots` are recorded here. The format follows
 ## [Unreleased] - 1.1.0
 
 ### Added
+- `wear` takes a list of things by name: `wear="party-hat round-glasses bow-tie"`
+  (or an array; `parseWear()` is exported). The bandana and badge follow
+  `accessoryColor` unless they have colours of their own. The Studio's Wear
+  tab is a wardrobe: outfits, then Head / Eyes / Neck / Extras picture tiles,
+  one colour; its code snippets use the `wear` list.
 - The site is a PWA: installable (manifest, icons rendered from the plush bot),
   and offline after the first visit. Each deploy precaches the whole site as
   one versioned set (`scripts/precache.mjs` writes it into `sw.js`), so pages

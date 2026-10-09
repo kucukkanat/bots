@@ -40,7 +40,8 @@ export interface BotOptions {
   light?: number | { angle?: number; color?: string; fill?: string; fillStrength?: number; rimColor?: string; shadow?: number; highlight?: number; rim?: number; spread?: number };
   material?: { shading?: BotShading; roundness?: number; gloss?: number; depth?: number };
   motion?: { speed?: number; turn?: number; blinkRate?: number; glanceRate?: number; breathing?: number; jiggle?: number; whirl?: number; whirlColor?: string; jump?: { every?: number; height?: number; time?: number; spin?: number; squash?: number; stretch?: number; lean?: number } };
-  wear?: { hat?: BotHat; glasses?: BotGlasses; headphones?: boolean; bowTie?: boolean; color?: string; scarf?: boolean; scarfColor?: string; badge?: string; badgeColor?: string; ears?: string; antennae?: string; accessories?: BotAccessory[] };
+  /** Things to wear: a list ('party-hat round-glasses bow-tie', or an array), or the grouped object. */
+  wear?: string | string[] | { hat?: BotHat; glasses?: BotGlasses; headphones?: boolean; bowTie?: boolean; color?: string; scarf?: boolean; scarfColor?: string; badge?: string; badgeColor?: string; ears?: string; antennae?: string; accessories?: BotAccessory[] };
   furClumps?: number;
   furPattern?: BotFurPattern;
   furColor2?: string;
@@ -281,3 +282,6 @@ export interface StickerOptions {
   duration?: number;
   fps?: number;
 }
+
+/** Options from a list of things to wear: 'party-hat round-glasses bow-tie' or an array; other names are hats; 'badge:AI' pins a badge. */
+export declare function parseWear(list: string | string[]): BotOptions;

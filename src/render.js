@@ -968,7 +968,9 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     ctx.save();
     ctx.globalAlpha = faceA;
     ctx.transform(R * c0, -R * s * sp, 0, R * cp, bX, bY);
-    drawSprite(ctx, sprite(`scarf|${look.scarfColor || '#d94f4f'}`, [-0.45, -0.12, 0.45, 0.38], R * dpr, (g) => drawScarf(g, look.scarfColor || '#d94f4f')));
+    // Worn things share accessoryColor unless they have their own.
+    const scarfC = look.scarfColor || look.accessoryColor || '#d94f4f';
+    drawSprite(ctx, sprite(`scarf|${scarfC}`, [-0.45, -0.12, 0.45, 0.38], R * dpr, (g) => drawScarf(g, scarfC)));
     ctx.restore();
   }
   if (faceA > 0 && look.badge) {
@@ -978,7 +980,8 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
     ctx.save();
     ctx.globalAlpha = faceA;
     ctx.transform(R * c0, -R * s * sp, 0, R * cp, bX, bY);
-    drawSprite(ctx, sprite(`badge|${look.badge}|${look.badgeColor}|${look.ink}`, 0.15, R * dpr, (g) => drawBadge(g, String(look.badge), look.badgeColor || '#ffffff', look.ink)));
+    const badgeC = look.badgeColor || look.accessoryColor || '#ffffff';
+    drawSprite(ctx, sprite(`badge|${look.badge}|${badgeC}|${look.ink}`, 0.15, R * dpr, (g) => drawBadge(g, String(look.badge), badgeC, look.ink)));
     ctx.restore();
   }
   if (faceA > 0 && look.bowTie) {
