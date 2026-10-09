@@ -132,7 +132,12 @@ export declare class BotAvatar {
   setState(state: BotState): this;
   poke(): void;
   draw(): void;
+  /** PNG data URL of the current frame. Synchronous: returns 'data:,' if called before the renderer has loaded on the main thread (it loads when the page is first idle); prefer toBlob(). */
   toDataURL(opts?: { full?: boolean; scale?: number }): string;
+  /** The current frame as an image (PNG by default), loading the renderer if needed. */
+  toBlob(opts?: { full?: boolean; scale?: number; type?: string; quality?: number }): Promise<Blob>;
+  /** Resolves once the avatar has a renderer (worker or main thread). */
+  readonly ready: Promise<this>;
   destroy(): void;
   /** Whether this avatar's frames are painted with WebGL. */
   readonly webgl: boolean;
@@ -194,6 +199,8 @@ export interface BotShape {
 }
 
 export declare function drawBot(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, frame: { size: number; dpr?: number; pose: BotPose; look: ReturnType<typeof resolveLook>; time?: number }, opts?: { gpu?: unknown; relaxed?: boolean }): void;
+/** Load the renderer on the main thread (drawBot needs it; avatars load it themselves). */
+export declare function loadRenderer(): Promise<{ drawBot: typeof drawBot }>;
 export declare function resolveLook(options: BotOptions): BotOptions & { shape: BotShape; color: string; ink: string; label: string };
 export declare function restPose(state: BotState): BotPose;
 export declare function jumpCurve(p: number, height: number, opts?: { squash?: number; stretch?: number }): { y: number; sx: number; sy: number; spin: number };

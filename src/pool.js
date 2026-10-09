@@ -8,8 +8,10 @@
 // if it never does, avatars stay on the main thread. Each worker has at most
 // one batch of frames in flight: while it's busy, newer poses replace queued
 // ones, so a slow thread draws less often instead of falling behind.
-
-import { GpuBody } from './gpu.js';
+//
+// The renderer (render.js and gpu.js) loads on the main thread only when it
+// has to draw there: no workers, a worker that failed to start, a canvas the
+// caller owns, or a snapshot (toDataURL). Workers import it themselves.
 
 /** Global switches. Change them before the first avatar is created. */
 export const settings = {
@@ -27,11 +29,43 @@ export const settings = {
 /** Frames drawn so far, on every thread (for benchmarks). */
 export const stats = { drawn: 0 };
 
+let renderMod = null, renderLoad = null;
+/**
+ * Load the renderer on this thread, once. Resolves to { drawBot, GpuBody }.
+ * A failed load is tried again on the next call.
+ */
+export function loadRenderer() {
+  return renderLoad ||= Promise.all([import('./render.js'), import('./gpu.js')]).then(
+    ([r, g]) => (renderMod = { drawBot: r.drawBot, GpuBody: g.GpuBody }),
+    (e) => { renderLoad = null; throw e; },
+  );
+}
+
+/** The renderer if it's loaded on this thread; else null, and it starts loading. */
+export function renderer() {
+  if (!renderMod) loadRenderer().catch(() => {});
+  return renderMod;
+}
+
+let prefetching = false;
+/**
+ * Fetch the renderer once the page is idle, so a synchronous snapshot
+ * (toDataURL) or a late fall back to main-thread drawing finds it ready.
+ */
+export function prefetchRenderer() {
+  if (prefetching || renderMod) return;
+  prefetching = true;
+  const go = () => { loadRenderer().catch(() => {}); };
+  if (typeof requestIdleCallback !== 'undefined') requestIdleCallback(go, { timeout: 5000 });
+  else setTimeout(go, 2000);
+}
+
 let mainGpu;
-/** The main thread's WebGL2 renderer, or null. */
+/** The main thread's WebGL2 renderer, or null (also until the renderer has loaded). */
 export function mainThreadGpu() {
+  if (!renderMod) return null;
   if (mainGpu === undefined) {
-    mainGpu = GpuBody.create({ allowSoftware: settings.softwareWebGL });
+    mainGpu = renderMod.GpuBody.create({ allowSoftware: settings.softwareWebGL });
     if (mainGpu) mainGpu.keep = settings.softwareWebGL;
   }
   return mainGpu && mainGpu.ok ? mainGpu : null;

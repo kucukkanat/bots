@@ -1,26 +1,49 @@
 {
   "name": "@kucukkanat/bots",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Animated bot avatars: eighteen plush 3D shapes with living faces, three states, hats and glasses. WebGL with a 2D canvas fallback, in worker threads, no dependencies. Web component, JS API and React wrapper.",
   "type": "module",
-  "main": "src/index.js",
-  "module": "src/index.js",
-  "types": "src/index.d.ts",
+  "main": "./dist/bots.js",
+  "module": "./dist/bots.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./src/index.d.ts", "default": "./src/index.js" },
-    "./react": { "types": "./src/react.d.ts", "default": "./src/react.js" },
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/bots.js" },
+    "./react": { "types": "./dist/react.d.ts", "default": "./dist/react.js" },
+    "./vue": { "types": "./dist/vue.d.ts", "default": "./dist/vue.js" },
+    "./svelte": { "types": "./dist/svelte.d.ts", "default": "./dist/svelte.js" },
+    "./export": { "types": "./dist/export.d.ts", "default": "./dist/export.js" },
+    "./render": { "types": "./dist/render.d.ts", "default": "./dist/render.js" },
+    "./packs/*": "./dist/packs/*.js",
     "./package.json": "./package.json"
   },
-  "files": ["src"],
-  "sideEffects": ["./src/index.js"],
+  "files": ["dist", "src"],
+  "sideEffects": [
+    "./src/index.js",
+    "./src/packs/*.js",
+    "./dist/bots.js",
+    "./dist/chunk-*.js",
+    "./dist/packs/*.js"
+  ],
   "scripts": {
+    "build": "node scripts/build.mjs",
     "test": "node --test test/*.test.js",
-    "start": "python3 -m http.server 8000"
+    "size": "node scripts/size.mjs",
+    "perf": "node scripts/perf.mjs",
+    "start": "python3 -m http.server 8000",
+    "prepublishOnly": "npm test && npm run build && npm run size"
   },
-  "peerDependencies": { "react": ">=17" },
-  "peerDependenciesMeta": { "react": { "optional": true } },
-  "keywords": ["avatar", "bot", "agent", "ai", "animation", "canvas", "web-component", "react", "mascot"],
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  },
+  "peerDependencies": { "react": ">=17", "vue": ">=3", "svelte": ">=4" },
+  "peerDependenciesMeta": {
+    "react": { "optional": true },
+    "vue": { "optional": true },
+    "svelte": { "optional": true }
+  },
+  "keywords": ["avatar", "bot", "agent", "ai", "animation", "canvas", "web-component", "react", "vue", "svelte", "mascot"],
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/kucukkanat/bots.git" },
-  "homepage": "https://kucukkanat.github.io/bots/"
+  "homepage": "https://kucukkanat.github.io/bots/",
+  "bugs": { "url": "https://github.com/kucukkanat/bots/issues" }
 }

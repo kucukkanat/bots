@@ -7,13 +7,8 @@ import { shade, rgba, clamp, luminance, mix, parseColor } from './color.js';
 import { mulberry32, smoothstep } from './engine.js';
 import { cssRgba, fringeQuads, invert } from './gpu.js';
 import { hatDef } from './plugins.js';
-
-/** The canvas is this much larger than the avatar's box, so hops never clip. */
-export const OVERSCAN = 1.5;
-/** Body radius as a fraction of the box. */
-export const BODY = 0.4;
-/** How far below the box centre the body's centre sits, as a fraction of the box. */
-export const RISE = 0.04;
+import { OVERSCAN, BODY, RISE, FUR_PATTERNS, EYE_STYLES, MOUTH_STYLES, BROWS, EAR_STYLES, HAT_STYLES } from './constants.js';
+export { OVERSCAN, BODY, RISE, FUR_PATTERNS, EYE_STYLES, MOUTH_STYLES, BROWS, EAR_STYLES, HAT_STYLES };
 
 const MIN_TURN = 0.14;
 /** Light buffers' resolution relative to the canvas, for the 2D renderer. */
@@ -343,8 +338,6 @@ function tintedSkin(skin, base, pattern = null) {
 }
 
 // --- Fur patterns ----------------------------------------------------------------
-
-export const FUR_PATTERNS = ['none', 'two-tone', 'gradient', 'tips', 'spots', 'stripes', 'belly', 'patches'];
 
 function furPatternOf(look, shape) {
   const kind = look.furPattern;
@@ -1079,10 +1072,6 @@ export function drawBot(ctx, { size, dpr = 1, pose, look, time = 0 }, { gpu = nu
 
 // --- Face --------------------------------------------------------------------
 
-export const EYE_STYLES = ['round', 'oval', 'wide', 'dot', 'sleepy', 'happy', 'line', 'star', 'heart'];
-export const MOUTH_STYLES = ['smile', 'cat', 'line', 'o', 'teeth', 'tongue'];
-export const BROWS = ['auto', 'none', 'soft', 'thick', 'line'];
-
 function star(ctx, x, y, r) {
   ctx.beginPath();
   for (let i = 0; i < 10; i++) {
@@ -1337,8 +1326,6 @@ function sprite(key, box, scale, paint) {
 }
 const drawSprite = (ctx, sp) => ctx.drawImage(sp.canvas, sp.x, sp.y, sp.w, sp.h);
 
-export const EAR_STYLES = ['none', 'cat', 'bunny', 'bear', 'round'];
-
 /** Ears on top of the head, behind the body (drawn under it, so steps reversed). */
 function drawEars(ctx, kind, shape, proj, R, c0, base, look) {
   const inner = look.blushColor || shade(base, 0.18, -15, 1.2);
@@ -1562,7 +1549,6 @@ function drawBowTie(ctx, acc, fabric) {
 
 // --- Hats --------------------------------------------------------------------
 
-export const HAT_STYLES = ['none', 'beanie', 'party', 'crown', 'beret', 'tophat', 'cap', 'witch', 'halo', 'bow'];
 const hatPaths = new Map();
 
 function drawHat(ctx, kind, acc, hw, s, lx, time, look) {
