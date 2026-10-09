@@ -24,9 +24,9 @@ await shoot('/docs/poster.html', 'hero.png', { width: 1280, height: 640, theme: 
 await shoot('/', 'landing.png', { height: 860 });
 // The gallery: every type on a crew page (c/), built from Bot DNA codes.
 const crew = (o) => '/c/#t=' + encodeURIComponent('The cast') + ',' + types.map((type) => `${encodeDNA({ type, ...o })}~${encodeURIComponent(presets[type].label)}`).join(',');
-await shoot(crew({}), 'gallery.png', { theme: 'dark', element: '#members', height: 2400 });
+await shoot(crew({}), 'gallery.png', { theme: 'dark', element: '#members', height: 2700 });
 await shoot(crew({ face: 'mouth' }), 'gallery-working.png', {
-  element: '#members', height: 2400,
+  element: '#members', height: 2700,
   before: async (p) => { await p.waitForTimeout(800); await p.click('#state-seg [data-v="working"]'); },
 });
 await shoot('/playground/#type=cat&hat=party&glasses=round&bowTie=true&face=mouth', 'playground.png', { width: 1440, height: 900 });

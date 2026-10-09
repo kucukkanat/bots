@@ -11,14 +11,15 @@ export default {
   type: 'owl', label: 'Owl', color: '#A68B6C', faceY: 0.06, faceScale: 1,
   outline: () => chaikin(polarUnion([
     circle(0, 0, 0.86),                                           // the round body
-    poly([[-0.55, -0.8], [0.55, -0.8], [0.62, -0.2], [-0.62, -0.2]]), // a broad, flattish head
-    poly([[-0.86, -0.3], [-0.78, -1.02], [-0.32, -0.8]]),         // ear tufts: short, splayed outward
-    poly([[0.86, -0.3], [0.32, -0.8], [0.78, -1.02]]),
+    poly([[-0.5, -0.8], [0.5, -0.8], [0.6, -0.2], [-0.6, -0.2]]), // a broad, flattish head
+    // Ear tufts: short, splayed outward; their bases sit inside the circle so the sides stay smooth.
+    poly([[-0.8, -0.2], [-0.78, -1.02], [-0.3, -0.78]]),
+    poly([[0.8, -0.2], [0.3, -0.78], [0.78, -1.02]]),
   ]), 3).map(([x, y]) => [x * (1 - 0.14 * Math.max(0, y)), y]),   // narrower below: top-heavy
   extras: {
     parts: [
       // Small wings folded at the sides; the rest flap is subtle and they beat while it thinks.
-      { kind: 'wings', y: 0.4, size: 0.48, style: 'leaf', color: '#8C7257', layer: 'back' },
+      { kind: 'wings', y: 0.4, size: 0.45, style: 'leaf', color: '#86684B', layer: 'back' },
     ],
   },
   temperament: 'scholar',
